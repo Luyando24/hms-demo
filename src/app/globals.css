@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --radius-4xl: 2.5rem;
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+}
+
+/* Utilities for glassmorphism and custom rounded corners */
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-lg border border-white/20;
+  }
+  .glass-dark {
+    @apply bg-slate-900/80 backdrop-blur-lg border border-slate-700/50;
+  }
+  .card-rounded {
+    @apply rounded-[2.5rem];
+  }
+}
