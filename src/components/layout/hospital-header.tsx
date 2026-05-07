@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Search, Bell, ChevronDown, Plus, HeartPulse, Menu, LogOut, User as UserIcon, Settings } from "lucide-react";
+import { Search, Bell, ChevronDown, Plus, HeartPulse, Menu, LogOut, User as UserIcon, Settings, LogIn } from "lucide-react";
 import { useMobileNav } from "./mobile-nav-context";
 import { useState, useEffect } from "react";
 import { signOut } from "@/app/login/actions";
 import { createClient } from "@/utils/supabase/client";
+import OPDCheckInModal from "../hospital/OPDCheckInModal";
 
 export function HospitalHeader() {
   const { toggle } = useMobileNav();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const supabase = createClient();
 
@@ -67,9 +69,12 @@ export function HospitalHeader() {
       {/* Right Controls */}
       <div className="flex items-center gap-6">
         {/* Quick Actions */}
-        <button className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-full text-sm font-semibold hover:bg-slate-800 transition-colors shadow-sm">
-          <Plus size={16} />
-          <span>New Admission</span>
+        <button 
+          onClick={() => setIsCheckInOpen(true)}
+          className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-full text-sm font-semibold hover:bg-brand-600 transition-colors shadow-sm"
+        >
+          <LogIn size={16} />
+          <span>OPD Check-in</span>
         </button>
 
         <div className="w-px h-6 bg-slate-200 hidden md:block" />
@@ -143,6 +148,10 @@ export function HospitalHeader() {
           )}
         </div>
       </div>
+      <OPDCheckInModal 
+        isOpen={isCheckInOpen}
+        onClose={() => setIsCheckInOpen(false)}
+      />
     </header>
   );
 }
