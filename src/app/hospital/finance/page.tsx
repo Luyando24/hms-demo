@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react";
-import { DollarSign, TrendingUp, TrendingDown, PieChart, ArrowUpRight, ArrowDownRight, Search, Plus, Calendar, Filter, FileText, Download } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, PieChart, ArrowUpRight, ArrowDownRight, Search, Plus, Calendar, Filter, FileText, Download, AlertCircle } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 
