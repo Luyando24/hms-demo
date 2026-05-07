@@ -23,6 +23,8 @@ import {
 import clsx from "clsx";
 import { useMobileNav } from "./mobile-nav-context";
 import { signOut } from "@/app/login/actions";
+import { useState, useEffect, useRef } from "react";
+import { createClient } from "@/utils/supabase/client";
 
 const navGroups = [
   {
@@ -72,6 +74,62 @@ const navGroups = [
 export function HospitalSidebar() {
   const pathname = usePathname();
   const { isOpen, close } = useMobileNav();
+  const [opdCount, setOpdCount] = useState(0);
+  const supabase = createClient();
+  const initialMount = useRef(true);
+
+  useEffect(() => {
+    fetchOpdCount();
+
+    const channel = supabase
+      .channel('opd-queue-sidebar')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'walkin_queue',
+        filter: 'status=eq.WAITING'
+      }, (payload) => {
+        setOpdCount(prev => prev + 1);
+        announceArrival();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'walkin_queue'
+      }, () => {
+        fetchOpdCount();
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'walkin_queue'
+      }, () => {
+        fetchOpdCount();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchOpdCount = async () => {
+    const { count } = await supabase
+      .from('walkin_queue')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'WAITING');
+    
+    setOpdCount(count || 0);
+  };
+
+  const announceArrival = () => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      const utterance = new SpeechSynthesisUtterance("New patient arrival for Outpatient Department");
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   return (
     <>
@@ -110,7 +168,15 @@ export function HospitalSidebar() {
                     )}
                   >
                     <item.icon size={18} strokeWidth={isActive ? 2.5 : 2} className={isActive ? "text-white" : "text-slate-400"} />
-                    {item.name}
+                    <span className="flex-1">{item.name}</span>
+                    {item.name === "Outpatient (OPD)" && opdCount > 0 && (
+                      <span className={clsx(
+                        "px-2 py-0.5 rounded-full text-[10px] font-black animate-pulse",
+                        isActive ? "bg-white text-brand-600" : "bg-brand-600 text-white shadow-lg shadow-brand-500/30"
+                      )}>
+                        {opdCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
