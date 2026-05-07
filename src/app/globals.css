@@ -13,6 +13,9 @@
   body {
     @apply bg-slate-50 text-slate-900 antialiased;
   }
+  button, a, [role="button"], select {
+    cursor: pointer;
+  }
 }
 
 /* Utilities for glassmorphism and custom rounded corners */

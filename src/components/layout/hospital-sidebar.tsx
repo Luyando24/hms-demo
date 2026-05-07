@@ -16,7 +16,9 @@ import {
   Users,
   Settings,
   LogOut,
-  X
+  X,
+  Building,
+  DoorOpen
 } from "lucide-react";
 import clsx from "clsx";
 import { useMobileNav } from "./mobile-nav-context";
@@ -33,6 +35,7 @@ const navGroups = [
     title: "Front Office",
     items: [
       { name: "Reception", href: "/hospital/reception", icon: Users },
+      { name: "Patient Directory", href: "/hospital/patients", icon: Users },
     ]
   },
   {
@@ -57,6 +60,9 @@ const navGroups = [
     title: "Administration",
     items: [
       { name: "Billing & Claims", href: "/hospital/billing", icon: CreditCard },
+      { name: "Staff Directory", href: "/hospital/staff", icon: Users },
+      { name: "Departments", href: "/hospital/admin/departments", icon: Building },
+      { name: "Rooms & Facilities", href: "/hospital/admin/rooms", icon: DoorOpen },
       { name: "HR & Staffing", href: "/hospital/hr", icon: Users },
       { name: "Reports & Analytics", href: "/hospital/reports", icon: LayoutDashboard },
     ]

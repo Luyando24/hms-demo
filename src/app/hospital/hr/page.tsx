@@ -1,15 +1,33 @@
-import { Users, Search, Filter, Plus, Calendar, Clock, UserCheck, Briefcase, Award, TrendingUp } from "lucide-react";
-import clsx from "clsx";
+'use client'
 
-const staffMembers = [
-  { id: "EMP-001", name: "Dr. Sarah Jenkins", role: "Chief of Surgery", dept: "Clinical", status: "on-duty" },
-  { id: "EMP-002", name: "Dr. Robert Jones", role: "Pediatrician", dept: "Clinical", status: "off-duty" },
-  { id: "EMP-003", name: "Nurse Jane Doe", role: "Senior Nurse", dept: "IPD", status: "on-duty" },
-  { id: "EMP-004", name: "John Smith", role: "Admin Officer", dept: "Reception", status: "on-duty" },
-  { id: "EMP-005", name: "Nurse Peter Pan", role: "Staff Nurse", dept: "ER", status: "break" },
-];
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Users, Search, Filter, Plus, Calendar, Clock, UserCheck, Briefcase, Award, TrendingUp, ExternalLink } from "lucide-react";
+import clsx from "clsx";
+import { createClient } from "@/utils/supabase/client";
+import AddStaffModal from "@/components/hospital/AddStaffModal";
 
 export default function HRDashboard() {
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [staff, setStaff] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => {
+    fetchRecentStaff();
+  }, []);
+
+  const fetchRecentStaff = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5);
+    if (data) setStaff(data);
+    setLoading(false);
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
@@ -19,13 +37,19 @@ export default function HRDashboard() {
           <p className="text-slate-500 mt-1">Workforce Management & Personnel Directory.</p>
         </div>
         <div className="flex gap-3">
-          <button className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2">
-            <Calendar size={16} />
-            Duty Roster
-          </button>
-          <button className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-md flex items-center gap-2">
-            <Plus size={16} />
-            Add Staff Member
+          <Link 
+            href="/hospital/staff"
+            className="bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
+          >
+            <Users size={18} />
+            Full Staff Directory
+          </Link>
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-brand-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20 flex items-center gap-2"
+          >
+            <Plus size={18} />
+            Register New Staff
           </button>
         </div>
       </div>
@@ -34,7 +58,7 @@ export default function HRDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Staff</p>
-          <p className="text-2xl font-black text-slate-900">342</p>
+          <p className="text-2xl font-black text-slate-900">{staff.length > 5 ? staff.length : '342'}</p>
         </div>
         <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
           <p className="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-2">Currently On-Duty</p>
@@ -52,19 +76,14 @@ export default function HRDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Staff Directory */}
+        {/* Recent Staff Activity */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-slate-900">Personnel Directory</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <input 
-                  type="text" 
-                  placeholder="Search by name or ID..." 
-                  className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
+              <h2 className="text-lg font-bold text-slate-900">Recently Added Personnel</h2>
+              <Link href="/hospital/staff" className="text-xs font-bold text-brand-600 hover:underline flex items-center gap-1">
+                View All Personnel <ExternalLink size={12} />
+              </Link>
             </div>
             
             <div className="overflow-hidden border border-slate-200 rounded-2xl">
@@ -72,29 +91,38 @@ export default function HRDashboard() {
                 <thead className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                   <tr>
                     <th className="px-6 py-3">Member</th>
-                    <th className="px-6 py-3">Role & Dept</th>
-                    <th className="px-6 py-3 text-right">Status</th>
+                    <th className="px-6 py-3">Role</th>
+                    <th className="px-6 py-3 text-right">Joined At</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {staffMembers.map((row) => (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-8 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">
+                        Loading personnel...
+                      </td>
+                    </tr>
+                  ) : staff.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-8 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">
+                        No personnel records found
+                      </td>
+                    </tr>
+                  ) : staff.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4">
-                        <p className="font-bold text-slate-900">{row.name}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">{row.id}</p>
+                        <p className="font-bold text-slate-900">{row.first_name} {row.last_name}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">{row.id.substring(0, 8)}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-slate-700 font-medium">{row.role}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">{row.dept}</p>
+                        <span className="px-2 py-0.5 rounded bg-brand-50 text-brand-600 text-[9px] font-black uppercase tracking-wider">
+                          {row.role || 'STAFF'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className={clsx(
-                          "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
-                          row.status === 'on-duty' ? "bg-emerald-500 text-white" : 
-                          row.status === 'break' ? "bg-amber-500 text-white" : "bg-slate-400 text-white"
-                        )}>
-                          {row.status}
-                        </span>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">
+                          {new Date(row.created_at).toLocaleDateString()}
+                        </p>
                       </td>
                     </tr>
                   ))}
@@ -111,10 +139,10 @@ export default function HRDashboard() {
             <h2 className="text-lg font-bold mb-6">Staff Spotlight</h2>
             <div className="flex items-center gap-4 bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
               <div className="w-12 h-12 rounded-full bg-brand-500 flex items-center justify-center font-bold text-lg">
-                JD
+                SA
               </div>
               <div>
-                <p className="font-bold text-slate-100">Nurse Jane Doe</p>
+                <p className="font-bold text-slate-100">Sarah Admin</p>
                 <p className="text-xs text-brand-400">Excellence in Patient Care</p>
               </div>
               <Award className="text-amber-400 ml-auto" size={24} />
@@ -148,6 +176,12 @@ export default function HRDashboard() {
           </div>
         </div>
       </div>
+
+      <AddStaffModal 
+        isOpen={isAddModalOpen} 
+        onClose={() => setIsAddModalOpen(false)} 
+        onSuccess={fetchRecentStaff} 
+      />
     </div>
   );
 }

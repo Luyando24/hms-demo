@@ -24,7 +24,7 @@ export function Hero() {
         </h1>
         
         <p className="text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto mb-12 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
-          At Marybegg Hospital, we combine compassionate care with state-of-the-art medical technology to provide the best possible outcomes for you and your family.
+          At HMSdemo Hospital, we combine compassionate care with state-of-the-art medical technology to provide the best possible outcomes for you and your family.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-500">

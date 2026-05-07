@@ -26,7 +26,7 @@ export function Header() {
             <HeartPulse size={24} strokeWidth={2.5} />
           </div>
           <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">
-            Marybegg<span className="text-brand-600">Portal</span>
+            HMS<span className="text-brand-600">demo</span>
           </span>
         </Link>
 

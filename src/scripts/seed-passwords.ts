@@ -15,11 +15,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 
 async function resetPasswords() {
   const emails = [
-    'admin@marybegg.com',
-    'doctor@marybegg.com',
-    'nurse@marybegg.com',
-    'cashier@marybegg.com',
-    'patient@marybegg.com'
+    'admin@hmsdemo.com',
+    'doctor@hmsdemo.com',
+    'nurse@hmsdemo.com',
+    'cashier@hmsdemo.com',
+    'patient@hmsdemo.com'
   ]
 
   console.log('Resetting passwords for test users...')

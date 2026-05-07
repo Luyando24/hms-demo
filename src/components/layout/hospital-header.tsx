@@ -3,12 +3,34 @@
 import Link from "next/link";
 import { Search, Bell, ChevronDown, Plus, HeartPulse, Menu, LogOut, User as UserIcon, Settings } from "lucide-react";
 import { useMobileNav } from "./mobile-nav-context";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signOut } from "@/app/login/actions";
+import { createClient } from "@/utils/supabase/client";
 
 export function HospitalHeader() {
   const { toggle } = useMobileNav();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
+        
+        setUser({
+          ...profile,
+          email: authUser.email
+        });
+      }
+    };
+    fetchUser();
+  }, []);
 
   return (
     <header className="fixed top-0 left-0 right-0 h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 z-50">
@@ -26,7 +48,7 @@ export function HospitalHeader() {
             <HeartPulse size={24} strokeWidth={2.5} />
           </div>
           <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">
-            Marybegg<span className="text-brand-600">Admin</span>
+            HMS<span className="text-brand-600">demo</span>
           </span>
         </Link>
 
@@ -65,11 +87,15 @@ export function HospitalHeader() {
             className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-1.5 pr-3 rounded-full transition-all hover:bg-slate-100 shadow-sm"
           >
             <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm">
-              SJ
+              {user ? `${user.first_name?.[0]}${user.last_name?.[0]}` : '...'}
             </div>
             <div className="text-left hidden md:block">
-              <p className="text-sm font-semibold text-slate-800 leading-tight">Dr. Sarah Jenkins</p>
-              <p className="text-xs text-brand-600 font-medium">Chief of Surgery</p>
+              <p className="text-sm font-semibold text-slate-800 leading-tight">
+                {user ? `${user.first_name} ${user.last_name}` : 'Loading...'}
+              </p>
+              <p className="text-xs text-brand-600 font-medium">
+                {user?.role || 'HOSPITAL STAFF'}
+              </p>
             </div>
             <ChevronDown size={16} className={`text-slate-400 ml-1 transition-transform ${isProfileOpen ? "rotate-180" : ""}`} />
           </button>
@@ -82,8 +108,10 @@ export function HospitalHeader() {
               />
               <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-200/50 z-20 py-2 animate-in fade-in zoom-in-95 duration-200">
                 <div className="px-4 py-3 border-b border-slate-100 mb-1">
-                  <p className="text-sm font-bold text-slate-900">Dr. Sarah Jenkins</p>
-                  <p className="text-xs text-slate-500 truncate">s.jenkins@marybegg.com</p>
+                  <p className="text-sm font-bold text-slate-900">
+                    {user ? `${user.first_name} ${user.last_name}` : '...'}
+                  </p>
+                  <p className="text-xs text-slate-500 truncate">{user?.email || '...'}</p>
                 </div>
                 
                 <Link 

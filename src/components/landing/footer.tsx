@@ -11,7 +11,7 @@ export function Footer() {
               <HeartPulse size={20} strokeWidth={2.5} />
             </div>
             <span className="font-bold text-xl tracking-tight text-white">
-              Marybegg<span className="text-brand-500">Hospital</span>
+              HMSdemo<span className="text-brand-500">Hospital</span>
             </span>
           </Link>
           <p className="text-sm leading-relaxed max-w-xs mb-6">
@@ -52,14 +52,14 @@ export function Footer() {
             </li>
             <li className="flex items-center gap-3">
               <Mail size={18} className="text-brand-500 shrink-0" />
-              <span>contact@marybegghospital.com</span>
+              <span>contact@hmsdemohospital.com</span>
             </li>
           </ul>
         </div>
       </div>
       
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
-        <p>&copy; {new Date().getFullYear()} Marybegg Hospital. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} HMSdemo Hospital. All rights reserved.</p>
         <div className="flex items-center gap-6">
           <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>
           <Link href="#" className="hover:text-white transition-colors">Patient Rights</Link>

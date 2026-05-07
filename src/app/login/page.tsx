@@ -96,7 +96,7 @@ function LoginContent() {
             <input type="hidden" name="role" value={activeTab.toUpperCase()} />
             <div>
               <label className="block text-[13px] font-bold text-slate-900 mb-2">
-                {activeTab === "patient" ? "Email Address" : "Email Address"}
+                {activeTab === "patient" ? "Email Address" : "Email or Staff ID"}
               </label>
               <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -104,10 +104,10 @@ function LoginContent() {
                 </div>
                 <input 
                   name="email"
-                  type="email" 
+                  type="text" 
                   required
                   className="w-full pl-10 pr-4 py-3 bg-[#f0f4f8] border border-transparent focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-xl outline-none transition-all text-[14px] text-slate-900 placeholder:text-slate-400"
-                  placeholder={activeTab === "patient" ? "patient@example.com" : "admin@hospital.com"}
+                  placeholder={activeTab === "patient" ? "m.phiri@example.com" : "Email or EMP-XXXXX"}
                 />
               </div>
             </div>

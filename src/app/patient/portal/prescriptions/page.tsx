@@ -117,7 +117,7 @@ export default function PatientPrescriptions() {
           <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
             <h2 className="text-lg font-bold text-slate-900 mb-6">Preferred Pharmacy</h2>
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 mb-6">
-              <p className="text-sm font-bold text-slate-800">Marybegg Pharmacy Main</p>
+              <p className="text-sm font-bold text-slate-800">HMSdemo Pharmacy Main</p>
               <p className="text-xs text-slate-500 mt-1">123 Hospital Way, Lusaka</p>
               <p className="text-xs text-emerald-600 font-bold mt-2 flex items-center gap-1.5">
                 <CheckCircle2 size={12} />

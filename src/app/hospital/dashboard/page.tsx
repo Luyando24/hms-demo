@@ -8,7 +8,7 @@ export default function HospitalDashboard() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Hospital Overview</h1>
-          <p className="text-slate-500 mt-1">Live metrics and operational status for Marybegg Hospital.</p>
+          <p className="text-slate-500 mt-1 font-medium">Live metrics and operational status for HMSdemo Hospital.</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg">
