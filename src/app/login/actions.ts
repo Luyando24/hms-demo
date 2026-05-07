@@ -11,18 +11,18 @@ export async function signIn(formData: FormData) {
   const supabase = await createClient();
   let effectiveEmail = identifier;
 
-  // 1. If identifier doesn't look like an email, assume it's a Staff Number
+  // 1. If identifier doesn't look like an email, assume it's a Staff Number or File Number
   if (!identifier.includes('@')) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("email")
-      .eq("staff_number", identifier)
+      .or(`staff_number.eq.${identifier},file_number.eq.${identifier}`)
       .single();
     
     if (profile?.email) {
       effectiveEmail = profile.email;
     } else {
-      return redirect(`/login?error=${encodeURIComponent("Invalid Staff ID or Email")}`);
+      return redirect(`/login?error=${encodeURIComponent("Invalid ID or Email")}`);
     }
   }
 

@@ -1,14 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/utils/supabase/client'
 import { X, User, Phone, Mail, MapPin, Calendar, Heart, Shield, Save } from 'lucide-react'
 import StatusModal from './StatusModal'
+import { registerPatientAction } from '@/app/hospital/actions'
 
 export default function RegisterPatientModal({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClose: () => void, onSuccess?: () => void }) {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null)
-  const supabase = createClient()
 
   if (!isOpen) return null
 
@@ -33,19 +32,19 @@ export default function RegisterPatientModal({ isOpen, onClose, onSuccess }: { i
       insurance_policy_number: formData.get('insurance_policy_number') as string,
     }
 
-    const { error } = await supabase.from('patients').insert(patientData)
-
+    const { success, error, warning } = await registerPatientAction(patientData)
+    
     if (error) {
       setStatus({
         type: 'error',
         title: 'Registration Failed',
-        message: error.message
+        message: error
       })
     } else {
       setStatus({
         type: 'success',
         title: 'Patient Registered',
-        message: `${patientData.first_name} ${patientData.last_name} has been added to the system.`
+        message: warning || `${patientData.first_name} ${patientData.last_name} has been added. They can now login to the Patient Portal using their File Number or Email (Default password: password123).`
       })
     }
     setLoading(false)

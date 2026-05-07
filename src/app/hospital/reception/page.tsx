@@ -108,11 +108,7 @@ export default function ReceptionDashboard() {
         onClose={() => setIsRegisterModalOpen(false)} 
         onSuccess={() => {
           setIsRegisterModalOpen(false);
-          setStatus({
-            type: 'success',
-            title: 'Patient Registered',
-            message: 'New patient has been successfully added to the system.'
-          });
+          // The modal itself handles success messaging now
         }}
       />
 
