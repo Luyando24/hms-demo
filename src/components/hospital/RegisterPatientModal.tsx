@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { X, User, Phone, Mail, MapPin, Calendar, Heart, Shield, Save } from 'lucide-react'
 import StatusModal from './StatusModal'
 
-export default function RegisterPatientModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+export default function RegisterPatientModal({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClose: () => void, onSuccess?: () => void }) {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null)
   const supabase = createClient()
@@ -183,7 +183,10 @@ export default function RegisterPatientModal({ isOpen, onClose }: { isOpen: bool
         onClose={() => {
           const isSuccess = status?.type === 'success'
           setStatus(null)
-          if (isSuccess) onClose()
+          if (isSuccess) {
+            onClose()
+            onSuccess?.()
+          }
         }}
       />
     </>
