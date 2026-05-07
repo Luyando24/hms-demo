@@ -11,7 +11,7 @@ export function Footer() {
               <HeartPulse size={20} strokeWidth={2.5} />
             </div>
             <span className="font-bold text-xl tracking-tight text-white">
-              HMSdemo<span className="text-brand-500">Hospital</span>
+              HMS<span className="text-brand-500">demo</span>
             </span>
           </Link>
           <p className="text-sm leading-relaxed max-w-xs mb-6">
