@@ -254,6 +254,7 @@ CREATE TABLE IF NOT EXISTS public.insurance_claims (
 );
 
 -- Add backlink for invoices
+ALTER TABLE public.invoices DROP CONSTRAINT IF EXISTS invoices_insurance_claim_id_fkey;
 ALTER TABLE public.invoices ADD CONSTRAINT invoices_insurance_claim_id_fkey FOREIGN KEY (insurance_claim_id) REFERENCES public.insurance_claims(id);
 
 -- 22. Payments

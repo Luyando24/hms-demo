@@ -15,10 +15,14 @@ import {
   FileText,
   Calendar,
   ShieldCheck,
-  Loader2
+  Loader2,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import RegisterPatientModal from '@/components/hospital/RegisterPatientModal';
+import EditPatientModal from '@/components/hospital/EditPatientModal';
+import { deletePatientAction } from '@/app/hospital/actions';
 
 export default function PatientsPage() {
   const [loading, setLoading] = useState(true);
@@ -27,9 +31,11 @@ export default function PatientsPage() {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [editingPatient, setEditingPatient] = useState<any>(null);
   const pageSize = 10;
   
   const supabase = createClient();
+
 
   useEffect(() => {
     fetchPatients();
@@ -211,9 +217,28 @@ export default function PatientsPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400 hover:text-slate-900 border border-transparent hover:border-slate-200">
-                          <MoreVertical size={18} />
-                        </button>
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => setEditingPatient(patient)}
+                            className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all"
+                            title="Edit Patient"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button 
+                            onClick={async () => {
+                              if (confirm(`Are you sure you want to delete patient ${patient.first_name} ${patient.last_name}?`)) {
+                                const res = await deletePatientAction(patient.id);
+                                if (res.error) alert(res.error);
+                                else fetchPatients();
+                              }
+                            }}
+                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                            title="Delete Patient"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -295,6 +320,19 @@ export default function PatientsPage() {
           fetchPatients();
         }}
       />
+
+      {editingPatient && (
+        <EditPatientModal
+          isOpen={!!editingPatient}
+          patient={editingPatient}
+          onClose={() => setEditingPatient(null)}
+          onSuccess={() => {
+            setEditingPatient(null);
+            fetchPatients();
+          }}
+        />
+      )}
     </div>
   );
+
 }

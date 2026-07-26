@@ -19,6 +19,8 @@ import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 
 import AddStaffModal from "@/components/hospital/AddStaffModal";
+import EditStaffModal from "@/components/hospital/EditStaffModal";
+import { deleteStaffAction } from "@/app/hospital/actions";
 
 const PAGE_SIZE = 10;
 
@@ -27,6 +29,7 @@ export default function StaffDirectory() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   
@@ -174,14 +177,25 @@ export default function StaffDirectory() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
+                      <button 
+                        onClick={() => setEditingStaff(member)}
+                        className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                        title="Edit Staff Member"
+                      >
                         <Edit2 size={16} />
                       </button>
-                      <button className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                      <button 
+                        onClick={async () => {
+                          if (confirm(`Are you sure you want to remove staff member ${member.first_name} ${member.last_name}?`)) {
+                            const res = await deleteStaffAction(member.id);
+                            if (res.error) alert(res.error);
+                            else fetchStaff();
+                          }
+                        }}
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Delete Staff Member"
+                      >
                         <Trash2 size={16} />
-                      </button>
-                      <button className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-colors">
-                        <MoreVertical size={16} />
                       </button>
                     </div>
                   </td>
@@ -240,6 +254,15 @@ export default function StaffDirectory() {
         onClose={() => setIsAddModalOpen(false)} 
         onSuccess={fetchStaff} 
       />
+
+      {editingStaff && (
+        <EditStaffModal
+          isOpen={!!editingStaff}
+          staffMember={editingStaff}
+          onClose={() => setEditingStaff(null)}
+          onSuccess={fetchStaff}
+        />
+      )}
     </div>
   );
 }

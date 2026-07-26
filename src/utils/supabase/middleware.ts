@@ -41,11 +41,63 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/auth') &&
     !request.nextUrl.pathname.startsWith('/seed')
   ) {
-    // no user, potentially respond by redirecting the user to the login page
+    // no user, redirect to login page
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
+
+  // RBAC route protection for authenticated users
+  if (user && request.nextUrl.pathname.startsWith('/hospital/')) {
+    const userRole = user.user_metadata?.role || 'STAFF';
+    const rolePermissions: Record<string, string[]> = {
+      ADMIN: [
+        '/hospital/dashboard', '/hospital/reception', '/hospital/patients', '/hospital/er',
+        '/hospital/ipd', '/hospital/opd', '/hospital/icu', '/hospital/radiology',
+        '/hospital/laboratory', '/hospital/inventory', '/hospital/bloodbank', '/hospital/billing',
+        '/hospital/staff', '/hospital/admin/departments', '/hospital/admin/rooms', '/hospital/hr', '/hospital/reports'
+      ],
+      DOCTOR: [
+        '/hospital/dashboard', '/hospital/patients', '/hospital/er', '/hospital/ipd',
+        '/hospital/opd', '/hospital/icu', '/hospital/radiology', '/hospital/laboratory', '/hospital/inventory'
+      ],
+      NURSE: [
+        '/hospital/dashboard', '/hospital/reception', '/hospital/patients', '/hospital/er',
+        '/hospital/ipd', '/hospital/opd', '/hospital/icu', '/hospital/laboratory', '/hospital/inventory', '/hospital/bloodbank'
+      ],
+      PHARMACIST: [
+        '/hospital/dashboard', '/hospital/patients', '/hospital/inventory'
+      ],
+      LAB_TECH: [
+        '/hospital/dashboard', '/hospital/patients', '/hospital/laboratory'
+      ],
+      RADIOLOGIST: [
+        '/hospital/dashboard', '/hospital/patients', '/hospital/radiology'
+      ],
+      ACCOUNTANT: [
+        '/hospital/dashboard', '/hospital/reception', '/hospital/patients', '/hospital/billing', '/hospital/reports'
+      ],
+      RECEPTIONIST: [
+        '/hospital/dashboard', '/hospital/reception', '/hospital/patients', '/hospital/billing'
+      ],
+      STAFF: [
+        '/hospital/dashboard', '/hospital/patients'
+      ]
+    };
+
+    const allowedRoutes = rolePermissions[userRole.toUpperCase()] || rolePermissions['ADMIN'];
+    const currentPath = request.nextUrl.pathname;
+
+    // Check if path is in allowed routes
+    const isAllowed = allowedRoutes.some(route => currentPath === route || currentPath.startsWith(route + '/'));
+
+    if (!isAllowed) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/hospital/dashboard';
+      return NextResponse.redirect(url);
+    }
+  }
+
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
   // creating a new response object with NextResponse.next() make sure to:

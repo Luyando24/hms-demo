@@ -70,3 +70,63 @@ export async function registerPatientAction(patientData: any) {
 
   return { success: true, patientId: patient.id };
 }
+
+export async function updatePatientAction(id: string, patientData: any) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('patients')
+    .update({ ...patientData, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+export async function deletePatientAction(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('patients')
+    .delete()
+    .eq('id', id);
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+export async function updateStaffAction(id: string, staffData: any) {
+  const adminSupabase = createAdminClient();
+  const { error } = await adminSupabase
+    .from('profiles')
+    .update({ ...staffData, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+export async function deleteStaffAction(id: string) {
+  const adminSupabase = createAdminClient();
+  const { error } = await adminSupabase
+    .from('profiles')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    // If delete profile fails due to auth or FK, try deleting auth user
+    const { error: authError } = await adminSupabase.auth.admin.deleteUser(id);
+    if (authError && error) return { error: error.message };
+  }
+  return { success: true };
+}
+
+export async function cancelInvoiceAction(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('invoices')
+    .update({ status: 'CANCELLED' })
+    .eq('id', id);
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+

@@ -5,6 +5,9 @@ import { CreditCard, Search, Filter, Plus, FileText, CheckCircle2, AlertCircle, 
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 import RecordPaymentModal from "@/components/hospital/RecordPaymentModal";
+import GenerateInvoiceModal from "@/components/hospital/GenerateInvoiceModal";
+import { cancelInvoiceAction } from "@/app/hospital/actions";
+import { formatCurrencyAmount } from "@/utils/currency";
 
 export default function BillingDashboard() {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -12,11 +15,24 @@ export default function BillingDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+  const [currencyConfig, setCurrencyConfig] = useState<{ symbol: string, position: 'prefix' | 'suffix' }>({ symbol: '$', position: 'prefix' });
   const supabase = createClient();
 
   useEffect(() => {
     fetchInvoices();
+    fetchCurrencyConfig();
   }, []);
+
+  const fetchCurrencyConfig = async () => {
+    const { data } = await supabase.from('system_settings').select('currency_symbol, currency_position').single();
+    if (data) {
+      setCurrencyConfig({
+        symbol: data.currency_symbol || '$',
+        position: (data.currency_position as 'prefix' | 'suffix') || 'prefix'
+      });
+    }
+  };
 
   const fetchInvoices = async () => {
     setLoading(true);
@@ -40,6 +56,7 @@ export default function BillingDashboard() {
     pendingAmount: invoices.reduce((acc, inv) => acc + (inv.total_amount - (inv.paid_amount || 0)), 0),
     overdueCount: invoices.filter(inv => inv.status === 'UNPAID' || inv.status === 'OVERDUE').length,
     collectionRate: invoices.length > 0 ? (invoices.reduce((acc, inv) => acc + (inv.paid_amount || 0), 0) / invoices.reduce((acc, inv) => acc + inv.total_amount, 0) * 100).toFixed(1) : "0.0"
+
   };
 
   return (
@@ -51,11 +68,10 @@ export default function BillingDashboard() {
           <p className="text-slate-500 mt-1">Financial Management & Insurance Processing.</p>
         </div>
         <div className="flex gap-3">
-          <button className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2">
-            <TrendingUp size={16} />
-            Revenue Report
-          </button>
-          <button className="bg-brand-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-md flex items-center gap-2">
+          <button 
+            onClick={() => setIsGenerateModalOpen(true)}
+            className="bg-brand-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-md flex items-center gap-2"
+          >
             <Plus size={16} />
             Generate Invoice
           </button>
@@ -74,7 +90,7 @@ export default function BillingDashboard() {
             </span>
           </div>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Revenue</p>
-          <p className="text-2xl font-black text-slate-900">${stats.totalRevenue.toLocaleString()}</p>
+          <p className="text-2xl font-black text-slate-900">{formatCurrencyAmount(stats.totalRevenue, currencyConfig.symbol, currencyConfig.position)}</p>
         </div>
         <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -83,7 +99,7 @@ export default function BillingDashboard() {
             </div>
           </div>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pending Collection</p>
-          <p className="text-2xl font-black text-slate-900">${stats.pendingAmount.toLocaleString()}</p>
+          <p className="text-2xl font-black text-slate-900">{formatCurrencyAmount(stats.pendingAmount, currencyConfig.symbol, currencyConfig.position)}</p>
         </div>
         <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -147,26 +163,44 @@ export default function BillingDashboard() {
                         <p className="font-bold text-slate-900">{row.patients?.first_name} {row.patients?.last_name}</p>
                         <p className="text-[10px] text-slate-400 font-bold uppercase">ID: {row.id.slice(0, 8)}</p>
                       </td>
-                      <td className="px-6 py-4 font-black text-slate-900">${row.total_amount.toLocaleString()}</td>
+                      <td className="px-6 py-4 font-black text-slate-900">{formatCurrencyAmount(row.total_amount, currencyConfig.symbol, currencyConfig.position)}</td>
                       <td className="px-6 py-4">
                         <span className={clsx(
                           "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
                           row.status === 'PAID' ? "bg-emerald-50 text-emerald-600" : 
-                          row.status === 'PARTIAL' ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"
+                          row.status === 'PARTIAL' ? "bg-amber-50 text-amber-600" :
+                          row.status === 'CANCELLED' ? "bg-slate-100 text-slate-400" : "bg-rose-50 text-rose-600"
                         )}>
-                          ${(row.total_amount - (row.paid_amount || 0)).toLocaleString()} {row.status}
+                          {formatCurrencyAmount(row.total_amount - (row.paid_amount || 0), currencyConfig.symbol, currencyConfig.position)} {row.status}
                         </span>
                       </td>
+
                       <td className="px-6 py-4 text-right">
-                        {row.status !== 'PAID' && (
-                          <button 
-                            onClick={() => { setSelectedInvoice(row); setIsPaymentModalOpen(true); }}
-                            className="bg-brand-50 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-600 hover:text-white transition-all flex items-center gap-1.5 ml-auto"
-                          >
-                            <CreditCard size={14} />
-                            Pay
-                          </button>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {row.status !== 'PAID' && row.status !== 'CANCELLED' && (
+                            <>
+                              <button 
+                                onClick={() => { setSelectedInvoice(row); setIsPaymentModalOpen(true); }}
+                                className="bg-brand-50 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-600 hover:text-white transition-all flex items-center gap-1.5"
+                              >
+                                <CreditCard size={14} />
+                                Pay
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  if (confirm('Cancel and void this invoice?')) {
+                                    const res = await cancelInvoiceAction(row.id);
+                                    if (res.error) alert(res.error);
+                                    else fetchInvoices();
+                                  }
+                                }}
+                                className="text-slate-400 hover:text-rose-600 text-xs font-bold transition-all"
+                              >
+                                Void
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -200,10 +234,6 @@ export default function BillingDashboard() {
               <p className="text-[10px] text-slate-500 mt-1 font-bold">ALL PAYMENTS VERIFIED</p>
             </div>
           </div>
-
-          <button className="w-full mt-8 bg-brand-500 hover:bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-brand-500/20 transition-all relative z-10">
-            Submit New Claim Batch
-          </button>
         </div>
       </div>
 
@@ -215,6 +245,13 @@ export default function BillingDashboard() {
           onSuccess={fetchInvoices}
         />
       )}
+
+      <GenerateInvoiceModal 
+        isOpen={isGenerateModalOpen}
+        onClose={() => setIsGenerateModalOpen(false)}
+        onSuccess={fetchInvoices}
+      />
     </div>
   );
 }
+

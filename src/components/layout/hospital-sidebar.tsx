@@ -71,14 +71,18 @@ const navGroups = [
   }
 ];
 
+import { isRouteAllowedForRole } from "@/utils/rbac";
+
 export function HospitalSidebar() {
   const pathname = usePathname();
   const { isOpen, close } = useMobileNav();
   const [opdCount, setOpdCount] = useState(0);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const supabase = createClient();
   const initialMount = useRef(true);
 
   useEffect(() => {
+    fetchUserRole();
     fetchOpdCount();
 
     const channel = supabase
@@ -112,6 +116,21 @@ export function HospitalSidebar() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const fetchUserRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.role) setUserRole(profile.role);
+      else if (user.user_metadata?.role) setUserRole(user.user_metadata.role);
+    }
+  };
+
 
   const fetchOpdCount = async () => {
     const { count } = await supabase
@@ -148,14 +167,19 @@ export function HospitalSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-4 space-y-8">
-        {navGroups.map((group) => (
-          <div key={group.title}>
-            <h4 className="px-4 text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
-              {group.title}
-            </h4>
-            <div className="space-y-1">
-              {group.items.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+        {navGroups.map((group) => {
+          const visibleItems = group.items.filter(item => isRouteAllowedForRole(userRole, item.href));
+          if (visibleItems.length === 0) return null;
+
+          return (
+            <div key={group.title}>
+              <h4 className="px-4 text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
+                {group.title}
+              </h4>
+              <div className="space-y-1">
+                {visibleItems.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+
                 return (
                   <Link
                     key={item.name}
@@ -182,8 +206,10 @@ export function HospitalSidebar() {
               })}
             </div>
           </div>
-        ))}
+        );
+      })}
       </nav>
+
 
       {/* Bottom Actions */}
       <div className="px-4 mt-8 pt-4 border-t border-slate-200/60 shrink-0 space-y-1">

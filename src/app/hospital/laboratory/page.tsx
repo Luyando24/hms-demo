@@ -1,28 +1,76 @@
-import { TestTube2, Search, Filter, Plus, Clock, FileText, CheckCircle2, AlertTriangle, FlaskConical, Beaker } from "lucide-react";
-import clsx from "clsx";
+'use client'
 
-const labOrders = [
-  { id: "LAB-501", patient: "Mwaba Musonda", test: "Full Blood Count (FBC)", status: "pending", priority: "high", received: "10m ago" },
-  { id: "LAB-502", patient: "Luyando Hamubaba", test: "Lipid Profile", status: "completed", priority: "normal", received: "2h ago" },
-  { id: "LAB-503", patient: "Dalitso Lungu", test: "Kidney Function Test (KFT)", status: "processing", priority: "critical", received: "5m ago" },
-  { id: "LAB-504", patient: "Bupe Chanda", test: "Liver Function Test (LFT)", status: "pending", priority: "normal", received: "1h ago" },
-];
+import { useState, useEffect } from "react";
+import { Search, Filter, Plus, Clock, CheckCircle2, AlertTriangle, FlaskConical, Loader2, Trash2, Edit } from "lucide-react";
+import clsx from "clsx";
+import { createClient } from "@/utils/supabase/client";
+import CreateLabOrderModal from "@/components/hospital/CreateLabOrderModal";
+import EnterLabResultModal from "@/components/hospital/EnterLabResultModal";
 
 export default function LaboratoryDashboard() {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedResult, setSelectedResult] = useState<any>(null);
+  const [selectedPatientName, setSelectedPatientName] = useState("");
+  const [isEnterResultModalOpen, setIsEnterResultModalOpen] = useState(false);
+  const supabase = createClient();
+
+  useEffect(() => {
+    fetchOrders();
+
+    const channel = supabase
+      .channel('lab_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lab_orders' }, () => fetchOrders())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lab_results' }, () => fetchOrders())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('lab_orders')
+      .select('*, patients(*), lab_results(*)')
+      .order('created_at', { ascending: false });
+
+    if (data) setOrders(data);
+    setLoading(false);
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm('Are you sure you want to cancel and delete this lab order?')) return;
+    
+    await supabase.from('lab_results').delete().eq('order_id', orderId);
+    const { error } = await supabase.from('lab_orders').delete().eq('id', orderId);
+    
+    if (error) alert('Delete failed: ' + error.message);
+    else fetchOrders();
+  };
+
+  const filteredOrders = orders.filter(order => {
+    const patientName = `${order.patients?.first_name || ''} ${order.patients?.last_name || ''}`.toLowerCase();
+    const testName = order.lab_results?.[0]?.test_name?.toLowerCase() || '';
+    return patientName.includes(searchQuery.toLowerCase()) || testName.includes(searchQuery.toLowerCase()) || order.id.includes(searchQuery);
+  });
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Laboratory (LIS)</h1>
-          <p className="text-slate-500 mt-1">Sample Tracking & Result Management.</p>
+          <p className="text-slate-500 mt-1 font-medium">Sample Tracking & Live Result Management.</p>
         </div>
         <div className="flex gap-3">
-          <button className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2">
-            <Filter size={16} />
-            All Tests
-          </button>
-          <button className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-md flex items-center gap-2">
+          <button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20 flex items-center gap-2"
+          >
             <Plus size={16} />
             Receive Sample
           </button>
@@ -41,111 +89,148 @@ export default function LaboratoryDashboard() {
                 <input 
                   type="text" 
                   placeholder="Search orders..." 
-                  className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <tr>
-                  <th className="px-6 py-4">Sample ID</th>
+                  <th className="px-6 py-4">Sample / Order ID</th>
                   <th className="px-6 py-4">Patient</th>
                   <th className="px-6 py-4">Test Description</th>
+                  <th className="px-6 py-4">Result</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {labOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={clsx(
-                          "w-8 h-8 rounded-lg flex items-center justify-center",
-                          order.priority === 'critical' ? "bg-rose-100 text-rose-600" : "bg-slate-100 text-slate-600"
-                        )}>
-                          <FlaskConical size={16} />
-                        </div>
-                        <span className="font-bold text-slate-900">{order.id}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-slate-900">{order.patient}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase">Received: {order.received}</p>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600 font-medium">{order.test}</td>
-                    <td className="px-6 py-4">
-                      <span className={clsx(
-                        "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                        order.status === 'completed' ? "bg-emerald-50 text-emerald-600" :
-                        order.status === 'processing' ? "bg-blue-50 text-blue-600" :
-                        "bg-amber-50 text-amber-600"
-                      )}>
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="text-brand-600 font-bold hover:underline text-xs">Enter Results</button>
+              <tbody className="divide-y divide-slate-50">
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                      <Loader2 className="animate-spin mx-auto mb-2" size={24} />
+                      Loading lab worklist...
                     </td>
                   </tr>
-                ))}
+                ) : filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                      No lab orders found.
+                    </td>
+                  </tr>
+                ) : filteredOrders.map((order) => {
+                  const result = order.lab_results?.[0];
+                  const patientName = `${order.patients?.first_name || 'Unknown'} ${order.patients?.last_name || ''}`;
+                  return (
+                    <tr key={order.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={clsx(
+                            "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs",
+                            order.priority === 'CRITICAL' ? "bg-rose-100 text-rose-600" : 
+                            order.priority === 'URGENT' ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-600"
+                          )}>
+                            <FlaskConical size={16} />
+                          </div>
+                          <span className="font-black text-slate-900 text-xs">#{order.id.slice(0, 8)}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-slate-900 capitalize">{patientName}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">{order.patients?.file_number || 'N/A'}</p>
+                      </td>
+                      <td className="px-6 py-4 text-slate-700 font-medium">
+                        {result?.test_name || 'Standard Panel'}
+                      </td>
+                      <td className="px-6 py-4">
+                        {result?.result_value ? (
+                          <span className="font-black text-slate-900">{result.result_value} <span className="text-[10px] text-slate-400">{result.unit}</span></span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-bold italic">Pending</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={clsx(
+                          "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider",
+                          order.status === 'COMPLETED' ? "bg-emerald-50 text-emerald-600" :
+                          order.status === 'PROCESSING' ? "bg-blue-50 text-blue-600" :
+                          "bg-amber-50 text-amber-600"
+                        )}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {result && (
+                            <button 
+                              onClick={() => {
+                                setSelectedResult(result);
+                                setSelectedPatientName(patientName);
+                                setIsEnterResultModalOpen(true);
+                              }}
+                              className="text-brand-600 font-bold hover:underline text-xs"
+                            >
+                              {result.result_value ? 'Edit Result' : 'Enter Result'}
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleDeleteOrder(order.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Right: Quick Entry / Analytics */}
+        {/* Right: Overview & Flags */}
         <div className="space-y-8">
-          <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900 mb-6">Quick Result Entry</h2>
-            <div className="space-y-4">
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Selected: Mwaba Musonda (FBC)</p>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-700">Hemoglobin (Hb)</span>
-                    <input type="text" placeholder="13.5" className="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-right focus:ring-1 focus:ring-brand-500" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-700">WBC Count</span>
-                    <input type="text" placeholder="7.2" className="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-right focus:ring-1 focus:ring-brand-500" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-700">Platelets</span>
-                    <input type="text" placeholder="250" className="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-right focus:ring-1 focus:ring-brand-500" />
-                  </div>
-                </div>
-                <button className="w-full mt-6 bg-brand-500 hover:bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-brand-500/20 transition-all">
-                  Submit Results
-                </button>
+          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">Laboratory Overview</h2>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
+                <span className="text-xs font-bold text-slate-600">Total Orders</span>
+                <span className="text-lg font-black text-slate-900">{orders.length}</span>
               </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-900 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 blur-2xl rounded-full" />
-            <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
-              <AlertTriangle className="text-rose-400" size={20} />
-              Abnormal Flags
-            </h2>
-            <div className="space-y-4">
-              <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700/50">
-                <p className="text-sm font-bold text-slate-100">Glucose (Fasting)</p>
-                <p className="text-2xl font-black text-rose-400 mt-1">182 <span className="text-xs font-medium text-slate-400 ml-1">mg/dL</span></p>
-                <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Patient: Mapalo Ngosa (Bed 105)</p>
+              <div className="flex justify-between items-center p-3 bg-amber-50 rounded-xl">
+                <span className="text-xs font-bold text-amber-700">Pending Samples</span>
+                <span className="text-lg font-black text-amber-700">{orders.filter(o => o.status === 'ORDERED').length}</span>
               </div>
-              <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700/50">
-                <p className="text-sm font-bold text-slate-100">Potassium (K+)</p>
-                <p className="text-2xl font-black text-amber-400 mt-1">5.8 <span className="text-xs font-medium text-slate-400 ml-1">mmol/L</span></p>
-                <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Patient: Natasha Zulu (Bed 107)</p>
+              <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-xl">
+                <span className="text-xs font-bold text-emerald-700">Completed Today</span>
+                <span className="text-lg font-black text-emerald-700">{orders.filter(o => o.status === 'COMPLETED').length}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <CreateLabOrderModal 
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={fetchOrders}
+      />
+
+      {selectedResult && (
+        <EnterLabResultModal 
+          isOpen={isEnterResultModalOpen}
+          onClose={() => { setIsEnterResultModalOpen(false); setSelectedResult(null); }}
+          onSuccess={fetchOrders}
+          labResult={selectedResult}
+          patientName={selectedPatientName}
+        />
+      )}
     </div>
   );
 }
