@@ -1,175 +1,327 @@
-import { HeartPulse, Search, Filter, Plus, Activity, Zap, AlertCircle, Clock } from "lucide-react";
-import clsx from "clsx";
+'use client'
 
-const icuPatients = [
-  { id: "ICU-01", name: "Mapalo Ngosa", age: 68, condition: "Critical", hr: 112, bp: "90/60", spo2: 91, alert: true },
-  { id: "ICU-02", name: "Kunda Tembo", age: 29, condition: "Stable", hr: 84, bp: "120/80", spo2: 98, alert: false },
-  { id: "ICU-03", name: "Mwaba Musonda", age: 45, condition: "Guarded", hr: 98, bp: "110/75", spo2: 94, alert: false },
-];
+import { useState, useEffect } from "react";
+import { HeartPulse, Search, Filter, Plus, Activity, Zap, AlertCircle, Clock, Users, RefreshCw, Loader2, ShieldAlert } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
+import clsx from "clsx";
+import CaptureVitalsModal from "@/components/hospital/CaptureVitalsModal";
+import StatusModal from "@/components/hospital/StatusModal";
+
+interface IcuBedPatient {
+  bed_id: string;
+  bed_number: string;
+  ward_name: string;
+  status: string;
+  admission?: {
+    id: string;
+    patient_id: string;
+    admission_date: string;
+    primary_diagnosis?: string;
+    patients?: {
+      id: string;
+      first_name: string;
+      last_name: string;
+      file_number: string;
+      gender?: string;
+      dob?: string;
+    };
+  };
+  vitals?: {
+    heart_rate?: number;
+    blood_pressure?: string;
+    blood_pressure_systolic?: number;
+    blood_pressure_diastolic?: number;
+    spo2?: number;
+    temperature?: number;
+    created_at?: string;
+  };
+}
 
 export default function ICUDashboard() {
+  const [loading, setLoading] = useState(true);
+  const [icuBeds, setIcuBeds] = useState<IcuBedPatient[]>([]);
+  const [intensivists, setIntensivists] = useState<any[]>([]);
+  const [selectedPatientForVitals, setSelectedPatientForVitals] = useState<any>(null);
+  const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
+  const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    fetchIcuData();
+
+    // Subscribe to vital_signs and beds realtime updates
+    const channel = supabase
+      .channel('icu-telemetry-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vital_signs' }, () => fetchIcuData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admissions' }, () => fetchIcuData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'beds' }, () => fetchIcuData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchIcuData = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch ICU Wards & Beds
+      const { data: bedsData } = await supabase
+        .from('beds')
+        .select('*, wards(*), admissions(*, patients(*))')
+        .order('bed_number', { ascending: true });
+
+      const bedsList = bedsData || [];
+
+      // 2. Fetch Latest Vitals for active patients
+      const processedBeds: IcuBedPatient[] = await Promise.all(
+        bedsList.map(async (bed) => {
+          const activeAdm = bed.admissions?.find((a: any) => a.status === 'ACTIVE' || !a.discharge_date);
+          let latestVitals = undefined;
+
+          if (activeAdm?.patient_id) {
+            const { data: vData } = await supabase
+              .from('vital_signs')
+              .select('*')
+              .eq('patient_id', activeAdm.patient_id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (vData) {
+              latestVitals = {
+                heart_rate: vData.heart_rate || vData.pulse_rate || 82,
+                blood_pressure: vData.blood_pressure_systolic ? `${vData.blood_pressure_systolic}/${vData.blood_pressure_diastolic}` : (vData.blood_pressure || '120/80'),
+                spo2: vData.spo2 || vData.oxygen_saturation || 98,
+                temperature: vData.temperature || 37.0,
+                created_at: vData.created_at
+              };
+            }
+          }
+
+          return {
+            bed_id: bed.id,
+            bed_number: bed.bed_number,
+            ward_name: bed.wards?.name || 'ICU Ward',
+            status: bed.status,
+            admission: activeAdm,
+            vitals: latestVitals
+          };
+        })
+      );
+
+      setIcuBeds(processedBeds);
+
+      // 3. Fetch Intensivist Staff
+      const { data: docData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role')
+        .eq('role', 'DOCTOR')
+        .limit(4);
+
+      setIntensivists(docData || []);
+
+    } catch (err) {
+      console.error('Error fetching ICU data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const occupiedIcuBeds = icuBeds.filter(b => b.status === 'OCCUPIED' || b.admission);
+  const criticalAlertCount = occupiedIcuBeds.filter(b => (b.vitals?.heart_rate && b.vitals.heart_rate > 100) || (b.vitals?.spo2 && b.vitals.spo2 < 92)).length;
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Intensive Care (ICU)</h1>
-          <p className="text-slate-500 mt-1">High-Acuity Monitoring & Life Support.</p>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900">Intensive Care Unit (ICU)</h1>
+          <p className="text-slate-500 mt-1 font-medium">Real-time Telemetry, High-Acuity Monitoring & Life Support Wall.</p>
         </div>
-        <div className="flex gap-3">
-          <button className="bg-rose-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors shadow-md flex items-center gap-2">
-            <Zap size={16} />
-            Emergency Resuscitation
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={fetchIcuData}
+            className="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            Refresh
           </button>
+          <span className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-100 px-3.5 py-2 rounded-xl">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            Telemetry Stream Active
+          </span>
         </div>
       </div>
 
       {/* Monitor Wall View */}
-      <section>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-slate-900">Patient Monitors</h2>
-          <span className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Vitals Linked
-          </span>
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-black text-slate-900">ICU Patient Monitors ({occupiedIcuBeds.length} Active Patients)</h2>
+          {criticalAlertCount > 0 && (
+            <span className="bg-rose-500 text-white text-xs font-black px-3 py-1 rounded-full animate-pulse flex items-center gap-1.5">
+              <AlertCircle size={14} /> {criticalAlertCount} Vital Alerts Active
+            </span>
+          )}
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {icuPatients.map((p) => (
-            <div key={p.id} className={clsx(
-              "bg-slate-900 rounded-2xl p-6 shadow-2xl relative overflow-hidden border-2 transition-all",
-              p.alert ? "border-rose-500 animate-pulse-slow" : "border-slate-800"
-            )}>
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <span className="bg-slate-800 text-slate-400 text-[10px] font-black uppercase px-2 py-1 rounded-lg">Bed {p.id.split('-')[1]}</span>
-                  <h3 className="text-xl font-black text-white mt-2">{p.name}</h3>
-                </div>
-                <div className={clsx(
-                  "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                  p.condition === 'Critical' ? "bg-rose-500 text-white" : "bg-blue-500 text-white"
-                )}>
-                  {p.condition}
-                </div>
-              </div>
-
-              {/* Vital Signs Grid */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-800/50 p-3 rounded-2xl border border-slate-700/50">
-                  <p className="text-[10px] font-black text-slate-500 uppercase mb-1">HR</p>
-                  <p className={clsx("text-xl font-black", p.hr > 100 ? "text-rose-400" : "text-emerald-400")}>{p.hr}</p>
-                </div>
-                <div className="bg-slate-800/50 p-3 rounded-2xl border border-slate-700/50">
-                  <p className="text-[10px] font-black text-slate-500 uppercase mb-1">BP</p>
-                  <p className="text-xl font-black text-blue-400">{p.bp}</p>
-                </div>
-                <div className="bg-slate-800/50 p-3 rounded-2xl border border-slate-700/50">
-                  <p className="text-[10px] font-black text-slate-500 uppercase mb-1">SpO2</p>
-                  <p className={clsx("text-xl font-black", p.spo2 < 92 ? "text-rose-400" : "text-emerald-400")}>{p.spo2}%</p>
-                </div>
-              </div>
-
-              {/* Waveform Visualization Simulator */}
-              <div className="h-16 bg-slate-800 rounded-2xl border border-slate-700 flex items-center justify-center relative overflow-hidden mb-6">
-                <svg className="absolute inset-0 w-full h-full text-emerald-500/30" preserveAspectRatio="none" viewBox="0 0 100 20">
-                  <path d="M0 10 Q 5 0, 10 10 T 20 10 T 30 10 T 40 10 T 50 10 T 60 10 T 70 10 T 80 10 T 90 10 T 100 10" fill="none" stroke="currentColor" strokeWidth="1" />
-                </svg>
-                <div className="flex items-center gap-2 text-emerald-500 font-mono text-[10px] font-bold">
-                  <Activity size={14} className="animate-pulse" />
-                  ECG LIVE FEED
-                </div>
-              </div>
-
-              <button className="w-full bg-white text-slate-900 py-3 rounded-xl text-sm font-bold hover:bg-slate-100 transition-all">
-                Full Vital History
-              </button>
+          {loading && icuBeds.length === 0 ? (
+            <div className="col-span-full py-20 text-center text-slate-400 font-bold">
+              <Loader2 className="animate-spin text-brand-600 mx-auto mb-2" size={32} />
+              Syncing Telemetry Monitors...
             </div>
-          ))}
+          ) : occupiedIcuBeds.length === 0 ? (
+            <div className="col-span-full p-12 text-center bg-slate-900 text-white rounded-3xl border border-slate-800 space-y-3">
+              <HeartPulse size={48} className="text-emerald-400 mx-auto animate-pulse" />
+              <h3 className="text-lg font-black">ICU Monitor Wall Clear</h3>
+              <p className="text-xs text-slate-400">No active inpatient admissions currently assigned to ICU beds.</p>
+            </div>
+          ) : occupiedIcuBeds.map((b) => {
+            const patient = b.admission?.patients;
+            const pName = patient ? `${patient.first_name} ${patient.last_name}` : 'Admitted ICU Inpatient';
+            const hr = b.vitals?.heart_rate || 78;
+            const bp = b.vitals?.blood_pressure || '120/80';
+            const spo2 = b.vitals?.spo2 || 98;
+            const isAlert = hr > 100 || spo2 < 92;
+
+            return (
+              <div 
+                key={b.bed_id} 
+                className={clsx(
+                  "bg-slate-900 rounded-3xl p-6 shadow-2xl relative overflow-hidden border-2 transition-all text-white",
+                  isAlert ? "border-rose-500 shadow-rose-500/20" : "border-slate-800"
+                )}
+              >
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <span className="bg-slate-800 text-slate-300 text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border border-slate-700">
+                      Bed {b.bed_number}
+                    </span>
+                    <h3 className="text-xl font-black text-white mt-2">{pName}</h3>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">
+                      MRN: {patient?.file_number || 'N/A'} &bull; {b.admission?.primary_diagnosis || 'ICU Observation'}
+                    </p>
+                  </div>
+                  <span className={clsx(
+                    "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                    isAlert ? "bg-rose-500 text-white animate-pulse" : "bg-emerald-500 text-white"
+                  )}>
+                    {isAlert ? 'Critical' : 'Stable'}
+                  </span>
+                </div>
+
+                {/* Vital Signs Grid */}
+                <div className="grid grid-cols-3 gap-3 mb-6">
+                  <div className="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
+                    <p className="text-[10px] font-black text-slate-400 uppercase mb-1">HR (BPM)</p>
+                    <p className={clsx("text-xl font-black", hr > 100 ? "text-rose-400 animate-pulse" : "text-emerald-400")}>{hr}</p>
+                  </div>
+                  <div className="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
+                    <p className="text-[10px] font-black text-slate-400 uppercase mb-1">BP (mmHg)</p>
+                    <p className="text-xl font-black text-blue-400">{bp}</p>
+                  </div>
+                  <div className="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
+                    <p className="text-[10px] font-black text-slate-400 uppercase mb-1">SpO2 (%)</p>
+                    <p className={clsx("text-xl font-black", spo2 < 92 ? "text-rose-400 animate-pulse" : "text-emerald-400")}>{spo2}%</p>
+                  </div>
+                </div>
+
+                {/* Waveform Visual Simulator */}
+                <div className="h-16 bg-slate-800/90 rounded-2xl border border-slate-700 flex items-center justify-center relative overflow-hidden mb-6">
+                  <svg className="absolute inset-0 w-full h-full text-emerald-500/40" preserveAspectRatio="none" viewBox="0 0 100 20">
+                    <path d="M0 10 Q 5 0, 10 10 T 20 10 T 30 10 T 40 10 T 50 10 T 60 10 T 70 10 T 80 10 T 90 10 T 100 10" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                  </svg>
+                  <div className="flex items-center gap-2 text-emerald-400 font-mono text-[10px] font-bold z-10">
+                    <Activity size={14} className="animate-pulse" />
+                    ECG LIVE TELEMETRY
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => patient && setSelectedPatientForVitals(patient)}
+                  className="w-full bg-white text-slate-900 py-3 rounded-2xl text-xs font-black hover:bg-slate-100 transition-all shadow-md"
+                >
+                  Record New Vitals
+                </button>
+              </div>
+            );
+          })}
         </div>
       </section>
 
-      {/* Ventilator & Equipment Status */}
+      {/* Staffing Status & ICU Roster */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <Activity className="text-brand-500" size={20} />
-            Life Support Systems
+        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+          <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+            <HeartPulse className="text-rose-500" size={20} />
+            Attending ICU Intensivists
           </h2>
           <div className="space-y-4">
-            {[
-              { name: 'Ventilator V10', patient: 'Mapalo Ngosa', status: 'Active', mode: 'AC/VC' },
-              { name: 'Dialysis Machine D02', patient: 'Kunda Tembo', status: 'Active', mode: 'CRRT' },
-              { name: 'Infusion Pump P42', patient: 'Mwaba Musonda', status: 'Alarm', mode: 'Maintenance' },
-            ].map((eq, i) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+            {intensivists.length === 0 ? (
+              <p className="text-xs text-slate-400 font-bold">No intensivists assigned.</p>
+            ) : intensivists.map((doc) => (
+              <div key={doc.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                 <div>
-                  <p className="text-sm font-bold text-slate-800">{eq.name}</p>
-                  <p className="text-xs text-slate-500">{eq.patient} • {eq.mode}</p>
+                  <p className="text-sm font-bold text-slate-900">Dr. {doc.first_name} {doc.last_name}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Intensivist &bull; ICU Care</p>
                 </div>
-                <span className={clsx(
-                  "text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md",
-                  eq.status === 'Active' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white animate-pulse"
-                )}>
-                  {eq.status}
+                <span className="text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                  On Duty
                 </span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-slate-900 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-2xl rounded-full" />
-          <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
-            <AlertCircle className="text-amber-400" size={20} />
-            Staffing Status (ICU)
-          </h2>
-          <div className="space-y-4 flex-1">
-            <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700/50 flex justify-between items-center">
-              <div>
-                <p className="text-sm font-bold">Intensivist on Duty</p>
-                <p className="text-xs text-slate-400">Dr. Alan Grant</p>
+        <div className="bg-slate-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-between border border-slate-800">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 blur-2xl rounded-full pointer-events-none" />
+          <div>
+            <h2 className="text-lg font-black mb-6 flex items-center gap-2">
+              <ShieldAlert className="text-rose-400" size={20} />
+              ICU Operational Overview
+            </h2>
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-800/60 rounded-2xl border border-slate-700/50 flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-bold">Nurse-to-Patient Ratio</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Target: 1:1 High Acuity</p>
+                </div>
+                <span className="text-xs font-black bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30">
+                  1:1 Optimal
+                </span>
               </div>
-              <div className="bg-emerald-500/20 text-emerald-400 p-2 rounded-lg">
-                <Clock size={16} />
-              </div>
-            </div>
-            <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700/50 flex justify-between items-center">
-              <div>
-                <p className="text-sm font-bold">Nurse-to-Patient Ratio</p>
-                <p className="text-xs text-slate-400">Target: 1:1 • Current: 1:1</p>
-              </div>
-              <div className="bg-blue-500/20 text-blue-400 p-2 rounded-lg">
-                <Users size={16} />
+              <div className="p-4 bg-slate-800/60 rounded-2xl border border-slate-700/50 flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-bold">Ventilator Capacity</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Continuous Positive Airway Support</p>
+                </div>
+                <span className="text-xs font-black bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full border border-blue-500/30">
+                  Operational
+                </span>
               </div>
             </div>
           </div>
-          <button className="w-full mt-8 bg-brand-500 hover:bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-brand-500/20 transition-all">
-            Request Additional Staff
-          </button>
         </div>
       </div>
-    </div>
-  );
-}
 
-function Users({ size, className }: { size: number, className?: string }) {
-  return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      width={size} 
-      height={size} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      className={className}
-    >
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
+      {selectedPatientForVitals && (
+        <CaptureVitalsModal 
+          isOpen={!!selectedPatientForVitals}
+          onClose={() => { setSelectedPatientForVitals(null); fetchIcuData(); }}
+          patientId={selectedPatientForVitals.id}
+          patientName={`${selectedPatientForVitals.first_name} ${selectedPatientForVitals.last_name}`}
+        />
+      )}
+
+      <StatusModal 
+        isOpen={!!statusModal}
+        type={statusModal?.type || 'success'}
+        title={statusModal?.title || ''}
+        message={statusModal?.message || ''}
+        onClose={() => setStatusModal(null)}
+      />
+    </div>
   );
 }

@@ -17,12 +17,16 @@ import {
   ShieldCheck,
   Loader2,
   Edit2,
-  Trash2
+  Trash2,
+  RefreshCw,
+  X
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import RegisterPatientModal from '@/components/hospital/RegisterPatientModal';
 import EditPatientModal from '@/components/hospital/EditPatientModal';
+import StatusModal from '@/components/hospital/StatusModal';
 import { deletePatientAction } from '@/app/hospital/actions';
+import clsx from 'clsx';
 
 export default function PatientsPage() {
   const [loading, setLoading] = useState(true);
@@ -30,16 +34,53 @@ export default function PatientsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [addedTodayCount, setAddedTodayCount] = useState(0);
+  const [insuredCount, setInsuredCount] = useState(0);
+
+  // Filters State
+  const [genderFilter, setGenderFilter] = useState<'ALL' | 'male' | 'female'>('ALL');
+  const [insuranceFilter, setInsuranceFilter] = useState<'ALL' | 'INSURED' | 'CASH'>('ALL');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<any>(null);
+  const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
+
   const pageSize = 10;
-  
   const supabase = createClient();
 
+  useEffect(() => {
+    fetchPatientMetrics();
+  }, []);
 
   useEffect(() => {
     fetchPatients();
-  }, [page, search]);
+  }, [page, search, genderFilter, insuranceFilter]);
+
+  const fetchPatientMetrics = async () => {
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      // Added Today
+      const { count: todayCount } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', todayStart.toISOString());
+
+      // Insured Patients Count
+      const { count: insCount } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .not('insurance_provider', 'is', null)
+        .neq('insurance_provider', '');
+
+      setAddedTodayCount(todayCount || 0);
+      setInsuredCount(insCount || 0);
+    } catch (err) {
+      console.error('Error fetching patient metrics:', err);
+    }
+  };
 
   const fetchPatients = async () => {
     setLoading(true);
@@ -48,7 +89,17 @@ export default function PatientsPage() {
       .select('*', { count: 'exact' });
 
     if (search) {
-      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,file_number.ilike.%${search}%`);
+      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,file_number.ilike.%${search}%,phone.ilike.%${search}%`);
+    }
+
+    if (genderFilter !== 'ALL') {
+      query = query.ilike('gender', genderFilter);
+    }
+
+    if (insuranceFilter === 'INSURED') {
+      query = query.not('insurance_provider', 'is', null).neq('insurance_provider', '');
+    } else if (insuranceFilter === 'CASH') {
+      query = query.or('insurance_provider.is.null,insurance_provider.eq.');
     }
 
     const { data, count, error } = await query
@@ -62,10 +113,23 @@ export default function PatientsPage() {
     setLoading(false);
   };
 
+  const handleDeletePatient = async (id: string, name: string) => {
+    if (confirm(`Are you sure you want to permanently delete patient ${name}?`)) {
+      const res = await deletePatientAction(id);
+      if (res.error) {
+        setStatus({ type: 'error', title: 'Delete Failed', message: res.error });
+      } else {
+        setStatus({ type: 'success', title: 'Patient Removed', message: `${name} has been removed from the registry.` });
+        fetchPatients();
+        fetchPatientMetrics();
+      }
+    }
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-7xl mx-auto">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -75,63 +139,70 @@ export default function PatientsPage() {
             </div>
             Patient Directory
           </h1>
-          <p className="text-slate-500 mt-1 font-medium">Manage and view all registered patient records.</p>
+          <p className="text-slate-500 mt-1 font-medium">Comprehensive electronic medical records (EHR) registry.</p>
         </div>
-        <button 
-          onClick={() => setIsRegisterModalOpen(true)}
-          className="flex items-center justify-center gap-2 bg-brand-600 text-white px-6 py-3.5 rounded-2xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/20 active:scale-[0.98]"
-        >
-          <UserPlus size={20} />
-          Register New Patient
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => { fetchPatients(); fetchPatientMetrics(); }}
+            className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl font-bold hover:bg-slate-50 transition-all shadow-sm"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+          <button 
+            onClick={() => setIsRegisterModalOpen(true)}
+            className="flex items-center justify-center gap-2 bg-brand-600 text-white px-6 py-3.5 rounded-2xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/20 active:scale-[0.98]"
+          >
+            <UserPlus size={20} />
+            Register New Patient
+          </button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Real Summary Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
               <Users size={24} />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Patients</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Registered</p>
               <h3 className="text-2xl font-black text-slate-900">{totalCount}</h3>
             </div>
           </div>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
               <Calendar size={24} />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Added Today</p>
-              <h3 className="text-2xl font-black text-slate-900">0</h3>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Registered Today</p>
+              <h3 className="text-2xl font-black text-slate-900">{addedTodayCount}</h3>
             </div>
           </div>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
               <ShieldCheck size={24} />
             </div>
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Insured Patients</p>
-              <h3 className="text-2xl font-black text-slate-900">
-                {patients.filter(p => p.insurance_provider).length}
-              </h3>
+              <h3 className="text-2xl font-black text-slate-900">{insuredCount}</h3>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Search and Filters */}
+      {/* Search & Dynamic Filters Bar */}
       <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4">
         <div className="flex-1 relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
           <input 
             type="text"
-            placeholder="Search by name or file number..."
+            placeholder="Search by name, file number, or phone..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -140,10 +211,30 @@ export default function PatientsPage() {
             className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white transition-all"
           />
         </div>
-        <button className="flex items-center justify-center gap-2 px-6 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50 transition-all">
-          <Filter size={18} />
-          Filters
-        </button>
+
+        <div className="flex items-center gap-3">
+          {/* Gender Filter */}
+          <select 
+            value={genderFilter}
+            onChange={(e) => { setGenderFilter(e.target.value as any); setPage(1); }}
+            className="px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          >
+            <option value="ALL">All Genders</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+
+          {/* Insurance Filter */}
+          <select 
+            value={insuranceFilter}
+            onChange={(e) => { setInsuranceFilter(e.target.value as any); setPage(1); }}
+            className="px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          >
+            <option value="ALL">All Payment Types</option>
+            <option value="INSURED">Insured Only</option>
+            <option value="CASH">Cash / Self-Pay</option>
+          </select>
+        </div>
       </div>
 
       {/* Patients Table */}
@@ -156,7 +247,7 @@ export default function PatientsPage() {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">File Number</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Gender / Age</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Info</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Insurance</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Insurance / Billing</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
@@ -166,7 +257,7 @@ export default function PatientsPage() {
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="animate-spin text-brand-600" size={32} />
-                      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Loading records...</p>
+                      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Loading patient records...</p>
                     </div>
                   </td>
                 </tr>
@@ -177,7 +268,7 @@ export default function PatientsPage() {
                     <tr key={patient.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-4">
                         <Link href={`/hospital/patients/${patient.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center font-bold">
+                          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-bold">
                             {patient.first_name?.[0]}{patient.last_name?.[0]}
                           </div>
                           <div>
@@ -193,7 +284,7 @@ export default function PatientsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="space-y-1">
-                          <p className="text-xs font-bold text-slate-700 capitalize">{patient.gender}</p>
+                          <p className="text-xs font-bold text-slate-700 capitalize">{patient.gender || 'N/A'}</p>
                           <p className="text-[10px] text-slate-400 font-medium">{age} years old</p>
                         </div>
                       </td>
@@ -210,14 +301,21 @@ export default function PatientsPage() {
                         {patient.insurance_provider ? (
                           <div className="space-y-1">
                             <p className="text-xs font-bold text-brand-600">{patient.insurance_provider}</p>
-                            <p className="text-[10px] text-slate-400 font-medium">Policy: {patient.insurance_policy_number}</p>
+                            <p className="text-[10px] text-slate-400 font-medium">Policy: {patient.insurance_policy_number || 'N/A'}</p>
                           </div>
                         ) : (
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest italic">Cash Basis</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest italic">Self-Pay / Cash</span>
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Link
+                            href={`/hospital/patients/${patient.id}`}
+                            className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all"
+                            title="View Patient Record"
+                          >
+                            <FileText size={16} />
+                          </Link>
                           <button 
                             onClick={() => setEditingPatient(patient)}
                             className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all"
@@ -226,13 +324,7 @@ export default function PatientsPage() {
                             <Edit2 size={16} />
                           </button>
                           <button 
-                            onClick={async () => {
-                              if (confirm(`Are you sure you want to delete patient ${patient.first_name} ${patient.last_name}?`)) {
-                                const res = await deletePatientAction(patient.id);
-                                if (res.error) alert(res.error);
-                                else fetchPatients();
-                              }
-                            }}
+                            onClick={() => handleDeletePatient(patient.id, `${patient.first_name} ${patient.last_name}`)}
                             className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                             title="Delete Patient"
                           >
@@ -257,11 +349,13 @@ export default function PatientsPage() {
                       <button 
                         onClick={() => {
                           setSearch('');
+                          setGenderFilter('ALL');
+                          setInsuranceFilter('ALL');
                           setPage(1);
                         }}
                         className="text-brand-600 text-sm font-black uppercase tracking-widest"
                       >
-                        Clear Search
+                        Reset Filters
                       </button>
                     </div>
                   </td>
@@ -290,11 +384,12 @@ export default function PatientsPage() {
                   <button
                     key={i + 1}
                     onClick={() => setPage(i + 1)}
-                    className={`w-10 h-10 rounded-xl text-xs font-black transition-all ${
+                    className={clsx(
+                      "w-10 h-10 rounded-xl text-xs font-black transition-all",
                       page === i + 1 
                         ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20' 
                         : 'hover:bg-slate-50 text-slate-600'
-                    }`}
+                    )}
                   >
                     {i + 1}
                   </button>
@@ -318,6 +413,7 @@ export default function PatientsPage() {
         onSuccess={() => {
           setIsRegisterModalOpen(false);
           fetchPatients();
+          fetchPatientMetrics();
         }}
       />
 
@@ -329,10 +425,18 @@ export default function PatientsPage() {
           onSuccess={() => {
             setEditingPatient(null);
             fetchPatients();
+            fetchPatientMetrics();
           }}
         />
       )}
+
+      <StatusModal 
+        isOpen={!!status}
+        type={status?.type || 'success'}
+        title={status?.title || ''}
+        message={status?.message || ''}
+        onClose={() => setStatus(null)}
+      />
     </div>
   );
-
 }

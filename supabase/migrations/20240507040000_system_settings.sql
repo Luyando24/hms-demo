@@ -22,7 +22,13 @@ WHERE NOT EXISTS (SELECT 1 FROM public.system_settings);
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "system_settings_select" ON public.system_settings;
-CREATE POLICY "system_settings_select" ON public.system_settings FOR SELECT USING (true);
-
 DROP POLICY IF EXISTS "system_settings_modify" ON public.system_settings;
-CREATE POLICY "system_settings_modify" ON public.system_settings FOR ALL WITH CHECK (true);
+DROP POLICY IF EXISTS "system_settings_select_all" ON public.system_settings;
+DROP POLICY IF EXISTS "system_settings_insert_all" ON public.system_settings;
+DROP POLICY IF EXISTS "system_settings_update_all" ON public.system_settings;
+DROP POLICY IF EXISTS "system_settings_delete_all" ON public.system_settings;
+
+CREATE POLICY "system_settings_select_all" ON public.system_settings FOR SELECT USING (true);
+CREATE POLICY "system_settings_insert_all" ON public.system_settings FOR INSERT WITH CHECK (true);
+CREATE POLICY "system_settings_update_all" ON public.system_settings FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "system_settings_delete_all" ON public.system_settings FOR DELETE USING (true);

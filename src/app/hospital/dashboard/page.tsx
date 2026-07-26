@@ -57,12 +57,12 @@ export default function HospitalDashboard() {
     nurseCount: 0,
   });
 
-  // Weekly Admissions Chart State (From DB)
+  // Weekly Admissions Chart State
   const [weeklyChartData, setWeeklyChartData] = useState<WeeklyDayMetric[]>([]);
   const [maxChartVal, setMaxChartVal] = useState(10);
   const [peakDay, setPeakDay] = useState<string>('Today');
 
-  // Critical Alerts State (From DB)
+  // Critical Alerts State
   const [alerts, setAlerts] = useState<AlertLog[]>([]);
   const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
   const [logFilter, setLogFilter] = useState<'ALL' | 'critical' | 'warning' | 'info'>('ALL');
@@ -73,7 +73,7 @@ export default function HospitalDashboard() {
 
     // Setup realtime channels for live metric & alert updates
     const channel = supabase
-      .channel('dashboard-live-metrics-real')
+      .channel('dashboard-live-metrics-clean')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'walkin_queue' }, () => fetchDashboardData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admissions' }, () => fetchDashboardData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => fetchDashboardData())
@@ -103,7 +103,7 @@ export default function HospitalDashboard() {
         });
       }
 
-      // 2. Fetch ER Cases & Emergency Queue from DB
+      // 2. Fetch ER Cases & Emergency Queue
       const { count: erCount } = await supabase
         .from('walkin_queue')
         .select('*', { count: 'exact', head: true })
@@ -115,7 +115,7 @@ export default function HospitalDashboard() {
         .eq('status', 'WAITING')
         .eq('priority', 'EMERGENCY');
 
-      // 3. Fetch Bed Occupancy (Admissions vs Total Beds) from DB
+      // 3. Fetch Bed Occupancy (Admissions vs Total Beds)
       const { count: totalBedsCount } = await supabase
         .from('beds')
         .select('*', { count: 'exact', head: true });
@@ -129,7 +129,7 @@ export default function HospitalDashboard() {
       const occupiedBeds = occupiedBedsCount || 0;
       const occupancyPct = Math.round((occupiedBeds / totalBeds) * 100);
 
-      // 4. Fetch Today's Revenue from DB Payments
+      // 4. Fetch Today's Revenue from Payments
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
@@ -140,7 +140,7 @@ export default function HospitalDashboard() {
 
       const revenueSum = (todayPayments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
-      // 5. Fetch Staff Counts from DB Profiles
+      // 5. Fetch Staff Counts
       const { data: staffProfiles } = await supabase
         .from('profiles')
         .select('role');
@@ -161,12 +161,11 @@ export default function HospitalDashboard() {
         nurseCount: nurses
       });
 
-      // 6. Calculate Weekly Admissions & Queue Chart Data DIRECTLY FROM DB
+      // 6. Calculate Weekly Admissions & Queue Chart Data
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const past7Days: WeeklyDayMetric[] = [];
       const now = new Date();
 
-      // Fetch last 7 days walkin queue & admissions
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
       sevenDaysAgo.setHours(0, 0, 0, 0);
@@ -211,10 +210,10 @@ export default function HospitalDashboard() {
       setMaxChartVal(Math.max(highestVal, 10));
       setPeakDay(highestDay);
 
-      // 7. Build Real-time Critical Alerts & Log Stream DIRECTLY FROM DB
+      // 7. Build Operational Alerts Stream
       const liveAlerts: AlertLog[] = [];
 
-      // A. Emergency Triage Queue Alerts
+      // Emergency Triage Queue Alerts
       const { data: emergencyQueue } = await supabase
         .from('walkin_queue')
         .select('*, patients(*)')
@@ -235,7 +234,7 @@ export default function HospitalDashboard() {
         });
       });
 
-      // B. Low Inventory Stock Alerts
+      // Low Inventory Stock Alerts
       const { data: inventoryData } = await supabase
         .from('inventory_items')
         .select('*')
@@ -246,7 +245,7 @@ export default function HospitalDashboard() {
         const isCritical = item.quantity <= (item.min_reorder_level || 10);
         liveAlerts.push({
           id: `inv-${item.id}`,
-          title: `Stock Telemetry: ${item.item_name} (${item.category || 'Pharmacy'})`,
+          title: `Low Stock: ${item.item_name} (${item.category || 'Pharmacy'})`,
           category: 'INVENTORY',
           time: formatTimeAgo(item.updated_at),
           timestamp: item.updated_at || new Date().toISOString(),
@@ -255,7 +254,7 @@ export default function HospitalDashboard() {
         });
       });
 
-      // C. Blood Bank Reserve Telemetry
+      // Blood Bank Supply Alerts
       const { data: bloodData } = await supabase
         .from('blood_inventory')
         .select('*')
@@ -266,16 +265,16 @@ export default function HospitalDashboard() {
         const isLow = item.units_in_stock <= 5;
         liveAlerts.push({
           id: `blood-${item.id}`,
-          title: `Blood Inventory: Group ${item.blood_group}`,
+          title: `Blood Bank Supply: Group ${item.blood_group}`,
           category: 'BLOOD',
-          time: 'Active Telemetry',
+          time: 'Active Notice',
           timestamp: new Date().toISOString(),
           level: isLow ? 'critical' : 'info',
           details: `${item.units_in_stock} unit(s) available in blood bank storage.`
         });
       });
 
-      // D. Recent Inpatient Admissions
+      // Inpatient Admissions
       const { data: recentAdmissions } = await supabase
         .from('admissions')
         .select('*, patients(*), beds(*)')
@@ -296,9 +295,7 @@ export default function HospitalDashboard() {
         });
       });
 
-      // Sort alerts chronologically
       liveAlerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
       setAlerts(liveAlerts);
     } catch (err) {
       console.error('Error loading dashboard metrics:', err);
@@ -325,24 +322,24 @@ export default function HospitalDashboard() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Hospital Overview</h1>
-          <p className="text-slate-500 mt-1 font-medium">Real database metrics and operational telemetry for HMSdemo Hospital.</p>
+          <p className="text-slate-500 mt-1 font-medium">Real-time operational status and clinical metrics for HMSdemo Hospital.</p>
         </div>
         <div className="flex items-center gap-3">
           <button 
             onClick={fetchDashboardData}
-            className="flex items-center gap-2 text-sm font-bold px-3 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-xl transition-colors"
+            className="flex items-center gap-2 text-sm font-bold px-3.5 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-xl transition-colors"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Sync DB Metrics
+            Refresh
           </button>
           <span className="flex items-center gap-2 text-sm font-bold px-3.5 py-2 bg-emerald-100 text-emerald-800 rounded-xl">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            Live DB Connection Active
+            System Operational
           </span>
         </div>
       </div>
 
-      {/* Top Real Metrics Grid */}
+      {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* ER Cases Metric */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative overflow-hidden">
@@ -351,7 +348,7 @@ export default function HospitalDashboard() {
               <Activity size={24} strokeWidth={2.5} />
             </div>
             <span className="flex items-center text-xs font-black text-rose-600 bg-rose-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
-              Live DB Queue
+              Active Triage
             </span>
           </div>
           <h3 className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-1">Active Triage Cases</h3>
@@ -389,7 +386,7 @@ export default function HospitalDashboard() {
               <TrendingUp size={24} strokeWidth={2.5} />
             </div>
             <span className="flex items-center text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
-              Live DB Payments
+              Settled Today
             </span>
           </div>
           <h3 className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-1">Today's Revenue</h3>
@@ -408,10 +405,10 @@ export default function HospitalDashboard() {
               <Users size={24} strokeWidth={2.5} />
             </div>
             <span className="text-xs font-black text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
-              Live DB Staff
+              Staffing
             </span>
           </div>
-          <h3 className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-1">Active Staff Directory</h3>
+          <h3 className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-1">Active Personnel</h3>
           <p className="text-3xl font-black text-slate-900">{metrics.staffOnDuty}</p>
           <p className="text-xs text-slate-400 font-bold mt-2">
             {metrics.doctorCount} Doctors &bull; {metrics.nurseCount} Nurses
@@ -422,12 +419,12 @@ export default function HospitalDashboard() {
       {/* Main Content Area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Visual Analytics Chart from DB */}
+        {/* Visual Analytics Chart */}
         <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 shadow-sm p-8 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-lg font-black text-slate-900">Weekly Patient Volume (DB Realtime)</h2>
-              <p className="text-xs text-slate-400 font-medium">Actual database records for Walk-ins & Admissions</p>
+              <h2 className="text-lg font-black text-slate-900">Weekly Patient Volume</h2>
+              <p className="text-xs text-slate-400 font-medium">Patient throughput across ER, OPD, and Inpatient admissions</p>
             </div>
             <select className="bg-slate-50 border border-slate-200 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/20 text-slate-700">
               <option>Last 7 Days</option>
@@ -437,7 +434,7 @@ export default function HospitalDashboard() {
           {/* SVG Visual Chart */}
           <div className="flex-1 bg-slate-900/95 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between min-h-[300px]">
             <div className="flex items-center justify-between text-xs text-slate-400 font-bold border-b border-slate-800 pb-3">
-              <span>DB Patient Volume</span>
+              <span>Patient Volume</span>
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1.5 text-brand-400">
                   <span className="w-2.5 h-2.5 rounded-full bg-brand-500" /> Walk-in Queue
@@ -468,12 +465,12 @@ export default function HospitalDashboard() {
 
             <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 font-medium">
               <span>Peak activity day: <strong className="text-white">{peakDay}</strong></span>
-              <span className="text-emerald-400 font-bold">100% Verified DB Records</span>
+              <span className="text-emerald-400 font-bold">7-Day Activity Trend</span>
             </div>
           </div>
         </div>
 
-        {/* Critical Alerts & Log Module (DB Driven) */}
+        {/* Operational Alerts Module */}
         <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden flex flex-col justify-between border border-slate-800">
           <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/10 blur-3xl rounded-full translate-x-1/3 -translate-y-1/3 pointer-events-none" />
           
@@ -482,9 +479,9 @@ export default function HospitalDashboard() {
               <div>
                 <h2 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
                   <ShieldAlert size={20} className="text-rose-500" />
-                  Critical Telemetry
+                  Operational Alerts
                 </h2>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Live Database Alerts</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Clinical & Resource Notifications</p>
               </div>
               {criticalCount > 0 ? (
                 <span className="bg-rose-500/90 text-white text-xs font-black px-2.5 py-1 rounded-full animate-pulse shadow-md shadow-rose-500/20">
@@ -499,7 +496,7 @@ export default function HospitalDashboard() {
 
             <div className="space-y-3.5 max-h-[340px] overflow-y-auto relative z-10 pr-1">
               {alerts.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-10 font-bold">No active alerts found in database.</p>
+                <p className="text-xs text-slate-400 text-center py-10 font-bold">No critical alerts recorded.</p>
               ) : alerts.map((alert) => (
                 <div 
                   key={alert.id} 
@@ -538,12 +535,12 @@ export default function HospitalDashboard() {
             className="w-full mt-6 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-3 rounded-2xl transition-all border border-slate-700/60 relative z-10 flex items-center justify-center gap-2"
           >
             <FileText size={16} />
-            View Full Database Log History ({alerts.length})
+            View System Log History ({alerts.length})
           </button>
         </div>
       </div>
 
-      {/* Full Database Log History Modal */}
+      {/* System Log History Modal */}
       {isLogsModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-3xl w-full p-8 border border-slate-200 shadow-2xl space-y-6 max-h-[90vh] flex flex-col">
@@ -551,9 +548,9 @@ export default function HospitalDashboard() {
               <div>
                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
                   <ShieldAlert className="text-brand-600" size={24} />
-                  Database System Telemetry Logs
+                  System Operational Logs
                 </h2>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">Real-time database event logs for emergency triage, inventory, blood bank, and admissions.</p>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Real-time event logs for emergency triage, inventory, blood bank, and admissions.</p>
               </div>
               <button 
                 onClick={() => setIsLogsModalOpen(false)}
@@ -589,7 +586,7 @@ export default function HospitalDashboard() {
             {/* Log List */}
             <div className="flex-1 overflow-y-auto space-y-3 pr-2">
               {filteredAlerts.length === 0 ? (
-                <p className="text-center py-10 text-slate-400 text-sm font-bold">No database logs matching severity filter.</p>
+                <p className="text-center py-10 text-slate-400 text-sm font-bold">No logs matching selected severity filter.</p>
               ) : filteredAlerts.map((log) => (
                 <div key={log.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
                   <div className="flex items-center justify-between">

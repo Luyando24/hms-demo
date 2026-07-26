@@ -12,31 +12,55 @@ import {
   MoreVertical, 
   CheckCircle2,
   Loader2,
-  DoorOpen
+  DoorOpen,
+  RefreshCw,
+  UserCheck
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 import CaptureVitalsModal from "@/components/hospital/CaptureVitalsModal";
 import ConsultationModal from "@/components/hospital/ConsultationModal";
+import RegisterPatientModal from "@/components/hospital/RegisterPatientModal";
+import Link from "next/link";
+
+interface DoctorItem {
+  id: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+}
 
 export default function OutpatientDashboard() {
   const [queue, setQueue] = useState<any[]>([]);
+  const [doctors, setDoctors] = useState<DoctorItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [selectedQueueItem, setSelectedQueueItem] = useState<any>(null);
+
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
   const [isConsultationModalOpen, setIsConsultationModalOpen] = useState(false);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+
+  // Real OPD Metrics State
+  const [opdStats, setOpdStats] = useState({
+    totalToday: 0,
+    inConsultation: 0,
+    waitingTriage: 0,
+    completedToday: 0,
+  });
+
   const supabase = createClient();
 
   useEffect(() => {
-    fetchQueue();
+    fetchOpdData();
     
-    // Subscribe to changes
+    // Subscribe to realtime OPD queue updates
     const channel = supabase
-      .channel('queue_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'walkin_queue' }, () => {
-        fetchQueue();
-      })
+      .channel('opd-queue-live-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'walkin_queue' }, () => fetchOpdData())
       .subscribe();
 
     return () => {
@@ -44,32 +68,87 @@ export default function OutpatientDashboard() {
     };
   }, []);
 
-  const fetchQueue = async () => {
+  const fetchOpdData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('walkin_queue')
-      .select('*, patients(*), rooms(*)')
-      .order('created_at', { ascending: true });
-    
-    if (data) setQueue(data);
-    setLoading(false);
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      // 1. Fetch Walkin Queue Items
+      const { data: queueData } = await supabase
+        .from('walkin_queue')
+        .select('*, patients(*), rooms(*)')
+        .order('created_at', { ascending: false });
+      
+      const qList = queueData || [];
+      setQueue(qList);
+
+      // 2. Compute OPD Metrics from DB
+      const todayQueue = qList.filter(i => new Date(i.created_at) >= todayStart);
+      setOpdStats({
+        totalToday: todayQueue.length || qList.length,
+        inConsultation: qList.filter(i => i.status === 'CONSULTATION' || i.status === 'TRIAGED').length,
+        waitingTriage: qList.filter(i => i.status === 'WAITING').length,
+        completedToday: qList.filter(i => i.status === 'COMPLETED').length,
+      });
+
+      // 3. Fetch Doctors for Availability List
+      const { data: docsData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role')
+        .eq('role', 'DOCTOR')
+        .limit(6);
+
+      setDoctors(docsData || []);
+
+    } catch (err) {
+      console.error('Error fetching OPD queue:', err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const filteredQueue = queue.filter(item => {
+    const p = item.patients;
+    const matchesSearch = searchQuery === '' ||
+      item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p?.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p?.file_number?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = filterStatus === 'ALL' || item.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Outpatient Department (OPD)</h1>
-          <p className="text-slate-500 mt-1 font-medium">Daily Consultation Queue & Patient Flow.</p>
+          <p className="text-slate-500 mt-1 font-medium">Daily Consultation Queue, Patient Triage & Clinical Workflows.</p>
         </div>
-        <div className="flex gap-3">
-          <button className="bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2">
-            <Calendar size={16} />
-            Today: May 05
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={fetchOpdData}
+            className="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            Refresh
           </button>
-          <button className="bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20 flex items-center gap-2">
+          <Link
+            href="/hospital/reception"
+            className="bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
+          >
+            <UserCheck size={16} />
+            Reception Desk
+          </Link>
+          <button 
+            onClick={() => setIsRegisterModalOpen(true)}
+            className="bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20 flex items-center gap-2"
+          >
             <Plus size={16} />
-            Check-in Patient
+            Register Patient
           </button>
         </div>
       </div>
@@ -77,41 +156,52 @@ export default function OutpatientDashboard() {
       {/* OPD Stats Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Registered</p>
-          <p className="text-2xl font-black text-slate-900">124</p>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Total Queue Today</p>
+          <p className="text-3xl font-black text-slate-900">{opdStats.totalToday}</p>
         </div>
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">In Consultation</p>
-          <p className="text-2xl font-black text-slate-900">8</p>
+          <p className="text-xs font-black text-blue-500 uppercase tracking-wider mb-2">In Consultation</p>
+          <p className="text-3xl font-black text-slate-900">{opdStats.inConsultation}</p>
         </div>
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-2">Waiting Triage</p>
-          <p className="text-2xl font-black text-slate-900">
-            {queue.filter(i => i.status === 'WAITING').length}
-          </p>
+          <p className="text-xs font-black text-amber-500 uppercase tracking-wider mb-2">Waiting Triage</p>
+          <p className="text-3xl font-black text-slate-900">{opdStats.waitingTriage}</p>
         </div>
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Completed</p>
-          <p className="text-2xl font-black text-slate-900">74</p>
+          <p className="text-xs font-black text-emerald-500 uppercase tracking-wider mb-2">Completed</p>
+          <p className="text-3xl font-black text-slate-900">{opdStats.completedToday}</p>
         </div>
       </div>
 
       {/* Main Queue Table */}
-      <section>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-black text-slate-900">Patient Queue</h2>
-          <div className="flex items-center gap-2">
+      <section className="space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h2 className="text-xl font-black text-slate-900">OPD Consultation Queue</h2>
+          
+          <div className="flex items-center gap-3">
+            {/* Status Filter */}
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="bg-white border border-slate-200 text-xs font-bold rounded-xl px-3 py-2 text-slate-700 focus:outline-none"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="WAITING">Waiting Triage</option>
+              <option value="TRIAGED">Triaged</option>
+              <option value="CONSULTATION">In Consultation</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+
             <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 group-focus-within:text-brand-600 transition-colors" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input 
                 type="text" 
                 placeholder="Search queue..." 
-                className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500/20"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               />
             </div>
-            <button className="bg-white border border-slate-200 text-slate-700 p-2 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
-              <Filter size={18} />
-            </button>
           </div>
         </div>
 
@@ -119,10 +209,10 @@ export default function OutpatientDashboard() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Token</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Token / ID</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Patient</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Wait Time</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Room</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Check-in Time</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Department</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
               </tr>
@@ -135,23 +225,25 @@ export default function OutpatientDashboard() {
                     Loading live queue...
                   </td>
                 </tr>
-              ) : queue.length === 0 ? (
+              ) : filteredQueue.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-20 text-center">
                     <div className="w-16 h-16 bg-slate-50 text-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
                       <Clock size={32} />
                     </div>
-                    <p className="text-slate-400 font-bold">No patients currently in queue.</p>
+                    <p className="text-slate-400 font-bold text-sm">No OPD queue records found.</p>
                   </td>
                 </tr>
-              ) : queue.map((item) => (
+              ) : filteredQueue.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-4">
-                    <span className="font-black text-slate-400 text-xs tracking-tighter">#{item.token_number || item.id.slice(0, 4)}</span>
+                    <span className="font-black text-slate-400 text-xs tracking-tighter">#{item.id.slice(0, 8)}</span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <p className="font-black text-slate-900 capitalize group-hover:text-brand-600 transition-colors">{item.patients.first_name} {item.patients.last_name}</p>
+                      <p className="font-black text-slate-900 capitalize group-hover:text-brand-600 transition-colors">
+                        {item.patients ? `${item.patients.first_name} ${item.patients.last_name}` : 'Walk-in Patient'}
+                      </p>
                       {item.priority !== 'NORMAL' && (
                         <span className={clsx(
                           "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter",
@@ -161,7 +253,9 @@ export default function OutpatientDashboard() {
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-0.5">MRN: {item.patients.file_number}</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-0.5">
+                      MRN: {item.patients?.file_number || 'N/A'}
+                    </p>
                   </td>
                   <td className="px-6 py-4">
                     <span className="flex items-center gap-1.5 text-slate-600 font-bold text-xs">
@@ -170,14 +264,10 @@ export default function OutpatientDashboard() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    {item.rooms ? (
-                      <div className="flex items-center gap-2 text-brand-600">
-                        <DoorOpen size={14} />
-                        <span className="text-xs font-black uppercase tracking-widest">{item.rooms.name}</span>
-                      </div>
-                    ) : (
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest italic">Triage Pending</span>
-                    )}
+                    <div className="flex items-center gap-2 text-brand-600">
+                      <DoorOpen size={14} />
+                      <span className="text-xs font-black uppercase tracking-widest">{item.department || 'General OPD'}</span>
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={clsx(
@@ -192,7 +282,7 @@ export default function OutpatientDashboard() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {item.status === 'WAITING' && (
+                      {item.status === 'WAITING' && item.patients && (
                         <button 
                           onClick={() => { setSelectedPatient(item.patients); setIsVitalsModalOpen(true); }}
                           className="bg-brand-600 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-brand-700 transition-all shadow-md flex items-center gap-1.5 active:scale-95"
@@ -201,7 +291,7 @@ export default function OutpatientDashboard() {
                           Capture Vitals
                         </button>
                       )}
-                      {(item.status === 'TRIAGED' || item.status === 'CONSULTATION') && (
+                      {(item.status === 'TRIAGED' || item.status === 'CONSULTATION' || item.status === 'WAITING') && item.patients && (
                         <button 
                           onClick={() => { setSelectedPatient(item.patients); setSelectedQueueItem(item); setIsConsultationModalOpen(true); }}
                           className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-slate-800 transition-all shadow-md flex items-center gap-1.5 active:scale-95"
@@ -210,9 +300,6 @@ export default function OutpatientDashboard() {
                           Start Consult
                         </button>
                       )}
-                      <button className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-100">
-                        <MoreVertical size={18} />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -222,10 +309,66 @@ export default function OutpatientDashboard() {
         </div>
       </section>
 
+      {/* Attending Physicians & Quick Nav */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+          <h2 className="text-lg font-black text-slate-900">Attending Physicians</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {doctors.length === 0 ? (
+              <p className="text-xs text-slate-400 font-bold col-span-full">No attending physicians registered.</p>
+            ) : doctors.map((doc) => (
+              <div key={doc.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center">
+                    <Stethoscope size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">Dr. {doc.first_name} {doc.last_name}</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">{doc.role}</p>
+                  </div>
+                </div>
+                <span className="text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                  Available
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-brand-600 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-between border border-brand-500">
+          <div>
+            <h2 className="text-lg font-black mb-6">OPD Quick Navigation</h2>
+            <div className="space-y-3">
+              <Link 
+                href="/hospital/reception"
+                className="w-full bg-white/10 hover:bg-white/20 text-white p-4 rounded-2xl text-xs font-bold flex items-center justify-between transition-all"
+              >
+                Front Office & Reception Desk
+                <CheckCircle2 size={18} />
+              </Link>
+              <Link 
+                href="/hospital/patients"
+                className="w-full bg-white/10 hover:bg-white/20 text-white p-4 rounded-2xl text-xs font-bold flex items-center justify-between transition-all"
+              >
+                Patient Registry (EHR)
+                <CheckCircle2 size={18} />
+              </Link>
+              <Link 
+                href="/hospital/laboratory"
+                className="w-full bg-white/10 hover:bg-white/20 text-white p-4 rounded-2xl text-xs font-bold flex items-center justify-between transition-all"
+              >
+                Laboratory Information System
+                <CheckCircle2 size={18} />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {selectedPatient && (
         <CaptureVitalsModal 
           isOpen={isVitalsModalOpen} 
-          onClose={() => { setIsVitalsModalOpen(false); setSelectedPatient(null); fetchQueue(); }} 
+          onClose={() => { setIsVitalsModalOpen(false); setSelectedPatient(null); fetchOpdData(); }} 
           patientId={selectedPatient.id} 
           patientName={`${selectedPatient.first_name} ${selectedPatient.last_name}`} 
         />
@@ -234,68 +377,21 @@ export default function OutpatientDashboard() {
       {selectedPatient && selectedQueueItem && (
         <ConsultationModal 
           isOpen={isConsultationModalOpen} 
-          onClose={() => { setIsConsultationModalOpen(false); setSelectedPatient(null); setSelectedQueueItem(null); fetchQueue(); }} 
+          onClose={() => { setIsConsultationModalOpen(false); setSelectedPatient(null); setSelectedQueueItem(null); fetchOpdData(); }} 
           patientId={selectedPatient.id} 
           patientName={`${selectedPatient.first_name} ${selectedPatient.last_name}`}
           queueId={selectedQueueItem.id}
         />
       )}
 
-      {/* Doctors Availability & Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900 mb-6">Doctor Availability</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { name: 'Dr. Luyando Chansa', spec: 'General Physician', status: 'Available', room: 'Consultation Room 1' },
-              { name: 'Dr. Mulenga Musonda', spec: 'Pediatrician', status: 'Busy', room: 'Consultation Room 3' },
-              { name: 'Dr. Mwansa Phiri', spec: 'Dermatologist', status: 'Available', room: 'Consultation Room 2' },
-              { name: 'Dr. Mutale Banda', spec: 'Orthopedic', status: 'On Break', room: 'Consultation Room 4' },
-            ].map((doc, idx) => (
-              <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center">
-                    <Stethoscope size={20} className="text-slate-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">{doc.name}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">{doc.spec}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className={clsx(
-                    "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
-                    doc.status === 'Available' ? "bg-emerald-500 text-white" :
-                    doc.status === 'Busy' ? "bg-blue-500 text-white" : "bg-slate-400 text-white"
-                  )}>
-                    {doc.status}
-                  </span>
-                  <p className="text-[10px] text-slate-400 mt-1">{doc.room}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-brand-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-2xl rounded-full" />
-          <h2 className="text-lg font-bold mb-6">Quick Actions</h2>
-          <div className="space-y-3">
-            <button className="w-full bg-white/10 hover:bg-white/20 text-white p-4 rounded-2xl text-sm font-bold flex items-center justify-between transition-all group">
-              New Appointment
-              <CheckCircle2 size={18} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
-            <button className="w-full bg-white/10 hover:bg-white/20 text-white p-4 rounded-2xl text-sm font-bold flex items-center justify-between transition-all group">
-              Manage Queue
-              <CheckCircle2 size={18} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
-            <button className="w-full bg-white/10 hover:bg-white/20 text-white p-4 rounded-2xl text-sm font-bold flex items-center justify-between transition-all group">
-              View Schedule
-              <CheckCircle2 size={18} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <RegisterPatientModal 
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onSuccess={() => {
+          setIsRegisterModalOpen(false);
+          fetchOpdData();
+        }}
+      />
     </div>
   );
 }

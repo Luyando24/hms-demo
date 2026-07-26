@@ -1,16 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, DollarSign, Building, Phone, Mail, Save, Loader2, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Settings as SettingsIcon, DollarSign, Building, Phone, Mail, Save, Loader2, CheckCircle2, ShieldAlert, CreditCard, Shield, Plus, X } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { SUPPORTED_CURRENCIES, formatCurrencyAmount } from '@/utils/currency';
 import StatusModal from '@/components/hospital/StatusModal';
+import { updateSystemSettingsAction } from '@/app/hospital/actions';
 
 export default function SystemSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [settingsId, setSettingsId] = useState<string | null>(null);
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
 
   const [form, setForm] = useState({
@@ -21,8 +21,13 @@ export default function SystemSettingsPage() {
     tax_rate: 0,
     phone: '',
     email: '',
-    address: ''
+    address: '',
+    payment_methods: ['CASH', 'CARD', 'MOBILE_MONEY', 'INSURANCE', 'BANK_TRANSFER', 'CHEQUE'],
+    insurance_providers: ['NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct']
   });
+
+  const [newPaymentMethod, setNewPaymentMethod] = useState('');
+  const [newInsuranceProvider, setNewInsuranceProvider] = useState('');
 
   const supabase = createClient();
 
@@ -40,19 +45,18 @@ export default function SystemSettingsPage() {
         .from('profiles')
         .select('role')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
       setUserRole(profile?.role || user.user_metadata?.role || 'STAFF');
     }
 
     // 2. Fetch system settings
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('system_settings')
       .select('*')
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (data) {
-      setSettingsId(data.id);
       setForm({
         hospital_name: data.hospital_name || 'HMS Clinic',
         default_currency: data.default_currency || 'USD',
@@ -61,7 +65,9 @@ export default function SystemSettingsPage() {
         tax_rate: data.tax_rate || 0,
         phone: data.phone || '',
         email: data.email || '',
-        address: data.address || ''
+        address: data.address || '',
+        payment_methods: data.payment_methods || ['CASH', 'CARD', 'MOBILE_MONEY', 'INSURANCE', 'BANK_TRANSFER', 'CHEQUE'],
+        insurance_providers: data.insurance_providers || ['NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct']
       });
     }
     setLoading(false);
@@ -79,6 +85,32 @@ export default function SystemSettingsPage() {
     }
   };
 
+  const handleAddPaymentMethod = () => {
+    if (!newPaymentMethod.trim()) return;
+    const formatted = newPaymentMethod.trim().toUpperCase().replace(/\s+/g, '_');
+    if (!form.payment_methods.includes(formatted)) {
+      setForm(prev => ({ ...prev, payment_methods: [...prev.payment_methods, formatted] }));
+    }
+    setNewPaymentMethod('');
+  };
+
+  const handleRemovePaymentMethod = (method: string) => {
+    setForm(prev => ({ ...prev, payment_methods: prev.payment_methods.filter(m => m !== method) }));
+  };
+
+  const handleAddInsuranceProvider = () => {
+    if (!newInsuranceProvider.trim()) return;
+    const formatted = newInsuranceProvider.trim();
+    if (!form.insurance_providers.includes(formatted)) {
+      setForm(prev => ({ ...prev, insurance_providers: [...prev.insurance_providers, formatted] }));
+    }
+    setNewInsuranceProvider('');
+  };
+
+  const handleRemoveInsuranceProvider = (provider: string) => {
+    setForm(prev => ({ ...prev, insurance_providers: prev.insurance_providers.filter(p => p !== provider) }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (userRole !== 'ADMIN') {
@@ -87,27 +119,17 @@ export default function SystemSettingsPage() {
     }
 
     setSaving(true);
-    const payload = {
-      ...form,
-      updated_at: new Date().toISOString()
-    };
-
-    let res;
-    if (settingsId) {
-      res = await supabase.from('system_settings').update(payload).eq('id', settingsId);
-    } else {
-      res = await supabase.from('system_settings').insert(payload);
-    }
+    const res = await updateSystemSettingsAction(form);
 
     if (res.error) {
-      setStatus({ type: 'error', title: 'Save Failed', message: res.error.message });
+      setStatus({ type: 'error', title: 'Save Failed', message: res.error });
     } else {
       setStatus({ 
         type: 'success', 
         title: 'Settings Saved', 
-        message: `Default currency updated to ${form.default_currency} (${form.currency_symbol}). Changes applied globally across all billing and financial reports.` 
+        message: 'System settings, payment methods, and accepted insurance providers updated successfully.' 
       });
-      fetchSettings();
+      await fetchSettings();
     }
     setSaving(false);
   };
@@ -132,7 +154,7 @@ export default function SystemSettingsPage() {
             </div>
             Hospital Settings & Preferences
           </h1>
-          <p className="text-slate-500 mt-1 font-medium">Manage default currency, localization, and facility branding.</p>
+          <p className="text-slate-500 mt-1 font-medium">Manage default currency, payment methods, insurance providers, and facility branding.</p>
         </div>
       </div>
 
@@ -140,7 +162,7 @@ export default function SystemSettingsPage() {
         <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl flex items-center gap-3">
           <ShieldAlert size={20} className="text-amber-600 shrink-0" />
           <p className="text-xs font-bold">
-            You are currently viewing settings in read-only mode. Administrator permissions are required to modify currency and facility configuration.
+            You are currently viewing settings in read-only mode. Administrator permissions are required to modify currency, payment options, and facility configuration.
           </p>
         </div>
       )}
@@ -201,7 +223,6 @@ export default function SystemSettingsPage() {
             </div>
           </div>
 
-          {/* Live Preview Box */}
           <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Live Currency Preview</p>
@@ -210,8 +231,110 @@ export default function SystemSettingsPage() {
               </p>
             </div>
             <div className="text-xs text-slate-500 font-medium">
-              <span className="font-bold text-slate-700">Code:</span> {form.default_currency} &bull; <span className="font-bold text-slate-700">Symbol:</span> {form.currency_symbol} &bull; <span className="font-bold text-slate-700">Placement:</span> {form.currency_position}
+              <span className="font-bold text-slate-700">Code:</span> {form.default_currency} &bull; <span className="font-bold text-slate-700">Symbol:</span> {form.currency_symbol}
             </div>
+          </div>
+        </section>
+
+        {/* Allowed Payment Methods Configuration */}
+        <section className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+              <CreditCard size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-slate-900">Allowed Payment Methods</h2>
+              <p className="text-xs text-slate-500 font-medium">Configure active payment methods available in the patient checkout and billing dropdown menus.</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {form.payment_methods.map(method => (
+                <span key={method} className="bg-slate-100 border border-slate-200 text-slate-800 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2">
+                  {method.replace('_', ' ')}
+                  {userRole === 'ADMIN' && (
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemovePaymentMethod(method)}
+                      className="text-slate-400 hover:text-rose-600 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+
+            {userRole === 'ADMIN' && (
+              <div className="flex items-center gap-3 pt-2">
+                <input 
+                  type="text" 
+                  placeholder="Add payment method (e.g. MOBILE_MONEY, CHEQUE)" 
+                  value={newPaymentMethod}
+                  onChange={e => setNewPaymentMethod(e.target.value)}
+                  className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-brand-500/20 max-w-md w-full"
+                />
+                <button 
+                  type="button"
+                  onClick={handleAddPaymentMethod}
+                  className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-800 transition-all flex items-center gap-1.5"
+                >
+                  <Plus size={16} /> Add Method
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Accepted Insurance Companies Configuration */}
+        <section className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-black">
+              <Shield size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-slate-900">Accepted Insurance Companies</h2>
+              <p className="text-xs text-slate-500 font-medium">Manage insurance providers available for selection during patient registration and invoice settlement.</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {form.insurance_providers.map(provider => (
+                <span key={provider} className="bg-purple-50 border border-purple-200 text-purple-800 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2">
+                  {provider}
+                  {userRole === 'ADMIN' && (
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemoveInsuranceProvider(provider)}
+                      className="text-purple-400 hover:text-rose-600 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+
+            {userRole === 'ADMIN' && (
+              <div className="flex items-center gap-3 pt-2">
+                <input 
+                  type="text" 
+                  placeholder="Add insurance provider (e.g. NHIMA, Sanlam)" 
+                  value={newInsuranceProvider}
+                  onChange={e => setNewInsuranceProvider(e.target.value)}
+                  className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-brand-500/20 max-w-md w-full"
+                />
+                <button 
+                  type="button"
+                  onClick={handleAddInsuranceProvider}
+                  className="bg-purple-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-purple-800 transition-all flex items-center gap-1.5"
+                >
+                  <Plus size={16} /> Add Insurance
+                </button>
+              </div>
+            )}
           </div>
         </section>
 

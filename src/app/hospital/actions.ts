@@ -130,3 +130,31 @@ export async function cancelInvoiceAction(id: string) {
   return { success: true };
 }
 
+export async function updateSystemSettingsAction(settingsData: any) {
+  const adminSupabase = createAdminClient();
+  
+  const { data: existing } = await adminSupabase
+    .from('system_settings')
+    .select('id')
+    .limit(1)
+    .maybeSingle();
+
+  let error;
+  if (existing?.id) {
+    const res = await adminSupabase
+      .from('system_settings')
+      .update({ ...settingsData, updated_at: new Date().toISOString() })
+      .eq('id', existing.id);
+    error = res.error;
+  } else {
+    const res = await adminSupabase
+      .from('system_settings')
+      .insert([{ ...settingsData, updated_at: new Date().toISOString() }]);
+    error = res.error;
+  }
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+

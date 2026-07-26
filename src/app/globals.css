@@ -1,7 +1,13 @@
 @import "tailwindcss";
 
 @theme {
-  --radius-4xl: 2.5rem;
+  --radius-4xl: 1rem;
+  --radius-3xl: 0.875rem;
+  --radius-2xl: 0.625rem;
+  --radius-xl: 0.5rem;
+  --radius-lg: 0.375rem;
+  --radius-md: 0.25rem;
+  --radius-sm: 0.125rem;
   --color-brand-50: #ecfdf5;
   --color-brand-100: #d1fae5;
   --color-brand-500: #10b981;
@@ -27,6 +33,6 @@
     @apply bg-slate-900/80 backdrop-blur-lg border border-slate-700/50;
   }
   .card-rounded {
-    @apply rounded-[2.5rem];
+    @apply rounded-xl;
   }
 }
