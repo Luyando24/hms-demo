@@ -62,7 +62,7 @@ export default function BillingDashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 border-b border-slate-200/60 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Billing & Claims</h1>
           <p className="text-slate-500 mt-1">Financial Management & Insurance Processing.</p>
@@ -70,7 +70,7 @@ export default function BillingDashboard() {
         <div className="flex gap-3">
           <button 
             onClick={() => setIsGenerateModalOpen(true)}
-            className="bg-brand-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-md flex items-center gap-2"
+            className="bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-md flex items-center gap-2"
           >
             <Plus size={16} />
             Generate Invoice

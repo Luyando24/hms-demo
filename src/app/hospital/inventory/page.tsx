@@ -155,7 +155,7 @@ export default function InventoryDashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 border-b border-slate-200/60 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Pharmacy & Inventory Management</h1>
           <p className="text-slate-500 mt-1 font-medium">Medical stock control, reorder alerts, and pharmacy dispensing.</p>
