@@ -31,6 +31,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/admin/rooms',
     '/hospital/hr',
     '/hospital/reports',
+    '/hospital/settings',
   ],
   DOCTOR: [
     '/hospital/dashboard',
@@ -42,6 +43,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/radiology',
     '/hospital/laboratory',
     '/hospital/inventory',
+    '/hospital/settings',
   ],
   NURSE: [
     '/hospital/dashboard',
@@ -54,21 +56,25 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/laboratory',
     '/hospital/inventory',
     '/hospital/bloodbank',
+    '/hospital/settings',
   ],
   PHARMACIST: [
     '/hospital/dashboard',
     '/hospital/patients',
     '/hospital/inventory',
+    '/hospital/settings',
   ],
   LAB_TECH: [
     '/hospital/dashboard',
     '/hospital/patients',
     '/hospital/laboratory',
+    '/hospital/settings',
   ],
   RADIOLOGIST: [
     '/hospital/dashboard',
     '/hospital/patients',
     '/hospital/radiology',
+    '/hospital/settings',
   ],
   ACCOUNTANT: [
     '/hospital/dashboard',
@@ -76,16 +82,19 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/patients',
     '/hospital/billing',
     '/hospital/reports',
+    '/hospital/settings',
   ],
   RECEPTIONIST: [
     '/hospital/dashboard',
     '/hospital/reception',
     '/hospital/patients',
     '/hospital/billing',
+    '/hospital/settings',
   ],
   STAFF: [
     '/hospital/dashboard',
     '/hospital/patients',
+    '/hospital/settings',
   ]
 };
 

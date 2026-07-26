@@ -55,35 +55,36 @@ export async function updateSession(request: NextRequest) {
         '/hospital/dashboard', '/hospital/reception', '/hospital/patients', '/hospital/er',
         '/hospital/ipd', '/hospital/opd', '/hospital/icu', '/hospital/radiology',
         '/hospital/laboratory', '/hospital/inventory', '/hospital/bloodbank', '/hospital/billing',
-        '/hospital/staff', '/hospital/admin/departments', '/hospital/admin/rooms', '/hospital/hr', '/hospital/reports'
+        '/hospital/staff', '/hospital/admin/departments', '/hospital/admin/rooms', '/hospital/hr', '/hospital/reports', '/hospital/settings'
       ],
       DOCTOR: [
         '/hospital/dashboard', '/hospital/patients', '/hospital/er', '/hospital/ipd',
-        '/hospital/opd', '/hospital/icu', '/hospital/radiology', '/hospital/laboratory', '/hospital/inventory'
+        '/hospital/opd', '/hospital/icu', '/hospital/radiology', '/hospital/laboratory', '/hospital/inventory', '/hospital/settings'
       ],
       NURSE: [
         '/hospital/dashboard', '/hospital/reception', '/hospital/patients', '/hospital/er',
-        '/hospital/ipd', '/hospital/opd', '/hospital/icu', '/hospital/laboratory', '/hospital/inventory', '/hospital/bloodbank'
+        '/hospital/ipd', '/hospital/opd', '/hospital/icu', '/hospital/laboratory', '/hospital/inventory', '/hospital/bloodbank', '/hospital/settings'
       ],
       PHARMACIST: [
-        '/hospital/dashboard', '/hospital/patients', '/hospital/inventory'
+        '/hospital/dashboard', '/hospital/patients', '/hospital/inventory', '/hospital/settings'
       ],
       LAB_TECH: [
-        '/hospital/dashboard', '/hospital/patients', '/hospital/laboratory'
+        '/hospital/dashboard', '/hospital/patients', '/hospital/laboratory', '/hospital/settings'
       ],
       RADIOLOGIST: [
-        '/hospital/dashboard', '/hospital/patients', '/hospital/radiology'
+        '/hospital/dashboard', '/hospital/patients', '/hospital/radiology', '/hospital/settings'
       ],
       ACCOUNTANT: [
-        '/hospital/dashboard', '/hospital/reception', '/hospital/patients', '/hospital/billing', '/hospital/reports'
+        '/hospital/dashboard', '/hospital/reception', '/hospital/patients', '/hospital/billing', '/hospital/reports', '/hospital/settings'
       ],
       RECEPTIONIST: [
-        '/hospital/dashboard', '/hospital/reception', '/hospital/patients', '/hospital/billing'
+        '/hospital/dashboard', '/hospital/reception', '/hospital/patients', '/hospital/billing', '/hospital/settings'
       ],
       STAFF: [
-        '/hospital/dashboard', '/hospital/patients'
+        '/hospital/dashboard', '/hospital/patients', '/hospital/settings'
       ]
     };
+
 
     const allowedRoutes = rolePermissions[userRole.toUpperCase()] || rolePermissions['ADMIN'];
     const currentPath = request.nextUrl.pathname;
