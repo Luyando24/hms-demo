@@ -178,7 +178,12 @@ export function HospitalSidebar() {
               </h4>
               <div className="space-y-1">
                 {visibleItems.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                  const subPath = item.href.replace('/hospital', '');
+                  const isActive = 
+                    pathname === item.href || 
+                    pathname.startsWith(item.href + '/') ||
+                    pathname === subPath ||
+                    (subPath !== '' && subPath !== '/' && pathname.startsWith(subPath + '/'));
 
                 return (
                   <Link

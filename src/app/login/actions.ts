@@ -1,17 +1,17 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import { getSubdomainUrl } from "@/utils/subdomain";
 import { redirect } from "next/navigation";
 
 export async function signIn(formData: FormData) {
-  const identifier = formData.get("email") as string; // This could be email OR staff number
+  const identifier = formData.get("email") as string; // Email or staff/file number
   const password = formData.get("password") as string;
-  const role = formData.get("role") as string;
 
   const supabase = await createClient();
   let effectiveEmail = identifier;
 
-  // 1. If identifier doesn't look like an email, assume it's a Staff Number or File Number
+  // 1. If identifier doesn't look like an email, lookup profile email
   if (!identifier.includes('@')) {
     const { data: profile } = await supabase
       .from("profiles")
@@ -26,7 +26,7 @@ export async function signIn(formData: FormData) {
     }
   }
 
-  // 2. Perform the actual sign in
+  // 2. Perform sign in
   const { error } = await supabase.auth.signInWithPassword({
     email: effectiveEmail,
     password,
@@ -36,29 +36,34 @@ export async function signIn(formData: FormData) {
     return redirect(`/login?error=${encodeURIComponent(error.message)}`);
   }
 
-  // Get current user to fetch their specific profile
+  // 3. Get user profile for subdomain redirect
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
     return redirect("/login?error=Authentication failed");
   }
 
-  // Get user profile to determine where to redirect
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .single();
 
-  if (profile?.role === "PATIENT") {
-    return redirect("/patient/portal");
+  const userRole = (profile?.role || user.user_metadata?.role || "STAFF").toUpperCase();
+
+  if (userRole === "PATIENT") {
+    return redirect(getSubdomainUrl("patient", "/patient/portal"));
   }
 
-  return redirect("/hospital/dashboard");
+  if (userRole === "ADMIN") {
+    return redirect(getSubdomainUrl("admin", "/hospital/dashboard"));
+  }
+
+  return redirect(getSubdomainUrl("staff", "/hospital/dashboard"));
 }
 
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  return redirect("/login");
+  return redirect(getSubdomainUrl(null, "/login"));
 }

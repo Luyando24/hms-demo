@@ -47,7 +47,13 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-4 space-y-2">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const subPath = item.href.replace('/patient/portal', '');
+          const isActive = 
+            pathname === item.href || 
+            pathname.startsWith(item.href + '/') ||
+            pathname === subPath ||
+            (subPath === '' && (pathname === '/' || pathname === '/portal')) ||
+            (subPath !== '' && subPath !== '/' && pathname.startsWith(subPath));
           return (
             <Link
               key={item.name}

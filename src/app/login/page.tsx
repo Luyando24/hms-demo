@@ -14,6 +14,15 @@ function LoginContent() {
   const error = searchParams.get("error");
   const [isLoading, setIsLoading] = useState(false);
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const host = window.location.hostname.toLowerCase();
+      if (host.startsWith("patient.")) setActiveTab("patient");
+      else if (host.startsWith("staff.")) setActiveTab("staff");
+      else if (host.startsWith("admin.")) setActiveTab("admin");
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center p-4 font-sans">
       
