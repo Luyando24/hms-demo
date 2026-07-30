@@ -393,6 +393,16 @@ export default function SystemSettingsPage() {
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
               />
             </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-1">Physical Address (Displayed on Landing Page & Invoices)</label>
+              <input 
+                value={form.address}
+                onChange={e => setForm({...form, address: e.target.value})}
+                disabled={userRole !== 'ADMIN'}
+                placeholder="e.g. 123 Health Avenue, Medical District"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+              />
+            </div>
           </div>
         </section>
 

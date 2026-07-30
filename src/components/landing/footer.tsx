@@ -1,7 +1,21 @@
 import Link from "next/link";
 import { HeartPulse, MapPin, Phone, Mail } from "lucide-react";
 
-export function Footer() {
+interface FooterProps {
+  settings?: {
+    hospital_name?: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+  } | null;
+}
+
+export function Footer({ settings }: FooterProps = {}) {
+  const hospitalName = settings?.hospital_name || "HMSdemo";
+  const address = settings?.address || "123 Health Avenue, Medical District";
+  const phone = settings?.phone || "+1 (800) 123-4567";
+  const email = settings?.email || "contact@hmsdemohospital.com";
+
   return (
     <footer className="bg-slate-950 text-slate-400 py-20 px-6">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 border-b border-slate-800 pb-12 mb-12">
@@ -11,7 +25,7 @@ export function Footer() {
               <HeartPulse size={20} strokeWidth={2.5} />
             </div>
             <span className="font-bold text-xl tracking-tight text-white">
-              HMS<span className="text-brand-500">demo</span>
+              {hospitalName}
             </span>
           </Link>
           <p className="text-sm leading-relaxed max-w-xs mb-6">
@@ -22,7 +36,7 @@ export function Footer() {
         <div>
           <h4 className="text-white font-bold mb-6 tracking-wide uppercase text-sm">Patient Services</h4>
           <ul className="space-y-4 text-sm">
-            <li><Link href="/book" className="hover:text-brand-400 transition-colors">Book an Appointment</Link></li>
+            <li><Link href="/login" className="hover:text-brand-400 transition-colors">Book an Appointment</Link></li>
             <li><Link href="/login" className="hover:text-brand-400 transition-colors">Patient Portal</Link></li>
             <li><Link href="#services" className="hover:text-brand-400 transition-colors">Our Departments</Link></li>
             <li><Link href="#" className="hover:text-brand-400 transition-colors">Billing & Insurance</Link></li>
@@ -40,26 +54,26 @@ export function Footer() {
         </div>
         
         <div>
-          <h4 className="text-white font-bold mb-6 tracking-wide uppercase text-sm">Contact</h4>
+          <h4 className="text-white font-bold mb-6 tracking-wide uppercase text-sm">Contact Us</h4>
           <ul className="space-y-4 text-sm">
             <li className="flex items-start gap-3">
               <MapPin size={18} className="text-brand-500 shrink-0 mt-0.5" />
-              <span>123 Health Avenue, Medical District</span>
+              <span>{address}</span>
             </li>
             <li className="flex items-center gap-3">
               <Phone size={18} className="text-brand-500 shrink-0" />
-              <span>+1 (800) 123-4567</span>
+              <span>{phone}</span>
             </li>
             <li className="flex items-center gap-3">
               <Mail size={18} className="text-brand-500 shrink-0" />
-              <span>contact@hmsdemohospital.com</span>
+              <span>{email}</span>
             </li>
           </ul>
         </div>
       </div>
       
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
-        <p>&copy; {new Date().getFullYear()} HMSdemo Hospital. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} {hospitalName}. All rights reserved.</p>
         <div className="flex items-center gap-6">
           <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>
           <Link href="#" className="hover:text-white transition-colors">Patient Rights</Link>

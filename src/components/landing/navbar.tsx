@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { HeartPulse } from "lucide-react";
 
-export function Navbar() {
+interface NavbarProps {
+  settings?: {
+    hospital_name?: string;
+  } | null;
+}
+
+export function Navbar({ settings }: NavbarProps = {}) {
+  const hospitalName = settings?.hospital_name || "HMSdemo";
+
   return (
     <header className="fixed top-0 w-full z-50 px-6 py-4">
       <nav className="glass max-w-7xl mx-auto rounded-full px-6 py-3 flex items-center justify-between shadow-sm">
@@ -12,7 +20,7 @@ export function Navbar() {
             <HeartPulse size={24} strokeWidth={2.5} />
           </div>
           <span className="font-bold text-xl tracking-tight text-slate-900">
-            HMS<span className="text-brand-600">demo</span>
+            {hospitalName}
           </span>
         </Link>
         
@@ -35,7 +43,7 @@ export function Navbar() {
           <Link href="/login" className="text-sm font-bold uppercase tracking-widest text-slate-700 hover:text-brand-600 transition-colors">
             Patient Portal
           </Link>
-          <Link href="/book" className="bg-brand-600 text-white text-sm font-bold uppercase tracking-widest px-6 py-3 rounded-full hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 hover:-translate-y-0.5">
+          <Link href="/login" className="bg-brand-600 text-white text-sm font-bold uppercase tracking-widest px-6 py-3 rounded-full hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 hover:-translate-y-0.5">
             Book Appointment
           </Link>
         </div>
