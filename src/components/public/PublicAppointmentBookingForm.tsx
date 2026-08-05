@@ -19,7 +19,6 @@ import {
   Printer, 
   Home, 
   HeartPulse,
-  Sparkles,
   AlertCircle
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -531,7 +530,7 @@ export function PublicAppointmentBookingForm({ departments, doctors, settings }:
 
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-extrabold uppercase tracking-widest mb-2">
-              <Sparkles size={14} /> Appointment Confirmed
+              Appointment Confirmed
             </div>
             <h2 className="text-3xl font-black text-slate-900">Booking Request Received!</h2>
             <p className="text-slate-500 max-w-md mx-auto font-medium text-sm">
