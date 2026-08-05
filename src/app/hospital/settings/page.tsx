@@ -16,6 +16,8 @@ export default function SystemSettingsPage() {
 
   const [form, setForm] = useState({
     hospital_name: 'HMS Clinic',
+    tagline: 'Integrated Healthcare & Clinical Operations System',
+    logo_url: '',
     default_currency: 'USD',
     currency_symbol: '$',
     currency_position: 'prefix' as 'prefix' | 'suffix',
@@ -55,6 +57,8 @@ export default function SystemSettingsPage() {
     if (data) {
       setForm({
         hospital_name: data.hospital_name || 'HMS Clinic',
+        tagline: data.tagline || 'Integrated Healthcare & Clinical Operations System',
+        logo_url: data.logo_url || '',
         default_currency: data.default_currency || 'USD',
         currency_symbol: data.currency_symbol || '$',
         currency_position: data.currency_position === 'suffix' ? 'suffix' : 'prefix',
@@ -147,7 +151,7 @@ export default function SystemSettingsPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-8">
       {/* Header */}
-      <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 border-b border-slate-200/60 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-lg shadow-brand-500/20">
@@ -361,6 +365,33 @@ export default function SystemSettingsPage() {
                 disabled={userRole !== 'ADMIN'}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-1">Brand Tagline / Subtitle</label>
+              <input 
+                value={form.tagline}
+                onChange={e => setForm({...form, tagline: e.target.value})}
+                disabled={userRole !== 'ADMIN'}
+                placeholder="e.g. Integrated Healthcare & Clinical Operations"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-1">Brand Logo / Icon URL</label>
+              <div className="flex gap-4 items-center">
+                <input 
+                  value={form.logo_url}
+                  onChange={e => setForm({...form, logo_url: e.target.value})}
+                  disabled={userRole !== 'ADMIN'}
+                  placeholder="https://example.com/hospital-logo.png"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+                />
+                {form.logo_url && (
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 p-1 flex items-center justify-center shrink-0 overflow-hidden">
+                    <img src={form.logo_url} alt="Logo preview" className="max-w-full max-h-full object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-1">Tax / VAT Rate (%)</label>

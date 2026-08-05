@@ -77,7 +77,7 @@ export function renderClientEmailTemplate(
     : "";
 
   const noteBox = note
-    ? `<div style="margin-top:24px;padding:14px 16px;background:#f0f9ff;border-left:4px solid #0284c7;border-radius:8px;">
+    ? `<div style="margin-top:24px;padding:14px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;">
         <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Important Notice</div>
         <div style="font-size:12px;line-height:1.5;color:#334155;">${note}</div>
        </div>`
@@ -94,8 +94,6 @@ export function renderClientEmailTemplate(
   <div style="max-width:600px;margin:0 auto;padding:32px 16px;">
     
     <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px -5px rgba(0,0,0,0.05);">
-      <div style="height:4px;background:linear-gradient(to right, #0284c7, #38bdf8, #0369a1);"></div>
-
       <div style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%);color:#ffffff;padding:26px 30px;">
         <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#38bdf8;margin-bottom:6px;">
           ✚ ${hospitalName}

@@ -6,19 +6,28 @@ import { HeartPulse } from "lucide-react";
 interface NavbarProps {
   settings?: {
     hospital_name?: string | null;
+    logo_url?: string | null;
+    tagline?: string | null;
   } | null;
 }
 
 export function Navbar({ settings }: NavbarProps = {}) {
   const hospitalName = settings?.hospital_name || "HMS Hospital";
+  const logoUrl = settings?.logo_url || "";
 
   return (
     <header className="fixed top-0 w-full z-50 px-6 py-4">
       <nav className="glass max-w-7xl mx-auto rounded-full px-6 py-3 flex items-center justify-between shadow-sm">
         <Link href="/" className="flex items-center gap-3">
-          <div className="bg-brand-500 p-2 rounded-xl text-white">
-            <HeartPulse size={24} strokeWidth={2.5} />
-          </div>
+          {logoUrl ? (
+            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center overflow-hidden shrink-0">
+              <img src={logoUrl} alt={hospitalName} className="max-w-full max-h-full object-contain" />
+            </div>
+          ) : (
+            <div className="bg-brand-500 p-2 rounded-xl text-white">
+              <HeartPulse size={24} strokeWidth={2.5} />
+            </div>
+          )}
           <span className="font-bold text-xl tracking-tight text-slate-900">
             {hospitalName}
           </span>

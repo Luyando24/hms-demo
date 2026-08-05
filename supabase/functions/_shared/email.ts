@@ -90,7 +90,7 @@ export function emailLayout(
     : "";
 
   const noteBox = note
-    ? `<div style="margin-top:24px;padding:14px 16px;background:#f0f9ff;border-left:4px solid #0284c7;border-radius:8px;">
+    ? `<div style="margin-top:24px;padding:14px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;">
         <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Important Notice</div>
         <div style="font-size:12px;line-height:1.5;color:#334155;">${escapeHtml(note)}</div>
        </div>`
@@ -109,9 +109,6 @@ export function emailLayout(
     <!-- Outer Card -->
     <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px -5px rgba(0,0,0,0.05),0 8px 10px -6px rgba(0,0,0,0.01);">
       
-      <!-- Top Brand Accent Bar -->
-      <div style="height:4px;background:linear-gradient(to right, #0284c7, #38bdf8, #0369a1);"></div>
-
       <!-- Header Banner -->
       <div style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%);color:#ffffff;padding:26px 30px;">
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width:100%;">

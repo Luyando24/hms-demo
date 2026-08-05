@@ -4,11 +4,13 @@ import { ArrowRight, ActivitySquare } from "lucide-react";
 interface HeroProps {
   settings?: {
     hospital_name?: string | null;
+    tagline?: string | null;
   } | null;
 }
 
 export function Hero({ settings }: HeroProps = {}) {
   const hospitalName = settings?.hospital_name || "HMS Hospital";
+  const tagline = settings?.tagline || "24/7 Emergency & Outpatient Care";
 
   return (
     <section className="relative pt-40 pb-20 px-6 overflow-hidden min-h-[90vh] flex items-center">
@@ -21,7 +23,7 @@ export function Hero({ settings }: HeroProps = {}) {
       <div className="max-w-5xl mx-auto text-center relative z-10">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 shadow-sm mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <ActivitySquare className="text-brand-500 w-4 h-4" />
-          <span className="text-sm font-semibold tracking-wide text-slate-700">24/7 Emergency & Outpatient Care</span>
+          <span className="text-sm font-semibold tracking-wide text-slate-700">{tagline}</span>
         </div>
         
         <h1 className="text-6xl md:text-8xl font-black tracking-tight text-slate-900 mb-8 animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-150">

@@ -14,17 +14,21 @@ export function HospitalHeader() {
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [hospitalName, setHospitalName] = useState<string>("HMS Hospital");
+  const [logoUrl, setLogoUrl] = useState<string>("");
   const supabase = createClient();
 
   useEffect(() => {
     const fetchUserAndSettings = async () => {
       const [{ data: authData }, { data: settings }] = await Promise.all([
         supabase.auth.getUser(),
-        supabase.from("system_settings").select("hospital_name").limit(1).maybeSingle(),
+        supabase.from("system_settings").select("hospital_name, logo_url").limit(1).maybeSingle(),
       ]);
 
       if (settings?.hospital_name) {
         setHospitalName(settings.hospital_name);
+      }
+      if (settings?.logo_url) {
+        setLogoUrl(settings.logo_url);
       }
 
       if (authData?.user) {
@@ -55,9 +59,15 @@ export function HospitalHeader() {
         </button>
 
         <Link href="/" className="flex items-center gap-3">
-          <div className="bg-brand-500 p-2 rounded-xl text-white shadow-sm shadow-brand-500/20">
-            <HeartPulse size={24} strokeWidth={2.5} />
-          </div>
+          {logoUrl ? (
+            <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 p-1 flex items-center justify-center overflow-hidden shrink-0">
+              <img src={logoUrl} alt={hospitalName} className="max-w-full max-h-full object-contain" />
+            </div>
+          ) : (
+            <div className="bg-brand-500 p-2 rounded-xl text-white shadow-sm shadow-brand-500/20">
+              <HeartPulse size={24} strokeWidth={2.5} />
+            </div>
+          )}
           <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">
             {hospitalName}
           </span>

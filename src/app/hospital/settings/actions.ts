@@ -149,7 +149,6 @@ export async function sendTestNotificationEmailAction() {
 <head><meta charset="utf-8"><title>Email Test</title></head>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:24px;background-color:#f1f5f9;color:#0f172a;">
   <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
-    <div style="height:4px;background:linear-gradient(to right, #0284c7, #38bdf8, #0369a1);"></div>
     <div style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%);color:#ffffff;padding:24px 28px;">
       <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#38bdf8;margin-bottom:4px;">✚ ${hospitalName}</div>
       <h1 style="font-size:20px;font-weight:900;margin:0;color:#ffffff;">Email Notification Test</h1>

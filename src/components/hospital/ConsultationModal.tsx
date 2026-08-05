@@ -18,6 +18,7 @@ import clsx from 'clsx';
 import StatusModal from './StatusModal';
 import { createClient } from '@/utils/supabase/client';
 import type { Database, Json } from '@/types/supabase';
+import { SearchableCombobox } from '../ui/SearchableCombobox';
 
 type InventoryItem = Database['public']['Tables']['inventory_items']['Row'];
 type Vital = Database['public']['Tables']['vitals']['Row'];
@@ -538,28 +539,27 @@ export default function ConsultationModal({
                         key={medication.id}
                         className='grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-6'
                       >
-                        <label className='md:col-span-2'>
-                          <FieldLabel>Medication</FieldLabel>
-                          <select
+                        <div className='md:col-span-2 space-y-1'>
+                          <FieldLabel>Medication / Formulary Item</FieldLabel>
+                          <SearchableCombobox
                             value={medication.drugId}
-                            onChange={(event) =>
+                            onChange={(val) =>
                               setMedications((current) =>
                                 current.map((item) =>
                                   item.id === medication.id
-                                    ? { ...item, drugId: event.target.value }
+                                    ? { ...item, drugId: val }
                                     : item,
                                 ),
                               )
                             }
-                            className={fieldClass}
-                          >
-                            {inventory.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.name} ({item.stock_level || 0} {item.unit})
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                            placeholder="Search medication name..."
+                            options={inventory.map((item) => ({
+                              value: item.id,
+                              label: item.name,
+                              badge: `${item.stock_level || 0} ${item.unit || 'units'}`,
+                            }))}
+                          />
+                        </div>
                         <DraftInput
                           label='Dosage'
                           value={medication.dosage}
