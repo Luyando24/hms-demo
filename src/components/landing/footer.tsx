@@ -3,10 +3,10 @@ import { HeartPulse, MapPin, Phone, Mail } from "lucide-react";
 
 interface FooterProps {
   settings?: {
-    hospital_name?: string;
-    address?: string;
-    phone?: string;
-    email?: string;
+    hospital_name?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
   } | null;
 }
 
@@ -36,8 +36,8 @@ export function Footer({ settings }: FooterProps = {}) {
         <div>
           <h4 className="text-white font-bold mb-6 tracking-wide uppercase text-sm">Patient Services</h4>
           <ul className="space-y-4 text-sm">
-            <li><Link href="/login" className="hover:text-brand-400 transition-colors">Book an Appointment</Link></li>
-            <li><Link href="/login" className="hover:text-brand-400 transition-colors">Patient Portal</Link></li>
+            <li><Link href="/patient/login" className="hover:text-brand-400 transition-colors">Book an Appointment</Link></li>
+            <li><Link href="/patient/login" className="hover:text-brand-400 transition-colors">Patient Portal</Link></li>
             <li><Link href="#services" className="hover:text-brand-400 transition-colors">Our Departments</Link></li>
             <li><Link href="#" className="hover:text-brand-400 transition-colors">Billing & Insurance</Link></li>
           </ul>
@@ -50,6 +50,7 @@ export function Footer({ settings }: FooterProps = {}) {
             <li><Link href="#doctors" className="hover:text-brand-400 transition-colors">Find a Doctor</Link></li>
             <li><Link href="#" className="hover:text-brand-400 transition-colors">Careers</Link></li>
             <li><Link href="#" className="hover:text-brand-400 transition-colors">News & Updates</Link></li>
+            <li><Link href="/login" className="hover:text-brand-400 transition-colors">Staff & Admin Sign In</Link></li>
           </ul>
         </div>
         

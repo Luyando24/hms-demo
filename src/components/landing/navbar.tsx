@@ -5,7 +5,7 @@ import { HeartPulse } from "lucide-react";
 
 interface NavbarProps {
   settings?: {
-    hospital_name?: string;
+    hospital_name?: string | null;
   } | null;
 }
 
@@ -40,10 +40,10 @@ export function Navbar({ settings }: NavbarProps = {}) {
         </div>
 
         <div className="flex items-center gap-4">
-          <Link href="/login" className="text-sm font-bold uppercase tracking-widest text-slate-700 hover:text-brand-600 transition-colors">
+          <Link href="/patient/login" className="text-sm font-bold uppercase tracking-widest text-slate-700 hover:text-brand-600 transition-colors">
             Patient Portal
           </Link>
-          <Link href="/login" className="bg-brand-600 text-white text-sm font-bold uppercase tracking-widest px-6 py-3 rounded-full hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 hover:-translate-y-0.5">
+          <Link href="/patient/login" className="bg-brand-600 text-white text-sm font-bold uppercase tracking-widest px-6 py-3 rounded-full hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 hover:-translate-y-0.5">
             Book Appointment
           </Link>
         </div>

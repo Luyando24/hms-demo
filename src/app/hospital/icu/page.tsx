@@ -11,20 +11,20 @@ interface IcuBedPatient {
   bed_id: string;
   bed_number: string;
   ward_name: string;
-  status: string;
+  status: string | null;
   admission?: {
     id: string;
-    patient_id: string;
-    admission_date: string;
-    primary_diagnosis?: string;
-    patients?: {
+    patient_id: string | null;
+    admission_date: string | null;
+    primary_diagnosis?: string | null;
+    patients: {
       id: string;
-      first_name: string;
-      last_name: string;
+      first_name: string | null;
+      last_name: string | null;
       file_number: string;
       gender?: string;
       dob?: string;
-    };
+    } | null;
   };
   vitals?: {
     heart_rate?: number;
@@ -33,7 +33,7 @@ interface IcuBedPatient {
     blood_pressure_diastolic?: number;
     spo2?: number;
     temperature?: number;
-    created_at?: string;
+    created_at?: string | null;
   };
 }
 
@@ -50,10 +50,10 @@ export default function ICUDashboard() {
   useEffect(() => {
     fetchIcuData();
 
-    // Subscribe to vital_signs and beds realtime updates
+    // Subscribe to canonical vitals and beds realtime updates
     const channel = supabase
       .channel('icu-telemetry-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vital_signs' }, () => fetchIcuData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vitals' }, () => fetchIcuData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admissions' }, () => fetchIcuData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'beds' }, () => fetchIcuData())
       .subscribe();
@@ -82,20 +82,20 @@ export default function ICUDashboard() {
 
           if (activeAdm?.patient_id) {
             const { data: vData } = await supabase
-              .from('vital_signs')
+              .from('vitals')
               .select('*')
               .eq('patient_id', activeAdm.patient_id)
-              .order('created_at', { ascending: false })
+              .order('recorded_at', { ascending: false })
               .limit(1)
               .maybeSingle();
 
             if (vData) {
               latestVitals = {
-                heart_rate: vData.heart_rate || vData.pulse_rate || 82,
-                blood_pressure: vData.blood_pressure_systolic ? `${vData.blood_pressure_systolic}/${vData.blood_pressure_diastolic}` : (vData.blood_pressure || '120/80'),
-                spo2: vData.spo2 || vData.oxygen_saturation || 98,
+                heart_rate: vData.heart_rate || 82,
+                blood_pressure: vData.bp_systolic ? `${vData.bp_systolic}/${vData.bp_diastolic}` : '120/80',
+                spo2: vData.sp_o2 || 98,
                 temperature: vData.temperature || 37.0,
-                created_at: vData.created_at
+                created_at: vData.recorded_at
               };
             }
           }

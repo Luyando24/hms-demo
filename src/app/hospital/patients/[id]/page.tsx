@@ -28,7 +28,8 @@ import clsx from 'clsx';
 import PatientIDCardModal from '@/components/hospital/PatientIDCardModal';
 
 export default function PatientDetailsPage() {
-  const { id } = useParams();
+  const params = useParams();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const [loading, setLoading] = useState(true);
   const [patient, setPatient] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('overview');
@@ -48,13 +49,15 @@ export default function PatientDetailsPage() {
   }, [id]);
 
   const fetchPatientData = async () => {
+    if (!id) return;
+    const patientId = id;
     setLoading(true);
     
     // 1. Fetch Patient Info
     const { data: patientData, error: pError } = await supabase
       .from('patients')
       .select('*')
-      .eq('id', id)
+      .eq('id', patientId)
       .single();
 
     if (pError) {
@@ -66,10 +69,10 @@ export default function PatientDetailsPage() {
 
     // 2. Fetch History in Parallel
     const [vitals, notes, prescriptions, billing] = await Promise.all([
-      supabase.from('vitals').select('*').eq('patient_id', id).order('recorded_at', { ascending: false }),
-      supabase.from('clinical_notes').select('*, diagnosis(*)').eq('patient_id', id).order('created_at', { ascending: false }),
-      supabase.from('prescriptions').select('*, prescription_items(*)').eq('patient_id', id).order('created_at', { ascending: false }),
-      supabase.from('invoices').select('*, payments(*)').eq('patient_id', id).order('created_at', { ascending: false })
+      supabase.from('vitals').select('*').eq('patient_id', patientId).order('recorded_at', { ascending: false }),
+      supabase.from('clinical_notes').select('*, diagnosis(*)').eq('patient_id', patientId).order('created_at', { ascending: false }),
+      supabase.from('prescriptions').select('*, prescription_items(*)').eq('patient_id', patientId).order('created_at', { ascending: false }),
+      supabase.from('invoices').select('*, payments(*)').eq('patient_id', patientId).order('created_at', { ascending: false })
     ]);
 
     setHistory({
@@ -285,7 +288,9 @@ export default function PatientDetailsPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-slate-600 line-clamp-2 italic">"{note.assessment || 'No assessment recorded.'}"</p>
+                      <p className="text-sm text-slate-600 line-clamp-2 italic">
+                        &quot;{note.assessment || 'No assessment recorded.'}&quot;
+                      </p>
                     </div>
                   )) : (
                      <div className="bg-slate-50 p-8 rounded-3xl border border-dashed border-slate-200 text-center">

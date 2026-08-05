@@ -66,7 +66,7 @@ export default function InventoryDashboard() {
     // Pending Prescriptions Queue
     const { data: pData } = await supabase
       .from('prescriptions')
-      .select('*, patients(*)')
+      .select('id, status, created_at, patients(first_name, last_name), prescription_items(id, dosage, frequency, duration, quantity_prescribed, quantity_dispensed, inventory_items(id, name, stock_level, unit))')
       .eq('status', 'PENDING')
       .order('created_at', { ascending: false });
 
@@ -83,32 +83,17 @@ export default function InventoryDashboard() {
   };
 
   const handleDispense = async (prescription: any) => {
-    const confirmDispense = window.confirm(`Dispense ${prescription.medication_name} to ${prescription.patients?.first_name || 'Patient'}?`);
+    const medicationNames = (prescription.prescription_items || [])
+      .map((item: any) => item.inventory_items?.name || 'Medication')
+      .join(', ');
+    const confirmDispense = window.confirm(
+      `Dispense ${medicationNames || 'this prescription'} to ${prescription.patients?.first_name || 'Patient'}?`
+    );
     if (!confirmDispense) return;
 
-    // 1. Find matching item to deduct stock
-    const item = items.find(i => i.name.toLowerCase().includes(prescription.medication_name.toLowerCase()));
-    
-    if (item) {
-      const deductQty = parseInt(prescription.dosage) || 1;
-      const newStock = Math.max(0, item.stock_level - deductQty);
-
-      const { error: stockError } = await supabase
-        .from('inventory_items')
-        .update({ stock_level: newStock })
-        .eq('id', item.id);
-      
-      if (stockError) {
-        setStatusModal({ type: 'error', title: 'Stock Update Failed', message: stockError.message });
-        return;
-      }
-    }
-
-    // 2. Update prescription status to DISPENSED
-    const { error: statusError } = await supabase
-      .from('prescriptions')
-      .update({ status: 'DISPENSED' })
-      .eq('id', prescription.id);
+    const { error: statusError } = await supabase.rpc('dispense_prescription', {
+      target_prescription_id: prescription.id
+    });
 
     if (statusError) {
       setStatusModal({ type: 'error', title: 'Dispense Failed', message: statusError.message });
@@ -116,7 +101,7 @@ export default function InventoryDashboard() {
       setStatusModal({
         type: 'success',
         title: 'Medication Dispensed',
-        message: `${prescription.medication_name} has been dispensed and stock deducted.`
+        message: `${medicationNames} has been dispensed and stock was deducted atomically.`
       });
       fetchPrescriptions();
       fetchItems();
@@ -330,8 +315,14 @@ export default function InventoryDashboard() {
                     <p className="text-sm font-bold text-slate-100">
                       {row.patients ? `${row.patients.first_name} ${row.patients.last_name}` : 'Patient'}
                     </p>
-                    <p className="text-xs text-brand-400 font-bold">{row.medication_name}</p>
-                    <p className="text-[10px] text-slate-400 font-medium">Dosage: {row.dosage || 'Standard'} &bull; {row.frequency || 'Daily'}</p>
+                    <p className="text-xs text-brand-400 font-bold">
+                      {(row.prescription_items || []).map((item: any) => item.inventory_items?.name || 'Medication').join(', ')}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      {(row.prescription_items || []).map((item: any) =>
+                        `${item.dosage} · ${item.frequency} · Qty ${item.quantity_prescribed - (item.quantity_dispensed || 0)}`
+                      ).join(' | ')}
+                    </p>
                   </div>
                   <button 
                     onClick={() => handleDispense(row)}

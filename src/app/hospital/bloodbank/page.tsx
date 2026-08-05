@@ -17,9 +17,8 @@ interface BloodDonationItem {
   id: string;
   donor_name: string;
   blood_group: string;
-  units_donated: number;
-  component_type?: string;
-  donation_date: string;
+  quantity_ml: number;
+  donation_date: string | null;
 }
 
 const ALL_BLOOD_GROUPS = ['O+', 'A+', 'B+', 'O-', 'AB+', 'A-', 'B-', 'AB-'];
@@ -59,7 +58,7 @@ export default function BloodBankDashboard() {
 
       const invMap = new Map<string, number>();
       (invData || []).forEach(row => {
-        invMap.set(row.blood_group, row.units_in_stock || 0);
+        invMap.set(row.blood_group, row.quantity_units || 0);
       });
 
       const formattedStock: BloodStockItem[] = ALL_BLOOD_GROUPS.map(bg => {
@@ -81,7 +80,7 @@ export default function BloodBankDashboard() {
         .order('donation_date', { ascending: false })
         .limit(10);
 
-      setDonations((donData as BloodDonationItem[]) || []);
+      setDonations(donData || []);
 
     } catch (err) {
       console.error('Error fetching blood bank data:', err);
@@ -111,7 +110,7 @@ export default function BloodBankDashboard() {
     if (existing) {
       await supabase
         .from('blood_inventory')
-        .update({ units_in_stock: newUnits, updated_at: new Date().toISOString() })
+        .update({ quantity_units: newUnits })
         .eq('id', existing.id);
     }
 
@@ -244,10 +243,12 @@ export default function BloodBankDashboard() {
                     <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4 font-bold text-slate-900">{row.donor_name || 'Anonymous Donor'}</td>
                       <td className="px-6 py-4 font-black text-rose-600">{row.blood_group}</td>
-                      <td className="px-6 py-4 font-bold text-slate-700">{row.units_donated || 1} unit(s)</td>
-                      <td className="px-6 py-4 text-xs text-slate-500 font-medium">{row.component_type || 'Whole Blood'}</td>
+                      <td className="px-6 py-4 font-bold text-slate-700">
+                        {Math.max(1, Math.ceil(row.quantity_ml / 450))} unit(s)
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-500 font-medium">Whole Blood</td>
                       <td className="px-6 py-4 text-right text-xs text-slate-500 font-bold">
-                        {new Date(row.donation_date).toLocaleDateString()}
+                        {row.donation_date ? new Date(row.donation_date).toLocaleDateString() : 'Pending'}
                       </td>
                     </tr>
                   ))}

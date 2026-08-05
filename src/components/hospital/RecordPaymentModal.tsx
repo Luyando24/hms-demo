@@ -54,18 +54,26 @@ export default function RecordPaymentModal({ isOpen, onClose, invoice, onSuccess
   if (!isOpen) return null;
 
   const handlePayment = async () => {
+    const outstanding = invoice.total_amount - (invoice.paid_amount || 0);
+    if (amount <= 0 || amount > outstanding) {
+      setStatus({
+        type: 'error',
+        title: 'Invalid Payment',
+        message: `Enter an amount between 0.01 and ${outstanding.toFixed(2)}.`
+      });
+      return;
+    }
     setLoading(true);
     
     const finalReference = method === 'INSURANCE' 
       ? `Insurance: ${insuranceProvider}${reference ? ` (Ref: ${reference})` : ''}`
       : reference;
 
-    // 1. Insert payment record
-    const { error: paymentError } = await supabase.from('payments').insert({
-      invoice_id: invoice.id,
-      amount: amount,
-      payment_method: method,
-      reference_number: finalReference
+    const { error: paymentError } = await supabase.rpc('record_invoice_payment', {
+      target_invoice_id: invoice.id,
+      payment_amount: amount,
+      method,
+      reference: finalReference || undefined
     });
 
     if (paymentError) {
@@ -78,28 +86,11 @@ export default function RecordPaymentModal({ isOpen, onClose, invoice, onSuccess
       return;
     }
 
-    // 2. Update invoice status
-    const newPaidAmount = (invoice.paid_amount || 0) + parseFloat(amount.toString());
-    const newStatus = newPaidAmount >= invoice.total_amount ? 'PAID' : 'PARTIAL';
-
-    const { error: invoiceError } = await supabase.from('invoices').update({
-      paid_amount: newPaidAmount,
-      status: newStatus
-    }).eq('id', invoice.id);
-
-    if (invoiceError) {
-      setStatus({
-        type: 'error',
-        title: 'Update Failed',
-        message: invoiceError.message
-      });
-    } else {
-      setStatus({
-        type: 'success',
-        title: 'Payment Recorded',
-        message: `Payment of ${amount} (${method.replace('_', ' ')}) applied to Invoice #${invoice.id.slice(0, 8)}.`
-      });
-    }
+    setStatus({
+      type: 'success',
+      title: 'Payment Recorded',
+      message: `Payment of ${amount} (${method.replace('_', ' ')}) applied to Invoice #${invoice.id.slice(0, 8)}.`
+    });
     
     setLoading(false);
   };

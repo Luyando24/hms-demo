@@ -101,7 +101,7 @@ export default function ReportsDashboard() {
         supabase.from('invoices').select('total_amount, paid_amount, status').gte('created_at', startIso),
         supabase.from('payroll_records').select('net_salary').gte('created_at', startIso),
         supabase.from('patients').select('id', { count: 'exact', head: true }),
-        supabase.from('beds').select('id, is_occupied'),
+        supabase.from('beds').select('id, status'),
         supabase.from('admissions').select('id').eq('status', 'ADMITTED'),
         supabase.from('lab_orders').select('id', { count: 'exact', head: true }).gte('created_at', startIso),
         supabase.from('radiology_orders').select('id', { count: 'exact', head: true }).gte('created_at', startIso),
@@ -130,7 +130,7 @@ export default function ReportsDashboard() {
 
       // Bed Occupancy
       const totalBeds = bedsRes.data?.length || 1;
-      const occupiedBeds = bedsRes.data?.filter(b => b.is_occupied).length || 0;
+      const occupiedBeds = bedsRes.data?.filter(b => b.status === 'OCCUPIED').length || 0;
       const rate = Math.round((occupiedBeds / totalBeds) * 100);
 
       const opdCount = walkinRes.count || 0;

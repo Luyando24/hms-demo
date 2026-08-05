@@ -1,122 +1,128 @@
-import { Settings, User, Bell, Shield, Lock, CreditCard, ChevronRight, Save, Camera } from "lucide-react";
-import clsx from "clsx";
+import { Save, ShieldCheck, User } from 'lucide-react';
+import { requireRole } from '@/lib/auth';
+import { updatePatientProfileAction } from '@/app/patient/portal/actions';
 
-export default function PatientSettings() {
+export default async function PatientSettings({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const { user, supabase } = await requireRole(['PATIENT']);
+  const [{ data: profile }, { data: patient }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('first_name, last_name, email, phone, file_number')
+      .eq('id', user.id)
+      .maybeSingle(),
+    supabase
+      .from('patients')
+      .select('address, phone, email, file_number')
+      .eq('auth_user_id', user.id)
+      .maybeSingle(),
+  ]);
+  const success = typeof params.success === 'string' ? params.success : null;
+  const error = typeof params.error === 'string' ? params.error : null;
+  const firstName = profile?.first_name || '';
+  const lastName = profile?.last_name || '';
+
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      {/* Header */}
+    <div className="mx-auto max-w-4xl space-y-8">
       <div>
-        <h1 className="text-3xl font-black tracking-tight text-slate-900">Settings</h1>
-        <p className="text-slate-500 mt-1">Manage your account preferences and personal information.</p>
+        <h1 className="text-3xl font-black text-slate-900">Profile settings</h1>
+        <p className="mt-1 text-slate-500">
+          Update the contact information shared with your care team.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        
-        {/* Navigation Tabs */}
-        <div className="space-y-2">
-          {[
-            { name: 'Personal Profile', icon: User, active: true },
-            { name: 'Security & Password', icon: Lock },
-            { name: 'Notifications', icon: Bell },
-            { name: 'Payment Methods', icon: CreditCard },
-          ].map((tab) => (
-            <button 
-              key={tab.name}
-              className={clsx(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all",
-                tab.active ? "bg-brand-600 text-white shadow-lg shadow-brand-500/20" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-              )}
-            >
-              <tab.icon size={20} />
-              {tab.name}
-              {tab.active && <ChevronRight size={18} className="ml-auto opacity-60" />}
-            </button>
-          ))}
+      {(success || error) && (
+        <div
+          className={
+            'rounded-xl border p-4 text-sm font-bold ' +
+            (error
+              ? 'border-rose-200 bg-rose-50 text-rose-700'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-700')
+          }
+        >
+          {error || success}
         </div>
+      )}
 
-        {/* Settings Form */}
-        <div className="md:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-8">
-            
-            {/* Profile Picture */}
-            <div className="flex items-center gap-6">
-              <div className="relative group">
-                <div className="w-24 h-24 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 text-3xl font-black border-4 border-white shadow-sm overflow-hidden">
-                  M
-                </div>
-                <button className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
-                  <Camera size={24} />
-                </button>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">Mwansa Chanda</h3>
-                <p className="text-sm text-slate-500">Patient ID: PAT-8420-11</p>
-                <div className="flex gap-2 mt-2">
-                  <button className="text-xs font-bold text-brand-600 hover:underline">Change Photo</button>
-                  <span className="text-slate-300">•</span>
-                  <button className="text-xs font-bold text-rose-500 hover:underline">Remove</button>
-                </div>
-              </div>
-            </div>
-
-            <div className="h-px bg-slate-100" />
-
-            {/* Form Fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">First Name</label>
-                <input 
-                  type="text" 
-                  defaultValue="Mwansa"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Last Name</label>
-                <input 
-                  type="text" 
-                  defaultValue="Chanda"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Email Address</label>
-                <input 
-                  type="email" 
-                  defaultValue="mwansa.chanda@example.com"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Phone Number</label>
-                <input 
-                  type="tel" 
-                  defaultValue="+260 97 1234567"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                />
-              </div>
-              <div className="sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Home Address</label>
-                <textarea 
-                  defaultValue="123 Wellness Avenue, Rhodes Park, Lusaka, Zambia"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 h-24"
-                />
-              </div>
-            </div>
-
-            <div className="h-px bg-slate-100" />
-
-            <div className="flex justify-end gap-3 pt-4">
-              <button className="px-6 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all text-sm">
-                Discard Changes
-              </button>
-              <button className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all text-sm flex items-center gap-2">
-                <Save size={18} />
-                Save Settings
-              </button>
-            </div>
+      <div className="grid gap-8 md:grid-cols-3">
+        <aside className="rounded-2xl bg-slate-900 p-6 text-white">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600 text-2xl font-black">
+            {(firstName[0] || 'P') + (lastName[0] || '')}
           </div>
-        </div>
+          <h2 className="mt-5 text-xl font-black">
+            {firstName} {lastName}
+          </h2>
+          <p className="mt-1 text-sm text-slate-400">
+            {patient?.file_number || profile?.file_number || 'Patient'}
+          </p>
+          <div className="mt-6 flex items-start gap-2 rounded-xl bg-white/10 p-4 text-xs text-slate-300">
+            <ShieldCheck size={18} className="shrink-0 text-emerald-400" />
+            Clinical facts and identifiers can only be changed by authorized hospital staff.
+          </div>
+        </aside>
+
+        <form
+          action={updatePatientProfileAction}
+          className="space-y-6 rounded-2xl border border-slate-200 bg-white p-8 md:col-span-2"
+        >
+          <h2 className="flex items-center gap-2 font-black text-slate-900">
+            <User size={20} className="text-brand-600" /> Personal information
+          </h2>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <label className="text-xs font-bold uppercase text-slate-500">
+              First name
+              <input
+                required
+                name="first_name"
+                defaultValue={firstName}
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm normal-case"
+              />
+            </label>
+            <label className="text-xs font-bold uppercase text-slate-500">
+              Last name
+              <input
+                required
+                name="last_name"
+                defaultValue={lastName}
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm normal-case"
+              />
+            </label>
+            <label className="text-xs font-bold uppercase text-slate-500">
+              Email
+              <input
+                required
+                type="email"
+                name="email"
+                defaultValue={patient?.email || profile?.email || user.email || ''}
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm normal-case"
+              />
+            </label>
+            <label className="text-xs font-bold uppercase text-slate-500">
+              Phone
+              <input
+                name="phone"
+                defaultValue={patient?.phone || profile?.phone || ''}
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm normal-case"
+              />
+            </label>
+          </div>
+          <label className="block text-xs font-bold uppercase text-slate-500">
+            Home address
+            <textarea
+              name="address"
+              rows={4}
+              defaultValue={patient?.address || ''}
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm normal-case"
+            />
+          </label>
+          <button className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3 font-bold text-white">
+            <Save size={18} /> Save profile
+          </button>
+        </form>
       </div>
     </div>
   );

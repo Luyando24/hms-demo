@@ -3,12 +3,44 @@
 import Link from "next/link";
 import { Search, Bell, ChevronDown, HeartPulse, Menu, LogOut, User as UserIcon, Settings } from "lucide-react";
 import { useMobileNav } from "./mobile-nav-context";
-import { useState } from "react";
-import { signOut } from "@/app/login/actions";
+import { useEffect, useState } from "react";
+import { patientSignOut } from "@/app/patient/login/actions";
+import { createClient } from "@/utils/supabase/client";
 
 export function Header() {
   const { toggle } = useMobileNav();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [identity, setIdentity] = useState({
+    firstName: 'Patient',
+    lastName: '',
+    email: ''
+  });
+
+  useEffect(() => {
+    const supabase = createClient();
+    const loadIdentity = async () => {
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, email')
+        .eq('id', user.id)
+        .maybeSingle();
+      setIdentity({
+        firstName: profile?.first_name || 'Patient',
+        lastName: profile?.last_name || '',
+        email: profile?.email || user.email || ''
+      });
+    };
+    void loadIdentity();
+  }, []);
+
+  const fullName = (identity.firstName + ' ' + identity.lastName).trim();
+  const initials = (
+    (identity.firstName[0] || 'P') + (identity.lastName[0] || '')
+  ).toUpperCase();
 
   return (
     <header className="fixed top-0 left-0 right-0 h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 z-50">
@@ -60,10 +92,10 @@ export function Header() {
             className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-1.5 pr-3 rounded-full transition-all hover:bg-slate-100 shadow-sm"
           >
             <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-sm">
-              MC
+              {initials}
             </div>
             <div className="text-left hidden md:block">
-              <p className="text-sm font-semibold text-slate-700 leading-tight">Mwansa Chanda</p>
+              <p className="text-sm font-semibold text-slate-700 leading-tight">{fullName}</p>
               <p className="text-xs text-slate-500 font-medium">Patient</p>
             </div>
             <ChevronDown size={16} className={`text-slate-400 ml-1 transition-transform ${isProfileOpen ? "rotate-180" : ""}`} />
@@ -77,8 +109,8 @@ export function Header() {
               />
               <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-200/50 z-20 py-2 animate-in fade-in zoom-in-95 duration-200">
                 <div className="px-4 py-3 border-b border-slate-100 mb-1">
-                  <p className="text-sm font-bold text-slate-900">Mwansa Chanda</p>
-                  <p className="text-xs text-slate-500 truncate">mwansa@example.com</p>
+                  <p className="text-sm font-bold text-slate-900">{fullName}</p>
+                  <p className="text-xs text-slate-500 truncate">{identity.email}</p>
                 </div>
                 
                 <Link 
@@ -99,7 +131,7 @@ export function Header() {
                 <div className="h-px bg-slate-100 my-1" />
                 
                 <button 
-                  onClick={() => signOut()}
+                  onClick={() => patientSignOut()}
                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
                 >
                   <LogOut size={16} />

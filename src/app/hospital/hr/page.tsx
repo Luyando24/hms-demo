@@ -39,6 +39,26 @@ interface StaffProfile {
   created_at: string;
 }
 
+function normalizeStaffProfile(profile: {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: string;
+  phone: string | null;
+  staff_number: string | null;
+  created_at: string | null;
+}): StaffProfile {
+  return {
+    id: profile.id,
+    first_name: profile.first_name || 'Unknown',
+    last_name: profile.last_name || 'Staff',
+    role: profile.role,
+    phone: profile.phone || undefined,
+    staff_number: profile.staff_number || undefined,
+    created_at: profile.created_at || new Date(0).toISOString(),
+  };
+}
+
 interface LeaveRequest {
   id: string;
   staff_id: string;
@@ -125,7 +145,7 @@ export default function HRDashboard() {
         .neq('role', 'PATIENT')
         .order('created_at', { ascending: false });
 
-      const profilesList: StaffProfile[] = allProfiles || [];
+      const profilesList = (allProfiles || []).map(normalizeStaffProfile);
       setStaff(profilesList.slice(0, 8));
 
       const total = profilesList.length;
@@ -139,7 +159,12 @@ export default function HRDashboard() {
         .select('*, profiles(*)')
         .order('start_date', { ascending: false });
 
-      const leaveList: LeaveRequest[] = rawLeave || [];
+      const leaveList: LeaveRequest[] = (rawLeave || []).map((request) => ({
+        ...request,
+        staff_id: request.staff_id || '',
+        reason: request.reason || undefined,
+        profiles: request.profiles ? normalizeStaffProfile(request.profiles) : undefined,
+      }));
       setLeaveRequests(leaveList);
       const pendingLeave = leaveList.filter(l => l.status === 'PENDING').length;
 
@@ -149,7 +174,17 @@ export default function HRDashboard() {
         .select('*, profiles(*)')
         .order('created_at', { ascending: false });
 
-      const payList: PayrollRecord[] = rawPayroll || [];
+      const payList: PayrollRecord[] = (rawPayroll || []).map((record) => ({
+        ...record,
+        staff_id: record.staff_id || '',
+        base_salary: record.base_salary || 0,
+        allowances: record.allowances || 0,
+        deductions: record.deductions || 0,
+        net_salary: record.net_salary || 0,
+        status: record.status || 'PENDING',
+        created_at: record.created_at || new Date(0).toISOString(),
+        profiles: record.profiles ? normalizeStaffProfile(record.profiles) : undefined,
+      }));
       setPayrollRecords(payList);
 
       const totalPay = payList.reduce((sum, r) => sum + (r.net_salary || 0), 0);
@@ -307,7 +342,7 @@ export default function HRDashboard() {
                   ) : payrollRecords.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-6 py-8 text-center text-slate-400 font-bold text-xs uppercase tracking-wider">
-                        No payroll records processed yet. Click "Process Payroll" to disburse.
+                        No payroll records processed yet. Click &quot;Process Payroll&quot; to disburse.
                       </td>
                     </tr>
                   ) : payrollRecords.map((row) => (

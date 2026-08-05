@@ -10,19 +10,18 @@ import clsx from "clsx";
 
 interface WalkinQueueItem {
   id: string;
-  patient_id: string;
-  department: string;
+  patient_id: string | null;
   status: string;
   priority: string;
-  reason?: string;
-  created_at: string;
-  patients?: {
+  reason: string | null;
+  created_at: string | null;
+  patients: {
     id: string;
     first_name: string;
     last_name: string;
     file_number: string;
     gender?: string;
-  };
+  } | null;
 }
 
 interface DoctorSchedule {
@@ -110,7 +109,7 @@ export default function ReceptionDashboard() {
         .order('created_at', { ascending: false })
         .limit(6);
 
-      setRecentQueue((queueData as WalkinQueueItem[]) || []);
+      setRecentQueue(queueData || []);
 
       // 5. Fetch Doctors & OPD Queue Distribution
       const { data: doctorsData } = await supabase
@@ -152,7 +151,6 @@ export default function ReceptionDashboard() {
     // 1. Create walk-in queue record
     const { data: queueData, error: queueError } = await supabase.from('walkin_queue').insert({
       patient_id: patientId,
-      department: 'OPD',
       status: 'WAITING',
       priority: 'NORMAL'
     }).select().single();
@@ -343,7 +341,7 @@ export default function ReceptionDashboard() {
                           </p>
                           <p className="text-[10px] text-slate-400 font-bold uppercase">{row.patients?.file_number || 'N/A'}</p>
                         </td>
-                        <td className="px-6 py-4 text-slate-600 font-medium">{row.department || 'OPD Triage'}</td>
+                        <td className="px-6 py-4 text-slate-600 font-medium">Clinical Triage</td>
                         <td className="px-6 py-4 text-slate-400 text-xs font-bold">{formatTimeAgo(row.created_at)}</td>
                         <td className="px-6 py-4 text-right">
                           <span className={clsx(

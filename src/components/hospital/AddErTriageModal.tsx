@@ -20,7 +20,8 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
   // New Patient Form
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [gender, setGender] = useState('Male');
+  const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'OTHER'>('MALE');
+  const [dob, setDob] = useState('');
 
   // ER Triage Form
   const [priority, setPriority] = useState<'EMERGENCY' | 'URGENT' | 'NORMAL'>('EMERGENCY');
@@ -60,7 +61,8 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
           first_name: firstName || 'Unknown',
           last_name: lastName || 'Trauma Patient',
           file_number: fileNo,
-          gender: gender,
+          gender,
+          dob,
           created_at: new Date().toISOString()
         })
         .select()
@@ -79,7 +81,6 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
       .from('walkin_queue')
       .insert({
         patient_id: patientIdToUse,
-        department: 'ER',
         status: 'WAITING',
         priority: priority,
         reason: `${triageLevel} - ${chiefComplaint || 'Acute Trauma'} (${location})`,
@@ -190,6 +191,29 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
                   onChange={(e) => setLastName(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20"
                 />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Date of Birth / Estimate</label>
+                <input
+                  type="date"
+                  required
+                  value={dob}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setDob(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Gender</label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value as 'MALE' | 'FEMALE' | 'OTHER')}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                >
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="OTHER">Other / Unknown</option>
+                </select>
               </div>
             </div>
           )}

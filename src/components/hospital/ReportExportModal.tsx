@@ -11,6 +11,99 @@ interface ReportExportModalProps {
   reportKey: string;
 }
 
+function safeFilePart(value: string) {
+  return value.replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '');
+}
+
+function escapePdfText(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/([\\()])/g, '\\$1');
+}
+
+function downloadSimplePdf(
+  filename: string,
+  title: string,
+  rows: Array<Record<string, unknown>>,
+) {
+  const rowLines = rows.flatMap((row, index) => [
+    `${index + 1}. ` +
+      Object.entries(row)
+        .map(([key, value]) => `${key}: ${String(value ?? '')}`)
+        .join(' | '),
+  ]);
+  const lines = [title, 'Generated: ' + new Date().toLocaleString(), '', ...rowLines]
+    .map((line) => line.slice(0, 115));
+  const pages = Array.from(
+    { length: Math.max(1, Math.ceil(lines.length / 48)) },
+    (_, index) => lines.slice(index * 48, index * 48 + 48),
+  );
+  const fontObjectNumber = 3 + pages.length * 2;
+  const objects: string[] = [];
+  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  objects[2] =
+    '<< /Type /Pages /Count ' +
+    pages.length +
+    ' /Kids [' +
+    pages.map((_, index) => 3 + index * 2 + ' 0 R').join(' ') +
+    '] >>';
+
+  pages.forEach((pageLines, index) => {
+    const pageObjectNumber = 3 + index * 2;
+    const contentObjectNumber = pageObjectNumber + 1;
+    const stream =
+      'BT\n/F1 9 Tf\n40 790 Td\n14 TL\n' +
+      pageLines.map((line) => '(' + escapePdfText(line) + ') Tj\nT*').join('') +
+      'ET';
+    objects[pageObjectNumber] =
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] ' +
+      '/Resources << /Font << /F1 ' +
+      fontObjectNumber +
+      ' 0 R >> >> /Contents ' +
+      contentObjectNumber +
+      ' 0 R >>';
+    objects[contentObjectNumber] =
+      '<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream';
+  });
+  objects[fontObjectNumber] =
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+
+  let pdf = '%PDF-1.4\n%HMS\n';
+  const offsets = [0];
+  for (let index = 1; index < objects.length; index += 1) {
+    offsets[index] = pdf.length;
+    pdf += index + ' 0 obj\n' + objects[index] + '\nendobj\n';
+  }
+  const xrefOffset = pdf.length;
+  pdf += 'xref\n0 ' + objects.length + '\n';
+  pdf += '0000000000 65535 f \n';
+  for (let index = 1; index < objects.length; index += 1) {
+    pdf += String(offsets[index]).padStart(10, '0') + ' 00000 n \n';
+  }
+  pdf +=
+    'trailer\n<< /Size ' +
+    objects.length +
+    ' /Root 1 0 R >>\nstartxref\n' +
+    xrefOffset +
+    '\n%%EOF';
+
+  const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = safeFilePart(filename) + '.pdf';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(value: unknown) {
+  const raw = String(value ?? '');
+  const formulaSafe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+  return '"' + formulaSafe.replace(/"/g, '""') + '"';
+}
+
 export default function ReportExportModal({ isOpen, onClose, reportName, reportKey }: ReportExportModalProps) {
   const [period, setPeriod] = useState<string>('THIS_MONTH');
   const [startDate, setStartDate] = useState<string>(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
@@ -98,7 +191,7 @@ export default function ReportExportModal({ isOpen, onClose, reportName, reportK
         const [roomsRes, inventoryRes, bedsRes] = await Promise.all([
           supabase.from('rooms').select('id, name, is_active'),
           supabase.from('inventory_items').select('id, name, stock_level, unit_price'),
-          supabase.from('beds').select('id, is_occupied')
+          supabase.from('beds').select('id, status')
         ]);
 
         let inventoryValuation = 0;
@@ -107,7 +200,7 @@ export default function ReportExportModal({ isOpen, onClose, reportName, reportK
         });
 
         const totalBeds = bedsRes.data?.length || 1;
-        const occupiedBeds = bedsRes.data?.filter(b => b.is_occupied).length || 0;
+        const occupiedBeds = bedsRes.data?.filter(b => b.status === 'OCCUPIED').length || 0;
 
         exportData = [{
           Report_Type: 'Facility Asset Valuation & Capacity ROI',
@@ -198,16 +291,24 @@ export default function ReportExportModal({ isOpen, onClose, reportName, reportK
         document.body.appendChild(downloadAnchor);
         downloadAnchor.click();
         downloadAnchor.remove();
-      } else {
-        // Generate CSV file
+      } else if (exportFormat === 'PDF') {
         if (exportData.length === 0) {
           alert('No records found for the selected period range.');
-          setLoading(false);
           return;
         }
-        const headers = Object.keys(exportData[0]).join(',');
+        downloadSimplePdf(
+          reportKey + '_report_' + startDate + '_to_' + endDate,
+          reportName,
+          exportData,
+        );
+      } else {
+        if (exportData.length === 0) {
+          alert('No records found for the selected period range.');
+          return;
+        }
+        const headers = Object.keys(exportData[0]).map(csvCell).join(',');
         const csvRows = exportData.map(row => 
-          Object.values(row).map(val => `"${String(val ?? '').replace(/"/g, '""')}"`).join(',')
+          Object.values(row).map(csvCell).join(',')
         );
         const csvContent = "data:text/csv;charset=utf-8," + [headers, ...csvRows].join('\n');
         const encodedUri = encodeURI(csvContent);
@@ -220,8 +321,8 @@ export default function ReportExportModal({ isOpen, onClose, reportName, reportK
       }
 
       onClose();
-    } catch (err: any) {
-      alert('Export failed: ' + err.message);
+    } catch (err: unknown) {
+      alert('Export failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }

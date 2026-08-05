@@ -24,44 +24,22 @@ export default function LogBloodDonationModal({ isOpen, onClose, onSuccess }: Lo
     setLoading(true);
 
     try {
-      // 1. Insert into blood_donations if exists or update blood_inventory
-      const { data: existingStock } = await supabase
-        .from('blood_inventory')
-        .select('*')
-        .eq('blood_group', bloodGroup)
-        .maybeSingle();
-
-      if (existingStock) {
-        await supabase
-          .from('blood_inventory')
-          .update({
-            units_in_stock: (existingStock.units_in_stock || 0) + units,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingStock.id);
-      } else {
-        await supabase
-          .from('blood_inventory')
-          .insert({
-            blood_group: bloodGroup,
-            units_in_stock: units,
-            status: 'AVAILABLE'
-          });
-      }
-
-      // Try inserting into blood_donations
-      await supabase.from('blood_donations').insert({
-        donor_name: donorName,
-        blood_group: bloodGroup,
-        units_donated: units,
-        component_type: componentType,
-        donation_date: new Date().toISOString()
-      }).select();
+      const { error } = await supabase.rpc('log_blood_donation', {
+        p_donor_name: donorName.trim(),
+        p_donor_contact: '',
+        p_blood_group: bloodGroup,
+        p_quantity_ml: units * 450,
+        p_component_type: componentType
+      });
+      if (error) throw error;
 
       onSuccess();
       onClose();
-    } catch (err: any) {
-      alert('Error logging blood donation: ' + err.message);
+    } catch (err: unknown) {
+      alert(
+        'Error logging blood donation: ' +
+          (err instanceof Error ? err.message : 'Unknown error')
+      );
     } finally {
       setLoading(false);
     }

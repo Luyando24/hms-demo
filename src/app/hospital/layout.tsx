@@ -1,8 +1,18 @@
+import type { Metadata } from "next";
 import { HospitalSidebar } from "@/components/layout/hospital-sidebar";
 import { HospitalHeader } from "@/components/layout/hospital-header";
 import { MobileNavProvider } from "@/components/layout/mobile-nav-context";
 import { HospitalBottomNav } from "@/components/layout/hospital-bottom-nav";
 import QueueFloatingIndicator from "@/components/hospital/QueueFloatingIndicator";
+
+export const metadata: Metadata = {
+  title: "Hospital Console",
+  description: "Secure clinical and hospital operations workspace.",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function HospitalLayout({
   children,

@@ -9,6 +9,7 @@ export default function AssetsDashboard() {
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [maintenanceCutoff] = useState(() => Date.now() + 30 * 24 * 60 * 60 * 1000);
   const supabase = createClient();
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export default function AssetsDashboard() {
   const stats = {
     total: assets.length,
     underRepair: assets.filter(a => a.status === 'UNDER_REPAIR').length,
-    maintenanceDue: assets.filter(a => a.next_maintenance && new Date(a.next_maintenance) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)).length,
+    maintenanceDue: assets.filter(a => a.next_maintenance && new Date(a.next_maintenance) <= new Date(maintenanceCutoff)).length,
   };
 
   return (

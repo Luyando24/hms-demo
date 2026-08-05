@@ -17,7 +17,6 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
   
   const [formData, setFormData] = useState({
     email: '',
-    password: 'password123',
     firstName: '',
     lastName: '',
     role: 'NURSE',
@@ -35,7 +34,6 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
 
       const result = await createStaffMember({
         email: effectiveEmail,
-        password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
         role: formData.role,
@@ -49,14 +47,14 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
       setStatus({
         type: 'success',
         title: 'Staff Member Added',
-        message: `${formData.firstName} ${formData.lastName} has been successfully registered as a ${formData.role.toLowerCase()}.`
+        message: `${formData.firstName} ${formData.lastName} has been registered and invited to set a secure password.`
       });
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatus({
         type: 'error',
         title: 'Creation Failed',
-        message: err.message || 'Failed to add staff member'
+        message: err instanceof Error ? err.message : 'Failed to add staff member'
       });
     } finally {
       setLoading(false);
@@ -187,7 +185,7 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
           </div>
           <div className="px-8 pb-8 text-center">
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-              Default password: <span className="text-slate-600">password123</span>
+              A secure account invitation will be emailed to the staff member.
             </p>
           </div>
         </div>

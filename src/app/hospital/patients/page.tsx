@@ -344,7 +344,7 @@ export default function PatientsPage() {
                       </div>
                       <div>
                         <h3 className="text-lg font-black text-slate-900">No Patients Found</h3>
-                        <p className="text-sm text-slate-400 mt-1">We couldn't find any patient records matching your search criteria.</p>
+                        <p className="text-sm text-slate-400 mt-1">We couldn&apos;t find any patient records matching your search criteria.</p>
                       </div>
                       <button 
                         onClick={() => {

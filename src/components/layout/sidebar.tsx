@@ -3,19 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
-  HeartPulse, 
   LayoutDashboard, 
   CalendarDays, 
   FileText, 
   Pill, 
   CreditCard,
   Settings,
-  LogOut,
-  X
+  LogOut
 } from "lucide-react";
 import clsx from "clsx";
 import { useMobileNav } from "./mobile-nav-context";
-import { signOut } from "@/app/login/actions";
+import { patientSignOut } from "@/app/patient/login/actions";
 
 const navItems = [
   { name: "Overview", href: "/patient/portal", icon: LayoutDashboard },
@@ -98,7 +96,7 @@ export function Sidebar() {
           Settings
         </Link>
         <button
-          onClick={() => signOut()}
+          onClick={() => patientSignOut()}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-all duration-200 group"
         >
           <LogOut size={20} strokeWidth={2} className="text-slate-400 group-hover:text-rose-500" />

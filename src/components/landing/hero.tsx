@@ -36,7 +36,7 @@ export function Hero() {
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
           <Link 
-            href="/login" 
+            href="/patient/login"
             className="flex items-center justify-center px-8 py-4 rounded-full text-lg font-bold text-slate-700 bg-white border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all w-full sm:w-auto"
           >
             Patient Portal

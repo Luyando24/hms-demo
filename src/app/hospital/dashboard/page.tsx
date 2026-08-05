@@ -228,9 +228,9 @@ export default function HospitalDashboard() {
           title: `${isEmergency ? 'Emergency Triage' : 'Walk-in Registration'}: ${patientName}`,
           category: 'ER',
           time: formatTimeAgo(item.created_at),
-          timestamp: item.created_at,
+          timestamp: item.created_at || new Date().toISOString(),
           level: isEmergency ? 'critical' : 'info',
-          details: `Patient registered for ${item.department || 'General OPD'}. Priority: ${item.priority || 'NORMAL'}. Chief Complaint: ${item.reason || 'Routine Consultation'}`
+          details: `Patient registered for clinical triage. Priority: ${item.priority || 'NORMAL'}. Chief Complaint: ${item.reason || 'Routine Consultation'}`
         });
       });
 
@@ -238,19 +238,21 @@ export default function HospitalDashboard() {
       const { data: inventoryData } = await supabase
         .from('inventory_items')
         .select('*')
-        .order('quantity', { ascending: true })
+        .order('stock_level', { ascending: true })
         .limit(5);
 
       (inventoryData || []).forEach(item => {
-        const isCritical = item.quantity <= (item.min_reorder_level || 10);
+        const stockLevel = item.stock_level || 0;
+        const reorderLevel = item.reorder_level || 10;
+        const isCritical = stockLevel <= reorderLevel;
         liveAlerts.push({
           id: `inv-${item.id}`,
-          title: `Low Stock: ${item.item_name} (${item.category || 'Pharmacy'})`,
+          title: `Low Stock: ${item.name} (${item.category || 'Pharmacy'})`,
           category: 'INVENTORY',
           time: formatTimeAgo(item.updated_at),
           timestamp: item.updated_at || new Date().toISOString(),
           level: isCritical ? 'critical' : 'warning',
-          details: `Current stock: ${item.quantity} ${item.unit || 'units'} (Reorder Level: ${item.min_reorder_level || 10}). Location: ${item.location || 'Central Pharmacy'}`
+          details: `Current stock: ${stockLevel} ${item.unit || 'units'} (Reorder Level: ${reorderLevel}).`
         });
       });
 
@@ -258,11 +260,12 @@ export default function HospitalDashboard() {
       const { data: bloodData } = await supabase
         .from('blood_inventory')
         .select('*')
-        .order('units_in_stock', { ascending: true })
+        .order('quantity_units', { ascending: true })
         .limit(3);
 
       (bloodData || []).forEach(item => {
-        const isLow = item.units_in_stock <= 5;
+        const quantityUnits = item.quantity_units || 0;
+        const isLow = quantityUnits <= 5;
         liveAlerts.push({
           id: `blood-${item.id}`,
           title: `Blood Bank Supply: Group ${item.blood_group}`,
@@ -270,7 +273,7 @@ export default function HospitalDashboard() {
           time: 'Active Notice',
           timestamp: new Date().toISOString(),
           level: isLow ? 'critical' : 'info',
-          details: `${item.units_in_stock} unit(s) available in blood bank storage.`
+          details: `${quantityUnits} unit(s) available in blood bank storage.`
         });
       });
 
@@ -289,7 +292,7 @@ export default function HospitalDashboard() {
           title: `Inpatient Admission: ${pName}`,
           category: 'ADMISSION',
           time: formatTimeAgo(item.admission_date),
-          timestamp: item.admission_date,
+          timestamp: item.admission_date || new Date().toISOString(),
           level: 'info',
           details: `Assigned to ${bedInfo}. Primary Diagnosis: ${item.primary_diagnosis || 'Under Observation'}`
         });
@@ -389,7 +392,7 @@ export default function HospitalDashboard() {
               Settled Today
             </span>
           </div>
-          <h3 className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-1">Today's Revenue</h3>
+          <h3 className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-1">Today&apos;s Revenue</h3>
           <p className="text-3xl font-black text-slate-900">
             {formatCurrencyAmount(metrics.todaysRevenue, currencyConfig.symbol, currencyConfig.position)}
           </p>

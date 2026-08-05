@@ -5,8 +5,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "HMSdemo",
-  description: "Next-Generation Healthcare Management System",
+  applicationName: "HMS Hospital",
+  title: "HMS Hospital",
+  description: "Integrated hospital services, clinical operations, and patient care.",
 };
 
 export default function RootLayout({

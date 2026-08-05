@@ -32,7 +32,7 @@ export default function RegisterPatientModal({ isOpen, onClose, onSuccess }: { i
       insurance_policy_number: formData.get('insurance_policy_number') as string,
     }
 
-    const { success, error, warning } = await registerPatientAction(patientData)
+    const { error, warning } = await registerPatientAction(patientData)
     
     if (error) {
       setStatus({
@@ -44,7 +44,7 @@ export default function RegisterPatientModal({ isOpen, onClose, onSuccess }: { i
       setStatus({
         type: 'success',
         title: 'Patient Registered',
-        message: warning || `${patientData.first_name} ${patientData.last_name} has been added. They can now login to the Patient Portal using their File Number or Email (Default password: password123).`
+        message: warning || `${patientData.first_name} ${patientData.last_name} has been added. If an email was provided, a secure portal invitation has been sent.`
       })
     }
     setLoading(false)

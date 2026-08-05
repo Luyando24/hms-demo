@@ -56,17 +56,21 @@ const navGroups = [
     items: [
       { name: "Pharmacy & Inventory", href: "/hospital/inventory", icon: Box },
       { name: "Blood Bank", href: "/hospital/bloodbank", icon: Droplet },
+      { name: "Assets & Documents", href: "/hospital/assets", icon: Building },
     ]
   },
   {
     title: "Administration",
     items: [
       { name: "Billing & Claims", href: "/hospital/billing", icon: CreditCard },
+      { name: "Finance & Expenses", href: "/hospital/finance", icon: CreditCard },
+      { name: "Management", href: "/hospital/management", icon: LayoutDashboard },
       { name: "Staff Directory", href: "/hospital/staff", icon: Users },
       { name: "Departments", href: "/hospital/admin/departments", icon: Building },
       { name: "Rooms & Facilities", href: "/hospital/admin/rooms", icon: DoorOpen },
       { name: "HR & Staffing", href: "/hospital/hr", icon: Users },
       { name: "Reports & Analytics", href: "/hospital/reports", icon: LayoutDashboard },
+      { name: "System Settings", href: "/hospital/settings", icon: Settings },
     ]
   }
 ];

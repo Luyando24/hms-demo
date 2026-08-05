@@ -33,24 +33,12 @@ export default function UpdateStockModal({ isOpen, onClose, item, onSuccess }: U
     }
     setLoading(true)
     
-    const newStock = type === 'ADD' 
-      ? item.stock_level + changeAmount 
-      : item.stock_level - changeAmount
-
-    if (newStock < 0) {
-      setStatus({
-        type: 'error',
-        title: 'Stock Error',
-        message: 'Cannot reduce stock below zero.'
-      })
-      setLoading(false)
-      return
-    }
-
-    const { error } = await supabase
-      .from('inventory_items')
-      .update({ stock_level: newStock })
-      .eq('id', item.id)
+    const quantityDelta = type === 'ADD' ? changeAmount : -changeAmount
+    const { data: newStock, error } = await supabase.rpc('adjust_inventory', {
+      target_item_id: item.id,
+      quantity_delta: quantityDelta,
+      movement_reason: reason || (type === 'ADD' ? 'Restock' : 'Adjustment')
+    })
 
     if (error) {
       setStatus({
@@ -59,13 +47,6 @@ export default function UpdateStockModal({ isOpen, onClose, item, onSuccess }: U
         message: error.message
       })
     } else {
-      // Optional: Log movement
-      await supabase.from('inventory_movements').insert({
-        item_id: item.id,
-        quantity: type === 'ADD' ? changeAmount : -changeAmount,
-        reason: reason || (type === 'ADD' ? 'Restock' : 'Adjustment')
-      })
-      
       setStatus({
         type: 'success',
         title: 'Inventory Updated',

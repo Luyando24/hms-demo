@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, DollarSign, Building, Phone, Mail, Save, Loader2, CheckCircle2, ShieldAlert, CreditCard, Shield, Plus, X } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Settings as SettingsIcon, DollarSign, Building, Save, Loader2, ShieldAlert, CreditCard, Shield, Plus, X } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { SUPPORTED_CURRENCIES, formatCurrencyAmount } from '@/utils/currency';
 import StatusModal from '@/components/hospital/StatusModal';
+import { EmailNotificationSettingsPanel } from '@/components/hospital/EmailNotificationSettingsPanel';
 import { updateSystemSettingsAction } from '@/app/hospital/actions';
 
 export default function SystemSettingsPage() {
@@ -29,14 +30,9 @@ export default function SystemSettingsPage() {
   const [newPaymentMethod, setNewPaymentMethod] = useState('');
   const [newInsuranceProvider, setNewInsuranceProvider] = useState('');
 
-  const supabase = createClient();
-
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     setLoading(true);
+    const supabase = createClient();
 
     // 1. Fetch user role
     const { data: { user } } = await supabase.auth.getUser();
@@ -61,7 +57,7 @@ export default function SystemSettingsPage() {
         hospital_name: data.hospital_name || 'HMS Clinic',
         default_currency: data.default_currency || 'USD',
         currency_symbol: data.currency_symbol || '$',
-        currency_position: data.currency_position || 'prefix',
+        currency_position: data.currency_position === 'suffix' ? 'suffix' : 'prefix',
         tax_rate: data.tax_rate || 0,
         phone: data.phone || '',
         email: data.email || '',
@@ -71,7 +67,12 @@ export default function SystemSettingsPage() {
       });
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void fetchSettings(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchSettings]);
 
   const handleCurrencySelect = (code: string) => {
     const preset = SUPPORTED_CURRENCIES.find(c => c.code === code);
@@ -419,6 +420,8 @@ export default function SystemSettingsPage() {
           </div>
         )}
       </form>
+
+      <EmailNotificationSettingsPanel canEdit={userRole === 'ADMIN'} />
 
       <StatusModal
         isOpen={!!status}

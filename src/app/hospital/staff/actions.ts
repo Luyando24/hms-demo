@@ -1,19 +1,31 @@
-'use server'
+'use server';
 
-import { createClient } from '@supabase/supabase-js'
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
+import { AuthorizationError, requireRole } from '@/lib/auth';
+import { createAdminClient } from '@/utils/supabase/admin';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
-)
+const staffSchema = z
+  .object({
+    email: z.string().trim().email().max(254),
+    firstName: z.string().trim().min(1).max(100),
+    lastName: z.string().trim().min(1).max(100),
+    role: z.enum([
+      'ADMIN',
+      'DOCTOR',
+      'NURSE',
+      'PHARMACIST',
+      'LAB_TECH',
+      'RADIOLOGIST',
+      'ACCOUNTANT',
+      'RECEPTIONIST',
+      'STAFF',
+    ]),
+    staffNumber: z.string().trim().max(60).optional(),
+  })
+  .strict();
 
-export async function generateSecureStaffId(role: string): Promise<string> {
+function generateSecureStaffId(role: string): string {
   const rolePrefixes: Record<string, string> = {
     DOCTOR: 'MED-DOC',
     NURSE: 'CLN-NRS',
@@ -23,60 +35,80 @@ export async function generateSecureStaffId(role: string): Promise<string> {
     ACCOUNTANT: 'FIN-ACC',
     RECEPTIONIST: 'ADM-RCP',
     ADMIN: 'SYS-ADM',
-    STAFF: 'HMS-STF'
+    STAFF: 'HMS-STF',
   };
-
-  const prefix = rolePrefixes[role?.toUpperCase()] || 'HMS-STF';
+  const prefix = rolePrefixes[role] || 'HMS-STF';
   const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-  let hash = '';
-  for (let i = 0; i < 6; i++) {
-    hash += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return `${prefix}-${hash}`;
+  const suffix = Array.from({ length: 8 }, () =>
+    chars.charAt(Math.floor(Math.random() * chars.length)),
+  ).join('');
+  return prefix + '-' + suffix;
 }
 
-export async function createStaffMember(formData: {
-  email: string;
-  password?: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  staffNumber?: string;
-}) {
-  try {
-    const assignedStaffNumber = formData.staffNumber || (await generateSecureStaffId(formData.role));
+function actionError(error: unknown): string {
+  if (error instanceof z.ZodError) {
+    return error.issues[0]?.message || 'The submitted staff details are invalid.';
+  }
+  if (error instanceof AuthorizationError) {
+    return error.message;
+  }
+  return error instanceof Error ? error.message : 'The staff account could not be created.';
+}
 
-    // 1. Create the user in Auth with admin privileges
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: formData.email,
-      password: formData.password || 'password123',
-      email_confirm: true,
+export async function createStaffMember(input: unknown) {
+  try {
+    await requireRole(['ADMIN']);
+    const formData = staffSchema.parse(input);
+    const assignedStaffNumber =
+      formData.staffNumber || generateSecureStaffId(formData.role);
+    const adminSupabase = createAdminClient();
+
+    const { data: invitation, error: inviteError } =
+      await adminSupabase.auth.admin.inviteUserByEmail(formData.email, {
+        data: {
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+        },
+      });
+    if (inviteError || !invitation.user) {
+      throw inviteError || new Error('Supabase did not return the invited staff user.');
+    }
+
+    const staffId = invitation.user.id;
+    const { error: metadataError } = await adminSupabase.auth.admin.updateUserById(staffId, {
+      app_metadata: {
+        role: formData.role,
+        staff_number: assignedStaffNumber,
+      },
       user_metadata: {
         first_name: formData.firstName,
         last_name: formData.lastName,
-        role: formData.role,
-        staff_number: assignedStaffNumber
-      }
+      },
     });
 
-    if (authError) throw authError;
+    const { error: profileError } = await adminSupabase
+      .from('profiles')
+      .update({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        staff_number: assignedStaffNumber,
+        role: formData.role,
+      })
+      .eq('id', staffId);
 
-    // 2. Explicitly update or set profile staff_number
-    if (authData.user) {
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .update({ 
-          staff_number: assignedStaffNumber,
-          role: formData.role
-        })
-        .eq('id', authData.user.id);
-      
-      if (profileError) throw profileError;
+    if (metadataError || profileError) {
+      await adminSupabase.auth.admin.deleteUser(staffId);
+      throw metadataError || profileError;
     }
 
-    return { success: true, user: authData.user, staffNumber: assignedStaffNumber };
-  } catch (error: any) {
-    console.error('Error creating staff:', error);
-    return { success: false, error: error.message };
+    revalidatePath('/hospital/staff');
+    return {
+      success: true,
+      userId: staffId,
+      staffNumber: assignedStaffNumber,
+    };
+  } catch (error) {
+    return { success: false, error: actionError(error) };
   }
 }

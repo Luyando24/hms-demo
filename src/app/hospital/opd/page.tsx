@@ -25,8 +25,8 @@ import Link from "next/link";
 
 interface DoctorItem {
   id: string;
-  first_name: string;
-  last_name: string;
+  first_name: string | null;
+  last_name: string | null;
   role: string;
 }
 
@@ -84,7 +84,7 @@ export default function OutpatientDashboard() {
       setQueue(qList);
 
       // 2. Compute OPD Metrics from DB
-      const todayQueue = qList.filter(i => new Date(i.created_at) >= todayStart);
+      const todayQueue = qList.filter(i => new Date(i.created_at || 0) >= todayStart);
       setOpdStats({
         totalToday: todayQueue.length || qList.length,
         inConsultation: qList.filter(i => i.status === 'CONSULTATION' || i.status === 'TRIAGED').length,

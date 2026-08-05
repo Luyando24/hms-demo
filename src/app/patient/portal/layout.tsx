@@ -1,7 +1,17 @@
+import type { Metadata } from "next";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNavProvider } from "@/components/layout/mobile-nav-context";
 import { PatientBottomNav } from "@/components/layout/patient-bottom-nav";
+
+export const metadata: Metadata = {
+  title: "Patient Portal",
+  description: "Secure access to appointments, records, prescriptions, and billing.",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function PatientPortalLayout({
   children,

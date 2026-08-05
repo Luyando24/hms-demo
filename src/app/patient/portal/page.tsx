@@ -1,178 +1,222 @@
-import { CalendarDays, FileText, Pill, CreditCard, ArrowRight, Heart, Activity, Thermometer, Droplet, CheckCircle2, ChevronRight } from "lucide-react";
-import Link from "next/link";
-import clsx from "clsx";
+import Link from 'next/link';
+import {
+  Activity,
+  ArrowRight,
+  CalendarDays,
+  CreditCard,
+  Heart,
+  Pill,
+  Thermometer,
+} from 'lucide-react';
+import { requireRole } from '@/lib/auth';
 
-export default function PatientPortalOverview() {
+function displayDate(value?: string | null) {
+  return value
+    ? new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(
+        new Date(value),
+      )
+    : 'Not available';
+}
+
+export default async function PatientPortalOverview() {
+  const { user, supabase } = await requireRole(['PATIENT']);
+  const { data: patient } = await supabase
+    .from('patients')
+    .select('id, first_name, last_name, file_number')
+    .eq('auth_user_id', user.id)
+    .maybeSingle();
+
+  if (!patient) {
+    return (
+      <div className="mx-auto max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 p-8">
+        <h1 className="text-2xl font-black text-amber-900">Patient record not linked</h1>
+        <p className="mt-2 text-amber-800">
+          Ask hospital reception to link your portal login to your clinical record.
+        </p>
+      </div>
+    );
+  }
+
+  const now = new Date().toISOString();
+  const [vitalsResult, appointmentsResult, labsResult, prescriptionsResult, invoicesResult] =
+    await Promise.all([
+      supabase
+        .from('vitals')
+        .select('heart_rate, bp_systolic, bp_diastolic, temperature, sp_o2, recorded_at')
+        .eq('patient_id', patient.id)
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('appointments')
+        .select('id, appointment_date, status, reason, profiles(first_name, last_name)')
+        .eq('patient_id', patient.id)
+        .gte('appointment_date', now)
+        .neq('status', 'CANCELLED')
+        .order('appointment_date')
+        .limit(3),
+      supabase
+        .from('lab_results')
+        .select('id, test_name, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(3),
+      supabase
+        .from('prescriptions')
+        .select('id, status, prescription_items(dosage, frequency, inventory_items(name))')
+        .eq('patient_id', patient.id)
+        .order('created_at', { ascending: false })
+        .limit(3),
+      supabase
+        .from('invoices')
+        .select('total_amount, paid_amount, status')
+        .eq('patient_id', patient.id)
+        .neq('status', 'CANCELLED'),
+    ]);
+
+  const vitals = vitalsResult.data;
+  const appointments = appointmentsResult.data || [];
+  const labs = labsResult.data || [];
+  const prescriptions = prescriptionsResult.data || [];
+  const balance = (invoicesResult.data || []).reduce(
+    (total, invoice) =>
+      total + Number(invoice.total_amount || 0) - Number(invoice.paid_amount || 0),
+    0,
+  );
+  const vitalCards = [
+    {
+      label: 'Heart Rate',
+      value: vitals?.heart_rate ?? '—',
+      unit: 'bpm',
+      icon: Heart,
+    },
+    {
+      label: 'Blood Pressure',
+      value:
+        vitals?.bp_systolic && vitals?.bp_diastolic
+          ? vitals.bp_systolic + '/' + vitals.bp_diastolic
+          : '—',
+      unit: 'mmHg',
+      icon: Activity,
+    },
+    {
+      label: 'Temperature',
+      value: vitals?.temperature ?? '—',
+      unit: '°C',
+      icon: Thermometer,
+    },
+    { label: 'SpO₂', value: vitals?.sp_o2 ?? '—', unit: '%', icon: Activity },
+  ];
+
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      
-      {/* Welcome Banner */}
-      <div className="bg-slate-900 rounded-2xl p-10 text-white shadow-2xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-brand-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:bg-brand-500/30 transition-all duration-700" />
-        <div className="absolute bottom-0 left-1/2 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+    <div className="mx-auto max-w-6xl space-y-8">
+      <section className="rounded-3xl bg-slate-900 p-8 text-white shadow-xl md:p-10">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-300">
+          Patient health portal · {patient.file_number}
+        </p>
+        <div className="mt-4 flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
-            <div className="inline-flex items-center gap-2 bg-brand-500/20 text-brand-400 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-6 border border-brand-500/30">
-              <span className="w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
-              Patient Health Portal
-            </div>
-            <h1 className="text-4xl font-black tracking-tight mb-3">Hello, Mwansa Chanda</h1>
-            <p className="text-slate-400 text-lg max-w-lg leading-relaxed">
-              Your health journey is looking great. You have <span className="text-white font-bold underline decoration-brand-500 underline-offset-4">1 appointment</span> and <span className="text-white font-bold underline decoration-emerald-500 underline-offset-4">2 new lab results</span> to review.
+            <h1 className="text-4xl font-black">
+              Hello, {patient.first_name} {patient.last_name}
+            </h1>
+            <p className="mt-2 text-slate-300">
+              {appointments.length} upcoming visit{appointments.length === 1 ? '' : 's'} and{' '}
+              {labs.length} recent lab result{labs.length === 1 ? '' : 's'}.
             </p>
           </div>
-          
-          <div className="flex gap-3 shrink-0">
-            <Link 
-              href="/patient/portal/appointments"
-              className="bg-brand-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/20 flex items-center gap-2 group/btn"
-            >
-              Book Visit
-              <ArrowRight size={20} className="group-hover/btn:translate-x-1 transition-transform" />
-            </Link>
-          </div>
+          <Link
+            href="/patient/portal/appointments"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3 font-bold"
+          >
+            Book a visit <ArrowRight size={18} />
+          </Link>
         </div>
-      </div>
+      </section>
 
-      {/* Health Vitals Quick View */}
       <section>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Your Latest Vitals (May 02)</h2>
-          <button className="text-xs font-bold text-brand-600 hover:underline">View Trends</button>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {[
-            { label: 'Heart Rate', val: '72', unit: 'bpm', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50' },
-            { label: 'Blood Pressure', val: '120/80', unit: 'mmHg', icon: Activity, color: 'text-blue-500', bg: 'bg-blue-50' },
-            { label: 'Temperature', val: '36.6', unit: '°C', icon: Thermometer, color: 'text-amber-500', bg: 'bg-amber-50' },
-            { label: 'SpO2', val: '98', unit: '%', icon: Droplet, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-          ].map((vital) => (
-            <div key={vital.label} className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all group">
-              <div className={clsx("w-10 h-10 rounded-xl flex items-center justify-center mb-4", vital.bg, vital.color)}>
-                <vital.icon size={20} />
-              </div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{vital.label}</p>
-              <div className="flex items-baseline gap-1">
-                <p className="text-2xl font-black text-slate-900 tracking-tight">{vital.val}</p>
-                <p className="text-xs font-bold text-slate-400">{vital.unit}</p>
-              </div>
+        <p className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">
+          Latest vitals · {displayDate(vitals?.recorded_at)}
+        </p>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {vitalCards.map((card) => (
+            <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-5">
+              <card.icon className="mb-4 text-brand-600" size={22} />
+              <p className="text-xs font-bold uppercase text-slate-400">{card.label}</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">
+                {card.value} <span className="text-xs text-slate-400">{card.unit}</span>
+              </p>
             </div>
           ))}
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Main Feed: Activities & Results */}
-        <div className="lg:col-span-8 space-y-8">
-          
-          {/* Upcoming Appointment Card */}
-          <div className="bg-brand-50 border border-brand-100 rounded-2xl p-8 relative overflow-hidden group hover:shadow-lg transition-all">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
-            <div className="flex flex-col md:flex-row justify-between gap-6 relative z-10">
-              <div className="flex gap-5">
-                <div className="w-16 h-16 rounded-3xl bg-white text-brand-600 flex items-center justify-center shadow-sm">
-                  <CalendarDays size={32} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-900">Next Visit: Dr. Sarah Jenkins</h3>
-                  <p className="text-slate-600 font-medium mt-1">General Surgery • Consultation Room 4</p>
-                  <div className="flex gap-4 mt-4">
-                    <span className="text-xs font-black text-brand-700 bg-brand-100 px-3 py-1.5 rounded-xl uppercase tracking-wider">Mon, May 12</span>
-                    <span className="text-xs font-black text-brand-700 bg-brand-100 px-3 py-1.5 rounded-xl uppercase tracking-wider">10:30 AM</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col justify-between items-end">
-                <span className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">Confirmed</span>
-                <button className="text-brand-600 font-bold text-sm flex items-center gap-1.5 group/link">
-                  Prepare for Visit
-                  <ChevronRight size={16} className="group-hover/link:translate-x-1 transition-transform" />
-                </button>
-              </div>
-            </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 lg:col-span-2">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="font-black text-slate-900">Upcoming appointments</h2>
+            <CalendarDays className="text-brand-600" size={20} />
           </div>
-
-          {/* Recent Records Grid */}
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Recent Health Records</h2>
-              <Link href="/patient/portal/records" className="text-xs font-bold text-brand-600 hover:underline">See All Records</Link>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                { title: 'Full Blood Count', date: 'May 02, 2026', type: 'Lab Result', icon: FileText, color: 'text-purple-500', bg: 'bg-purple-50' },
-                { title: 'Chest X-Ray Report', date: 'April 28, 2026', type: 'Radiology', icon: Activity, color: 'text-blue-500', bg: 'bg-blue-50' },
-              ].map((item, i) => (
-                <div key={i} className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all group cursor-pointer">
-                  <div className="flex items-center gap-4">
-                    <div className={clsx("w-12 h-12 rounded-2xl flex items-center justify-center", item.bg, item.color)}>
-                      <item.icon size={24} />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-base font-bold text-slate-900 group-hover:text-brand-600 transition-colors">{item.title}</h4>
-                      <p className="text-xs text-slate-400 font-medium mt-1">{item.type} • {item.date}</p>
-                    </div>
-                    <ChevronRight size={18} className="text-slate-300 group-hover:text-brand-600 transition-all" />
-                  </div>
+          <div className="space-y-3">
+            {appointments.length ? (
+              appointments.map((appointment) => (
+                <div key={appointment.id} className="rounded-xl bg-slate-50 p-4">
+                  <p className="font-bold text-slate-900">
+                    {appointment.reason || 'Consultation'}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {displayDate(appointment.appointment_date)} · {appointment.status}
+                  </p>
                 </div>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        {/* Right Sidebar: Wellness & Meds */}
-        <div className="lg:col-span-4 space-y-8">
-          
-          {/* Active Meds Card */}
-          <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center justify-between">
-              Medications
-              <Pill className="text-slate-200" size={24} />
-            </h2>
-            <div className="space-y-4 mb-8">
-              {[
-                { name: 'Amoxicillin 500mg', instructions: '1 capsule • 3x daily' },
-                { name: 'Ibuprofen 400mg', instructions: '1 tablet • As needed' },
-              ].map((med, i) => (
-                <div key={i} className="flex gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-emerald-500 shrink-0 shadow-sm">
-                    <Pill size={20} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">{med.name}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">{med.instructions}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Link 
-              href="/patient/portal/prescriptions"
-              className="w-full bg-slate-900 text-white py-3.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
-            >
-              Manage Prescriptions
-            </Link>
+              ))
+            ) : (
+              <p className="text-sm text-slate-500">No upcoming appointments.</p>
+            )}
           </div>
+        </section>
 
-          {/* Billing Summary */}
-          <div className="bg-emerald-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-2xl rounded-full" />
-            <h2 className="text-lg font-bold mb-2">Account Balance</h2>
-            <p className="text-emerald-100 text-sm mb-6">Last payment made May 01</p>
-            <div className="flex items-baseline gap-1 mb-8">
-              <span className="text-lg font-bold opacity-80">$</span>
-              <p className="text-5xl font-black">245.50</p>
-            </div>
-            <Link 
-              href="/patient/portal/billing"
-              className="w-full bg-white text-emerald-600 py-3.5 rounded-xl text-sm font-bold hover:bg-emerald-50 transition-all flex items-center justify-center gap-2"
-            >
-              <CreditCard size={18} />
-              Pay Now
-            </Link>
-          </div>
-        </div>
+        <section className="rounded-2xl bg-emerald-600 p-6 text-white">
+          <CreditCard size={24} />
+          <p className="mt-6 text-sm font-bold text-emerald-100">Outstanding balance</p>
+          <p className="mt-1 text-4xl font-black">K {balance.toFixed(2)}</p>
+          <Link
+            href="/patient/portal/billing"
+            className="mt-6 block rounded-xl bg-white px-4 py-3 text-center font-bold text-emerald-700"
+          >
+            View billing
+          </Link>
+        </section>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6">
+          <h2 className="mb-4 flex items-center gap-2 font-black text-slate-900">
+            <Pill size={20} className="text-brand-600" /> Prescriptions
+          </h2>
+          {prescriptions.length ? (
+            prescriptions.map((prescription) => (
+              <p key={prescription.id} className="border-t border-slate-100 py-3 text-sm">
+                {(prescription.prescription_items || [])
+                  .map((item) => item.inventory_items?.name || 'Medication')
+                  .join(', ')}{' '}
+                <span className="font-bold text-slate-400">· {prescription.status}</span>
+              </p>
+            ))
+          ) : (
+            <p className="text-sm text-slate-500">No prescriptions found.</p>
+          )}
+        </section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-6">
+          <h2 className="mb-4 font-black text-slate-900">Recent lab results</h2>
+          {labs.length ? (
+            labs.map((lab) => (
+              <p key={lab.id} className="border-t border-slate-100 py-3 text-sm">
+                {lab.test_name}{' '}
+                <span className="font-bold text-slate-400">· {lab.status}</span>
+              </p>
+            ))
+          ) : (
+            <p className="text-sm text-slate-500">No lab results found.</p>
+          )}
+        </section>
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSubdomain, getSubdomainUrl, getRootDomain } from '@/utils/subdomain'
-import { isRouteAllowedForRole } from '@/utils/rbac'
+import { getRoleLandingDestination, isRouteAllowedForRole } from '@/utils/rbac'
+import type { Database } from '@/types/supabase'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -11,7 +12,7 @@ export async function updateSession(request: NextRequest) {
   const envRoot = getRootDomain()
   const rootDomainHost = envRoot.split(':')[0]
 
-  const supabase = createServerClient(
+  const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -58,22 +59,41 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  const isWorkforceLoginRoute = pathname === '/login'
+  const isPatientLoginRoute = pathname === '/patient/login'
   const isPublicRoute =
-    pathname === '/login' ||
-    pathname.startsWith('/auth') ||
-    pathname.startsWith('/seed')
+    isWorkforceLoginRoute ||
+    isPatientLoginRoute ||
+    pathname.startsWith('/auth')
 
   // Unauthenticated user flow
   if (!user) {
+    if (subdomain === 'patient' && isWorkforceLoginRoute) {
+      return helperResponse(
+        NextResponse.redirect(getSubdomainUrl('patient', '/patient/login')),
+      )
+    }
+
+    if ((subdomain === 'staff' || subdomain === 'admin') && isPatientLoginRoute) {
+      return helperResponse(
+        NextResponse.redirect(getSubdomainUrl(subdomain, '/login')),
+      )
+    }
+
     if (!isPublicRoute && pathname !== '/') {
-      const loginUrl = getSubdomainUrl(subdomain, '/login')
+      const isPatientRequest =
+        subdomain === 'patient' || (!subdomain && pathname.startsWith('/patient'))
+      const loginUrl = getSubdomainUrl(
+        subdomain,
+        isPatientRequest ? '/patient/login' : '/login',
+      )
       return helperResponse(NextResponse.redirect(loginUrl))
     }
 
     // Root path rewrites for unauthenticated subdomain landing
     if (subdomain === 'patient' && pathname === '/') {
       const url = request.nextUrl.clone()
-      url.pathname = '/login'
+      url.pathname = '/patient/login'
       return helperResponse(NextResponse.rewrite(url))
     }
 
@@ -86,31 +106,56 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
-  // 2. Fetch authenticated user role
-  let userRole = user.user_metadata?.role
-  if (!userRole) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    userRole = profile?.role || 'STAFF'
+  // 2. Authorization always comes from the protected profile, never editable
+  // user metadata.
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const userRole = profile?.role?.toUpperCase()
+  const landingDestination = getRoleLandingDestination(userRole)
+  if (profileError || !userRole || !landingDestination) {
+    await supabase.auth.signOut()
+    const loginPath = subdomain === 'patient' || (!subdomain && pathname.startsWith('/patient'))
+      ? '/patient/login?error=Invalid%20account%20profile'
+      : '/login?error=Invalid%20account%20profile'
+    const loginUrl = getSubdomainUrl(subdomain, loginPath)
+    return helperResponse(NextResponse.redirect(loginUrl))
   }
-  userRole = userRole.toUpperCase()
+
+  if (isWorkforceLoginRoute || isPatientLoginRoute) {
+    return helperResponse(
+      NextResponse.redirect(
+        getSubdomainUrl(landingDestination.subdomain, landingDestination.path),
+      ),
+    )
+  }
+
+  if (pathname.startsWith('/seed')) {
+    return helperResponse(
+      NextResponse.redirect(
+        getSubdomainUrl(landingDestination.subdomain, landingDestination.path),
+      ),
+    )
+  }
 
   // 3. Subdomain enforcement & URL rewriting for authenticated users
 
   // A. PATIENT Subdomain
   if (subdomain === 'patient') {
     if (userRole !== 'PATIENT') {
-      const targetSubdomain = userRole === 'ADMIN' ? 'admin' : 'staff'
-      const redirectUrl = getSubdomainUrl(targetSubdomain, '/hospital/dashboard')
+      const redirectUrl = getSubdomainUrl(
+        landingDestination.subdomain,
+        landingDestination.path,
+      )
       return helperResponse(NextResponse.redirect(redirectUrl))
     }
 
     const url = request.nextUrl.clone()
     if (pathname === '/' || pathname === '') {
-      url.pathname = '/patient/portal'
+      url.pathname = landingDestination.path
       return helperResponse(NextResponse.rewrite(url))
     }
 
@@ -129,7 +174,10 @@ export async function updateSession(request: NextRequest) {
   // B. STAFF Subdomain
   if (subdomain === 'staff') {
     if (userRole === 'PATIENT') {
-      const redirectUrl = getSubdomainUrl('patient', '/patient/portal')
+      const redirectUrl = getSubdomainUrl(
+        landingDestination.subdomain,
+        landingDestination.path,
+      )
       return helperResponse(NextResponse.redirect(redirectUrl))
     }
 
@@ -141,13 +189,23 @@ export async function updateSession(request: NextRequest) {
       pathname.includes('/staff')
 
     if (isAdminOnlyRoute && userRole !== 'ADMIN') {
-      const adminRedirectUrl = getSubdomainUrl('admin', pathname)
-      return helperResponse(NextResponse.redirect(adminRedirectUrl))
+      const defaultUrl = getSubdomainUrl(
+        landingDestination.subdomain,
+        landingDestination.path,
+      )
+      return helperResponse(NextResponse.redirect(defaultUrl))
     }
 
     const url = request.nextUrl.clone()
     if (pathname === '/' || pathname === '') {
-      url.pathname = '/hospital/dashboard'
+      if (landingDestination.subdomain !== 'staff') {
+        return helperResponse(
+          NextResponse.redirect(
+            getSubdomainUrl(landingDestination.subdomain, landingDestination.path),
+          ),
+        )
+      }
+      url.pathname = landingDestination.path
       return helperResponse(NextResponse.rewrite(url))
     }
 
@@ -158,8 +216,11 @@ export async function updateSession(request: NextRequest) {
 
     const effectivePath = url.pathname
     if (!isRouteAllowedForRole(userRole, effectivePath)) {
-      url.pathname = '/hospital/dashboard'
-      return helperResponse(NextResponse.redirect(url))
+      return helperResponse(
+        NextResponse.redirect(
+          getSubdomainUrl(landingDestination.subdomain, landingDestination.path),
+        ),
+      )
     }
 
     return supabaseResponse
@@ -168,18 +229,24 @@ export async function updateSession(request: NextRequest) {
   // C. ADMIN Subdomain
   if (subdomain === 'admin') {
     if (userRole === 'PATIENT') {
-      const redirectUrl = getSubdomainUrl('patient', '/patient/portal')
+      const redirectUrl = getSubdomainUrl(
+        landingDestination.subdomain,
+        landingDestination.path,
+      )
       return helperResponse(NextResponse.redirect(redirectUrl))
     }
 
     if (userRole !== 'ADMIN') {
-      const redirectUrl = getSubdomainUrl('staff', '/hospital/dashboard')
+      const redirectUrl = getSubdomainUrl(
+        landingDestination.subdomain,
+        landingDestination.path,
+      )
       return helperResponse(NextResponse.redirect(redirectUrl))
     }
 
     const url = request.nextUrl.clone()
     if (pathname === '/' || pathname === '') {
-      url.pathname = '/hospital/dashboard'
+      url.pathname = landingDestination.path
       return helperResponse(NextResponse.rewrite(url))
     }
 
@@ -194,18 +261,10 @@ export async function updateSession(request: NextRequest) {
   // D. ROOT Domain (No subdomain)
   if (!subdomain && user) {
     if (pathname === '/' || pathname === '/hospital' || pathname === '/patient') {
-      let targetSubdomain: 'patient' | 'staff' | 'admin' = 'staff'
-      let targetPath = '/hospital/dashboard'
-
-      if (userRole === 'PATIENT') {
-        targetSubdomain = 'patient'
-        targetPath = '/patient/portal'
-      } else if (userRole === 'ADMIN') {
-        targetSubdomain = 'admin'
-        targetPath = '/hospital/dashboard'
-      }
-
-      const targetUrl = getSubdomainUrl(targetSubdomain, targetPath)
+      const targetUrl = getSubdomainUrl(
+        landingDestination.subdomain,
+        landingDestination.path,
+      )
       return helperResponse(NextResponse.redirect(targetUrl))
     }
   }

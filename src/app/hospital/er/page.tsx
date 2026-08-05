@@ -10,20 +10,19 @@ import clsx from "clsx";
 
 interface ErQueueItem {
   id: string;
-  patient_id: string;
-  department: string;
+  patient_id: string | null;
   status: string;
   priority: string;
-  reason?: string;
-  created_at: string;
-  patients?: {
+  reason: string | null;
+  created_at: string | null;
+  patients: {
     id: string;
     first_name: string;
     last_name: string;
     file_number: string;
     gender?: string;
     dob?: string;
-  };
+  } | null;
 }
 
 export default function EmergencyDashboard() {
@@ -60,7 +59,7 @@ export default function EmergencyDashboard() {
 
       if (data) {
         // Filter for ER or emergency cases, or all queue items
-        setErCases(data as ErQueueItem[]);
+        setErCases(data);
       }
     } catch (err) {
       console.error('Error fetching ER queue:', err);
