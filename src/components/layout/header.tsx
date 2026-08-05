@@ -10,6 +10,7 @@ import { createClient } from "@/utils/supabase/client";
 export function Header() {
   const { toggle } = useMobileNav();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [hospitalName, setHospitalName] = useState<string>("HMS Hospital");
   const [identity, setIdentity] = useState({
     firstName: 'Patient',
     lastName: '',
@@ -18,23 +19,30 @@ export function Header() {
 
   useEffect(() => {
     const supabase = createClient();
-    const loadIdentity = async () => {
-      const {
-        data: { user }
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, email')
-        .eq('id', user.id)
-        .maybeSingle();
-      setIdentity({
-        firstName: profile?.first_name || 'Patient',
-        lastName: profile?.last_name || '',
-        email: profile?.email || user.email || ''
-      });
+    const loadIdentityAndSettings = async () => {
+      const [{ data: authData }, { data: settings }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.from("system_settings").select("hospital_name").limit(1).maybeSingle(),
+      ]);
+
+      if (settings?.hospital_name) {
+        setHospitalName(settings.hospital_name);
+      }
+
+      if (authData?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, email')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+        setIdentity({
+          firstName: profile?.first_name || 'Patient',
+          lastName: profile?.last_name || '',
+          email: profile?.email || authData.user.email || ''
+        });
+      }
     };
-    void loadIdentity();
+    void loadIdentityAndSettings();
   }, []);
 
   const fullName = (identity.firstName + ' ' + identity.lastName).trim();
@@ -58,7 +66,7 @@ export function Header() {
             <HeartPulse size={24} strokeWidth={2.5} />
           </div>
           <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">
-            HMS<span className="text-brand-600">demo</span>
+            {hospitalName}
           </span>
         </Link>
 

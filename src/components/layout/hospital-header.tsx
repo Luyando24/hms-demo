@@ -13,25 +13,34 @@ export function HospitalHeader() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [hospitalName, setHospitalName] = useState<string>("HMS Hospital");
   const supabase = createClient();
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
+    const fetchUserAndSettings = async () => {
+      const [{ data: authData }, { data: settings }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.from("system_settings").select("hospital_name").limit(1).maybeSingle(),
+      ]);
+
+      if (settings?.hospital_name) {
+        setHospitalName(settings.hospital_name);
+      }
+
+      if (authData?.user) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', authUser.id)
-          .single();
+          .eq('id', authData.user.id)
+          .maybeSingle();
         
         setUser({
           ...profile,
-          email: authUser.email
+          email: authData.user.email
         });
       }
     };
-    fetchUser();
+    fetchUserAndSettings();
   }, []);
 
   return (
@@ -50,7 +59,7 @@ export function HospitalHeader() {
             <HeartPulse size={24} strokeWidth={2.5} />
           </div>
           <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">
-            HMS<span className="text-brand-600">demo</span>
+            {hospitalName}
           </span>
         </Link>
 
@@ -92,11 +101,11 @@ export function HospitalHeader() {
             className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-1.5 pr-3 rounded-full transition-all hover:bg-slate-100 shadow-sm"
           >
             <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm">
-              {user ? `${user.first_name?.[0]}${user.last_name?.[0]}` : '...'}
+              {user ? `${user.first_name?.[0] || 'S'}${user.last_name?.[0] || 'T'}` : '...'}
             </div>
             <div className="text-left hidden md:block">
               <p className="text-sm font-semibold text-slate-800 leading-tight">
-                {user ? `${user.first_name} ${user.last_name}` : 'Loading...'}
+                {user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Loading...'}
               </p>
               <p className="text-xs text-brand-600 font-medium">
                 {user?.role || 'HOSPITAL STAFF'}
@@ -114,7 +123,7 @@ export function HospitalHeader() {
               <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-200/50 z-20 py-2 animate-in fade-in zoom-in-95 duration-200">
                 <div className="px-4 py-3 border-b border-slate-100 mb-1">
                   <p className="text-sm font-bold text-slate-900">
-                    {user ? `${user.first_name} ${user.last_name}` : '...'}
+                    {user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '...'}
                   </p>
                   <p className="text-xs text-slate-500 truncate">{user?.email || '...'}</p>
                 </div>
