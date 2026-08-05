@@ -4,6 +4,7 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@^2.105.1";
 import {
   APP_URL,
   emailLayout,
+  getHospitalInfo,
   getHospitalName,
   plainText,
   sendEmail,
@@ -76,7 +77,8 @@ export default {
           { status: 503 },
         );
       }
-      const hospitalName = await getHospitalName(admin);
+      const hospitalInfo = await getHospitalInfo(admin);
+      const hospitalName = hospitalInfo.hospitalName;
 
       if (mode === "test") {
         if (!settings.manager_report_email) {
@@ -86,7 +88,7 @@ export default {
           );
         }
         const html = emailLayout(
-          hospitalName,
+          hospitalInfo,
           "Email notifications are connected",
           "This test confirms that the hospital can send operational reminders and management reports through Resend.",
           [

@@ -127,7 +127,7 @@ export async function sendTestNotificationEmailAction() {
     const adminSupabase = createAdminClient();
     const [{ data: settings }, { data: hospSettings }] = await Promise.all([
       adminSupabase.from('email_notification_settings').select('manager_report_email, timezone').eq('singleton_key', true).maybeSingle(),
-      adminSupabase.from('system_settings').select('hospital_name').limit(1).maybeSingle(),
+      adminSupabase.from('system_settings').select('hospital_name, address, phone, email').limit(1).maybeSingle(),
     ]);
 
     const recipient = settings?.manager_report_email;
@@ -136,7 +136,13 @@ export async function sendTestNotificationEmailAction() {
     }
 
     const hospitalName = hospSettings?.hospital_name || 'HMS Hospital';
+    const address = hospSettings?.address?.trim() || '';
+    const phone = hospSettings?.phone?.trim() || '';
+    const email = hospSettings?.email?.trim() || '';
     const appUrl = (process.env.HMS_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
+    const websiteDisplay = appUrl.replace(/^https?:\/\//, '');
+
+    const contactParts = [address, phone, email].filter(Boolean);
 
     const html = `<!doctype html>
 <html>
@@ -156,6 +162,11 @@ export async function sendTestNotificationEmailAction() {
         <strong>Target Recipient:</strong> ${recipient}
       </div>
       ${appUrl ? `<p style="margin:24px 0 0;text-align:center;"><a href="${appUrl}/hospital/settings" style="display:inline-block;padding:12px 24px;background:#0284c7;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:800;font-size:13px;">Open Settings &rarr;</a></p>` : ''}
+    </div>
+    <div style="background:#f8fafc;padding:20px 28px;border-top:1px solid #e2e8f0;text-align:center;">
+      <p style="font-size:13px;color:#0f172a;margin:0 0 4px;font-weight:800;">${hospitalName}</p>
+      ${contactParts.length ? `<p style="font-size:11px;color:#64748b;margin:0 0 6px;line-height:1.4 font-weight:500;">${contactParts.join(' &bull; ')}</p>` : ''}
+      ${appUrl ? `<p style="font-size:11px;margin:0;font-weight:700;"><a href="${appUrl}" target="_blank" style="color:#0284c7;text-decoration:none;">🌐 ${websiteDisplay}</a></p>` : ''}
     </div>
   </div>
 </body>

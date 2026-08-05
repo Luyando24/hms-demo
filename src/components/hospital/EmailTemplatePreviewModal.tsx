@@ -1,7 +1,16 @@
 'use client'
 
-import React, { useState } from 'react';
-import { X, Mail, Smartphone, Monitor, Sparkles, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Mail, Smartphone, Monitor, Sparkles } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
+
+export interface ClientHospitalInfo {
+  hospitalName: string;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  appUrl?: string | null;
+}
 
 interface EmailTemplatePreviewModalProps {
   isOpen: boolean;
@@ -10,13 +19,28 @@ interface EmailTemplatePreviewModalProps {
 }
 
 export function renderClientEmailTemplate(
-  hospitalName: string,
+  hospital: string | ClientHospitalInfo,
   title: string,
   introduction: string,
   rows: Array<[string, string | number]>,
   cta?: { label: string; href: string },
   note?: string
 ): string {
+  const info: ClientHospitalInfo = typeof hospital === "string"
+    ? { hospitalName: hospital, address: "Capital Healthcare District, Suite 400", phone: "+1 (800) 555-0199", email: "info@medicloud.health", appUrl: "https://kundahealthcare.org" }
+    : hospital;
+
+  const hospitalName = info.hospitalName || "HMS Hospital";
+  const address = info.address?.trim() || "";
+  const phone = info.phone?.trim() || "";
+  const email = info.email?.trim() || "";
+  const rawUrl = info.appUrl || "https://kundahealthcare.org";
+  const websiteUrl = rawUrl ? rawUrl.replace(/\/$/, "") : "";
+  const websiteDisplay = websiteUrl.replace(/^https?:\/\//, "");
+
+  const contactParts = [address, phone, email].filter(Boolean);
+  const contactLine = contactParts.join(" &bull; ");
+
   const details = rows
     .map(([label, value], index) => {
       const bg = index % 2 === 0 ? "#ffffff" : "#f8fafc";
@@ -102,10 +126,27 @@ export function renderClientEmailTemplate(
         ${noteBox}
       </div>
 
-      <div style="background:#f8fafc;padding:16px 30px;border-top:1px solid #e2e8f0;text-align:center;">
-        <p style="font-size:11px;color:#64748b;margin:0;font-weight:600;">
-          Confidential Notification &bull; ${hospitalName}
+      <!-- Card Footer -->
+      <div style="background:#f8fafc;padding:20px 30px;border-top:1px solid #e2e8f0;text-align:center;">
+        <p style="font-size:13px;color:#0f172a;margin:0 0 4px;font-weight:800;letter-spacing:-0.2px;">
+          ${hospitalName}
         </p>
+        ${
+          contactLine
+            ? `<p style="font-size:11px;color:#64748b;margin:0 0 6px;line-height:1.45;font-weight:500;">
+                ${contactLine}
+               </p>`
+            : ""
+        }
+        ${
+          websiteUrl
+            ? `<p style="font-size:11px;margin:0;font-weight:700;">
+                <a href="${websiteUrl}" target="_blank" style="color:#0284c7;text-decoration:none;">
+                  🌐 ${websiteDisplay}
+                </a>
+               </p>`
+            : ""
+        }
       </div>
     </div>
 
@@ -130,6 +171,38 @@ export default function EmailTemplatePreviewModal({
     'APPOINTMENT_CONFIRMATION' | 'CRITICAL_STOCK' | 'DAILY_DIGEST'
   >('APPOINTMENT_CONFIRMATION');
   const [deviceView, setDeviceView] = useState<'DESKTOP' | 'MOBILE'>('DESKTOP');
+  const [hospInfo, setHospInfo] = useState<ClientHospitalInfo>({
+    hospitalName,
+    address: 'Capital Healthcare District, Suite 400',
+    phone: '+1 (800) 555-0199',
+    email: 'info@medicloud.health',
+    appUrl: 'https://kundahealthcare.org'
+  });
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    if (isOpen) {
+      const loadInfo = async () => {
+        const { data } = await supabase
+          .from('system_settings')
+          .select('hospital_name, address, phone, email')
+          .limit(1)
+          .maybeSingle();
+
+        if (data) {
+          setHospInfo({
+            hospitalName: data.hospital_name || hospitalName,
+            address: data.address || 'Capital Healthcare District, Suite 400',
+            phone: data.phone || '+1 (800) 555-0199',
+            email: data.email || 'info@medicloud.health',
+            appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://kundahealthcare.org'
+          });
+        }
+      };
+      void loadInfo();
+    }
+  }, [isOpen, hospitalName]);
 
   if (!isOpen) return null;
 
@@ -178,7 +251,7 @@ export default function EmailTemplatePreviewModal({
     note = 'Aggregate facility report prepared for hospital management and board governance.';
   }
 
-  const htmlContent = renderClientEmailTemplate(hospitalName, title, intro, rows, cta, note);
+  const htmlContent = renderClientEmailTemplate(hospInfo, title, intro, rows, cta, note);
 
   return (
     <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">

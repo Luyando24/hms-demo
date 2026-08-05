@@ -3,7 +3,15 @@ import type { EmailMessage, JsonRecord, ZonedParts } from "./notification-types.
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL");
-export const APP_URL = (Deno.env.get("HMS_APP_URL") ?? "").replace(/\/$/, "");
+export const APP_URL = (Deno.env.get("HMS_APP_URL") ?? Deno.env.get("NEXT_PUBLIC_APP_URL") ?? "").replace(/\/$/, "");
+
+export interface HospitalInfo {
+  hospitalName: string;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  appUrl?: string | null;
+}
 
 export function escapeHtml(value: unknown): string {
   return String(value ?? "")
@@ -35,13 +43,28 @@ function renderValueBadge(value: string | number): string {
 }
 
 export function emailLayout(
-  hospitalName: string,
+  hospital: string | HospitalInfo,
   title: string,
   introduction: string,
   rows: Array<[string, string | number]>,
   cta?: { label: string; href: string },
   note?: string,
 ): string {
+  const info: HospitalInfo = typeof hospital === "string"
+    ? { hospitalName: hospital, appUrl: APP_URL || null }
+    : hospital;
+
+  const hospitalName = info.hospitalName || "HMS Hospital";
+  const address = info.address?.trim() || "";
+  const phone = info.phone?.trim() || "";
+  const email = info.email?.trim() || "";
+  const rawUrl = info.appUrl || APP_URL || "";
+  const websiteUrl = rawUrl ? rawUrl.replace(/\/$/, "") : "";
+  const websiteDisplay = websiteUrl.replace(/^https?:\/\//, "");
+
+  const contactParts = [address, phone, email].filter(Boolean);
+  const contactLine = contactParts.map(escapeHtml).join(" &bull; ");
+
   const details = rows
     .map(([label, value], index) => {
       const bg = index % 2 === 0 ? "#ffffff" : "#f8fafc";
@@ -132,10 +155,26 @@ export function emailLayout(
       </div>
 
       <!-- Card Footer -->
-      <div style="background:#f8fafc;padding:16px 30px;border-top:1px solid #e2e8f0;text-align:center;">
-        <p style="font-size:11px;color:#64748b;margin:0;font-weight:600;">
-          Confidential Notification &bull; ${escapeHtml(hospitalName)}
+      <div style="background:#f8fafc;padding:20px 30px;border-top:1px solid #e2e8f0;text-align:center;">
+        <p style="font-size:13px;color:#0f172a;margin:0 0 4px;font-weight:800;letter-spacing:-0.2px;">
+          ${escapeHtml(hospitalName)}
         </p>
+        ${
+          contactLine
+            ? `<p style="font-size:11px;color:#64748b;margin:0 0 6px;line-height:1.45;font-weight:500;">
+                ${contactLine}
+               </p>`
+            : ""
+        }
+        ${
+          websiteUrl
+            ? `<p style="font-size:11px;margin:0;font-weight:700;">
+                <a href="${escapeHtml(websiteUrl)}" target="_blank" style="color:#0284c7;text-decoration:none;">
+                  🌐 ${escapeHtml(websiteDisplay)}
+                </a>
+               </p>`
+            : ""
+        }
       </div>
     </div>
 
@@ -223,13 +262,25 @@ export function formatDateTime(value: string, timezone: string): string {
   }).format(new Date(value));
 }
 
-export async function getHospitalName(admin: SupabaseClient): Promise<string> {
+export async function getHospitalInfo(admin: SupabaseClient): Promise<HospitalInfo> {
   const { data } = await admin
     .from("system_settings")
-    .select("hospital_name")
+    .select("hospital_name, address, phone, email")
     .limit(1)
     .maybeSingle();
-  return data?.hospital_name || "HMS Hospital";
+
+  return {
+    hospitalName: data?.hospital_name || "HMS Hospital",
+    address: data?.address || null,
+    phone: data?.phone || null,
+    email: data?.email || null,
+    appUrl: APP_URL || null,
+  };
+}
+
+export async function getHospitalName(admin: SupabaseClient): Promise<string> {
+  const info = await getHospitalInfo(admin);
+  return info.hospitalName;
 }
 
 export async function sendEmail(admin: SupabaseClient, message: EmailMessage) {
