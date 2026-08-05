@@ -210,7 +210,9 @@ export function EmailNotificationSettingsPanel({
         ? "The scheduler will now use these reminder and report preferences."
         : "Preferences were saved. Email delivery remains disabled.",
     });
-    await loadSettings();
+    // Do not re-fetch after save — the form already reflects the saved state,
+    // and re-fetching via the client can hit RLS and silently return null,
+    // which would reset all checkboxes back to their defaults.
   };
 
   const handleTest = async () => {
@@ -230,7 +232,6 @@ export function EmailNotificationSettingsPanel({
       title: "Test Email Sent",
       message: result.message || "The test email was accepted for delivery.",
     });
-    await loadSettings();
   };
 
   if (!canEdit) return null;
