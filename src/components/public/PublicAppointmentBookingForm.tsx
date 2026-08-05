@@ -594,20 +594,16 @@ export function PublicAppointmentBookingForm({ departments, doctors, settings }:
             <button
               onClick={() => {
                 setBookingResult(null);
-                setStep(1);
-                setFormData({
-                  first_name: '',
-                  last_name: '',
-                  phone: '',
-                  email: '',
-                  dob: '',
-                  gender: 'MALE',
+                // Keep personal details; only reset appointment-specific fields
+                setFormData(prev => ({
+                  ...prev,
                   department_id: '',
                   provider_id: '',
                   date: '',
                   time: '09:00',
                   reason: '',
-                });
+                }));
+                setStep(2);
               }}
               className="px-6 py-3 rounded-2xl text-xs font-bold text-brand-700 bg-brand-50 border border-brand-200 hover:bg-brand-100 transition-all flex items-center gap-2"
             >
