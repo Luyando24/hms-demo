@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       admissions: {
@@ -499,60 +524,6 @@ export type Database = {
           },
         ]
       }
-      er_visits: {
-        Row: {
-          arrival_mode: string | null
-          assigned_doctor_id: string | null
-          chief_complaint: string
-          created_at: string | null
-          disposition: string | null
-          id: string
-          patient_id: string | null
-          status: string | null
-          triage_level: string
-          vitals_snapshot: Json | null
-        }
-        Insert: {
-          arrival_mode?: string | null
-          assigned_doctor_id?: string | null
-          chief_complaint: string
-          created_at?: string | null
-          disposition?: string | null
-          id?: string
-          patient_id?: string | null
-          status?: string | null
-          triage_level: string
-          vitals_snapshot?: Json | null
-        }
-        Update: {
-          arrival_mode?: string | null
-          assigned_doctor_id?: string | null
-          chief_complaint?: string
-          created_at?: string | null
-          disposition?: string | null
-          id?: string
-          patient_id?: string | null
-          status?: string | null
-          triage_level?: string
-          vitals_snapshot?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "er_visits_assigned_doctor_id_fkey"
-            columns: ["assigned_doctor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "er_visits_patient_id_fkey"
-            columns: ["patient_id"]
-            isOneToOne: false
-            referencedRelation: "patients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       email_deliveries: {
         Row: {
           created_at: string
@@ -790,6 +761,60 @@ export type Database = {
           received_at?: string
         }
         Relationships: []
+      }
+      er_visits: {
+        Row: {
+          arrival_mode: string | null
+          assigned_doctor_id: string | null
+          chief_complaint: string
+          created_at: string | null
+          disposition: string | null
+          id: string
+          patient_id: string | null
+          status: string | null
+          triage_level: string
+          vitals_snapshot: Json | null
+        }
+        Insert: {
+          arrival_mode?: string | null
+          assigned_doctor_id?: string | null
+          chief_complaint: string
+          created_at?: string | null
+          disposition?: string | null
+          id?: string
+          patient_id?: string | null
+          status?: string | null
+          triage_level: string
+          vitals_snapshot?: Json | null
+        }
+        Update: {
+          arrival_mode?: string | null
+          assigned_doctor_id?: string | null
+          chief_complaint?: string
+          created_at?: string | null
+          disposition?: string | null
+          id?: string
+          patient_id?: string | null
+          status?: string | null
+          triage_level?: string
+          vitals_snapshot?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "er_visits_assigned_doctor_id_fkey"
+            columns: ["assigned_doctor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "er_visits_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       expenses: {
         Row: {
@@ -2179,6 +2204,7 @@ export type Database = {
       system_settings: {
         Row: {
           address: string | null
+          brand_title: string | null
           currency_position: string | null
           currency_symbol: string | null
           default_currency: string | null
@@ -2186,13 +2212,16 @@ export type Database = {
           hospital_name: string | null
           id: string
           insurance_providers: string[] | null
+          logo_url: string | null
           payment_methods: string[] | null
           phone: string | null
+          tagline: string | null
           tax_rate: number | null
           updated_at: string | null
         }
         Insert: {
           address?: string | null
+          brand_title?: string | null
           currency_position?: string | null
           currency_symbol?: string | null
           default_currency?: string | null
@@ -2200,13 +2229,16 @@ export type Database = {
           hospital_name?: string | null
           id?: string
           insurance_providers?: string[] | null
+          logo_url?: string | null
           payment_methods?: string[] | null
           phone?: string | null
+          tagline?: string | null
           tax_rate?: number | null
           updated_at?: string | null
         }
         Update: {
           address?: string | null
+          brand_title?: string | null
           currency_position?: string | null
           currency_symbol?: string | null
           default_currency?: string | null
@@ -2214,8 +2246,10 @@ export type Database = {
           hospital_name?: string | null
           id?: string
           insurance_providers?: string[] | null
+          logo_url?: string | null
           payment_methods?: string[] | null
           phone?: string | null
+          tagline?: string | null
           tax_rate?: number | null
           updated_at?: string | null
         }
@@ -2548,6 +2582,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

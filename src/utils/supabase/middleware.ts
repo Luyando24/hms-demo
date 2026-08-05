@@ -64,7 +64,8 @@ export async function updateSession(request: NextRequest) {
   const isPublicRoute =
     isWorkforceLoginRoute ||
     isPatientLoginRoute ||
-    pathname.startsWith('/auth')
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/book-appointment')
 
   // Unauthenticated user flow
   if (!user) {

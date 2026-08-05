@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { Navbar } from "@/components/landing/navbar";
 import { Hero } from "@/components/landing/hero";
 import { Features, DepartmentItem } from "@/components/landing/features";
@@ -14,10 +15,11 @@ export const metadata: Metadata = {
 
 export default async function LandingPage() {
   const supabase = await createClient();
+  const adminSupabase = createAdminClient();
 
   const [{ data: settings }, { data: departmentsData }, { data: profilesData }] =
     await Promise.all([
-      supabase.from("system_settings").select("*").limit(1).maybeSingle(),
+      adminSupabase.from("system_settings").select("*").limit(1).maybeSingle(),
       supabase.from("departments").select("id, name, description").order("name"),
       supabase
         .from("profiles")

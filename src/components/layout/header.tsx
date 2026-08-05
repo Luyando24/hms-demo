@@ -10,8 +10,10 @@ import { createClient } from "@/utils/supabase/client";
 export function Header() {
   const { toggle } = useMobileNav();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [hospitalName, setHospitalName] = useState<string>("HMS Hospital");
+  const [hospitalName, setHospitalName] = useState<string>("");
+  const [brandTitle, setBrandTitle] = useState<string>("");
   const [logoUrl, setLogoUrl] = useState<string>("");
+  const [tagline, setTagline] = useState<string>("");
   const [identity, setIdentity] = useState({
     firstName: 'Patient',
     lastName: '',
@@ -23,14 +25,19 @@ export function Header() {
     const loadIdentityAndSettings = async () => {
       const [{ data: authData }, { data: settings }] = await Promise.all([
         supabase.auth.getUser(),
-        supabase.from("system_settings").select("hospital_name, logo_url").limit(1).maybeSingle(),
+        supabase.from("system_settings").select("hospital_name, brand_title, logo_url, tagline").limit(1).maybeSingle(),
       ]);
 
       if (settings?.hospital_name) {
         setHospitalName(settings.hospital_name);
       }
+      setBrandTitle(settings?.brand_title?.trim() || settings?.hospital_name || "");
+
       if (settings?.logo_url) {
         setLogoUrl(settings.logo_url);
+      }
+      if (settings?.tagline) {
+        setTagline(settings.tagline);
       }
 
       if (authData?.user) {
@@ -75,9 +82,16 @@ export function Header() {
               <HeartPulse size={24} strokeWidth={2.5} />
             </div>
           )}
-          <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block">
-            {hospitalName}
-          </span>
+          <div className="hidden sm:flex flex-col">
+            <span className="font-bold text-base leading-tight text-slate-900">
+              {brandTitle}
+            </span>
+            {tagline && (
+              <span className="text-[11px] font-semibold text-slate-500 leading-tight">
+                {tagline}
+              </span>
+            )}
+          </div>
         </Link>
 
         {/* Search Bar */}

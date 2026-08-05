@@ -16,7 +16,6 @@ import {
   Users,
   Settings,
   LogOut,
-  X,
   Building,
   DoorOpen
 } from "lucide-react";
@@ -25,6 +24,7 @@ import { useMobileNav } from "./mobile-nav-context";
 import { signOut } from "@/app/login/actions";
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { isRouteAllowedForRole } from "@/utils/rbac";
 
 const navGroups = [
   {
@@ -70,12 +70,9 @@ const navGroups = [
       { name: "Rooms & Facilities", href: "/hospital/admin/rooms", icon: DoorOpen },
       { name: "HR & Staffing", href: "/hospital/hr", icon: Users },
       { name: "Reports & Analytics", href: "/hospital/reports", icon: LayoutDashboard },
-      { name: "System Settings", href: "/hospital/settings", icon: Settings },
     ]
   }
 ];
-
-import { isRouteAllowedForRole } from "@/utils/rbac";
 
 export function HospitalSidebar() {
   const pathname = usePathname();
@@ -83,7 +80,6 @@ export function HospitalSidebar() {
   const [opdCount, setOpdCount] = useState(0);
   const [userRole, setUserRole] = useState<string | null>(null);
   const supabase = createClient();
-  const initialMount = useRef(true);
 
   useEffect(() => {
     fetchUserRole();
@@ -96,7 +92,7 @@ export function HospitalSidebar() {
         schema: 'public', 
         table: 'walkin_queue',
         filter: 'status=eq.WAITING'
-      }, (payload) => {
+      }, () => {
         setOpdCount(prev => prev + 1);
         announceArrival();
       })
@@ -134,7 +130,6 @@ export function HospitalSidebar() {
       else if (user.user_metadata?.role) setUserRole(user.user_metadata.role);
     }
   };
-
 
   const fetchOpdCount = async () => {
     const { count } = await supabase
@@ -219,14 +214,18 @@ export function HospitalSidebar() {
       })}
       </nav>
 
-
       {/* Bottom Actions */}
       <div className="px-4 mt-8 pt-4 border-t border-slate-200/60 shrink-0 space-y-1">
         <Link
           href="/hospital/settings"
-          className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all duration-200"
+          className={clsx(
+            "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+            pathname === "/hospital/settings"
+              ? "bg-brand-600 text-white shadow-md shadow-brand-500/20"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+          )}
         >
-          <Settings size={18} strokeWidth={2} className="text-slate-400" />
+          <Settings size={18} strokeWidth={pathname === "/hospital/settings" ? 2.5 : 2} className={pathname === "/hospital/settings" ? "text-white" : "text-slate-400"} />
           Settings
         </Link>
         <button

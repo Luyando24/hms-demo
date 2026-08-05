@@ -58,6 +58,7 @@ const staffUpdateSchema = z
 const systemSettingsSchema = z
   .object({
     hospital_name: z.string().trim().min(1).max(200),
+    brand_title: optionalText(200),
     tagline: optionalText(300),
     logo_url: optionalText(1000),
     default_currency: z.string().trim().min(3).max(3),

@@ -4,12 +4,13 @@ import { ArrowRight, ActivitySquare } from "lucide-react";
 interface HeroProps {
   settings?: {
     hospital_name?: string | null;
+    brand_title?: string | null;
     tagline?: string | null;
   } | null;
 }
 
 export function Hero({ settings }: HeroProps = {}) {
-  const hospitalName = settings?.hospital_name || "HMS Hospital";
+  const hospitalName = settings?.hospital_name || settings?.brand_title?.trim() || "";
   const tagline = settings?.tagline || "24/7 Emergency & Outpatient Care";
 
   return (
@@ -39,7 +40,7 @@ export function Hero({ settings }: HeroProps = {}) {
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-500">
           <Link 
-            href="/patient/login" 
+            href="/book-appointment" 
             className="group flex items-center justify-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-full text-lg font-bold hover:bg-slate-800 transition-all shadow-xl hover:-translate-y-1 w-full sm:w-auto"
           >
             Book Appointment
