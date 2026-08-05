@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { ArrowRight, ActivitySquare } from "lucide-react";
 
-export function Hero() {
+interface HeroProps {
+  settings?: {
+    hospital_name?: string | null;
+  } | null;
+}
+
+export function Hero({ settings }: HeroProps = {}) {
+  const hospitalName = settings?.hospital_name || "HMS Hospital";
+
   return (
     <section className="relative pt-40 pb-20 px-6 overflow-hidden min-h-[90vh] flex items-center">
       {/* Background decoration */}
@@ -24,12 +32,12 @@ export function Hero() {
         </h1>
         
         <p className="text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto mb-12 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
-          At HMSdemo Hospital, we combine compassionate care with state-of-the-art medical technology to provide the best possible outcomes for you and your family.
+          At <strong className="font-extrabold text-slate-900">{hospitalName}</strong>, we combine compassionate care with state-of-the-art medical technology to provide the best possible outcomes for you and your family.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-500">
           <Link 
-            href="/book" 
+            href="/patient/login" 
             className="group flex items-center justify-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-full text-lg font-bold hover:bg-slate-800 transition-all shadow-xl hover:-translate-y-1 w-full sm:w-auto"
           >
             Book Appointment

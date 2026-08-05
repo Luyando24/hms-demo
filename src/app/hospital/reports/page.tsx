@@ -342,6 +342,7 @@ export default function ReportsDashboard() {
           onClose={() => setActiveExportReport(null)}
           reportName={activeExportReport.name}
           reportKey={activeExportReport.key}
+          currencyConfig={currencyConfig}
         />
       )}
     </div>

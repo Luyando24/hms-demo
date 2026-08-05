@@ -10,7 +10,7 @@ interface NavbarProps {
 }
 
 export function Navbar({ settings }: NavbarProps = {}) {
-  const hospitalName = settings?.hospital_name || "HMSdemo";
+  const hospitalName = settings?.hospital_name || "HMS Hospital";
 
   return (
     <header className="fixed top-0 w-full z-50 px-6 py-4">
@@ -30,9 +30,6 @@ export function Navbar({ settings }: NavbarProps = {}) {
           </Link>
           <Link href="#doctors" className="text-sm font-bold uppercase tracking-widest text-slate-600 hover:text-brand-600 transition-colors">
             Our Doctors
-          </Link>
-          <Link href="#locations" className="text-sm font-bold uppercase tracking-widest text-slate-600 hover:text-brand-600 transition-colors">
-            Locations
           </Link>
           <Link href="#contact" className="text-sm font-bold uppercase tracking-widest text-slate-600 hover:text-brand-600 transition-colors">
             Contact

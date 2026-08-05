@@ -18,6 +18,22 @@ export function plainText(value: string): string {
   return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function renderValueBadge(value: string | number): string {
+  const str = String(value).trim();
+  const upper = str.toUpperCase();
+
+  if (upper.includes("COMPLETED") || upper.includes("CONFIRMED") || upper.includes("100%") || upper.includes("GRADE A+")) {
+    return `<span style="display:inline-block;padding:3px 10px;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:9999px;font-size:11px;font-weight:800;">${escapeHtml(str)}</span>`;
+  }
+  if (upper.includes("CRITICAL") || upper.includes("CANCELLED") || upper.includes("STOCK-OUT") || upper.includes("HIGH")) {
+    return `<span style="display:inline-block;padding:3px 10px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3;border-radius:9999px;font-size:11px;font-weight:800;">${escapeHtml(str)}</span>`;
+  }
+  if (upper.includes("PENDING") || upper.includes("RESCHEDULED") || upper.includes("LOW-STOCK")) {
+    return `<span style="display:inline-block;padding:3px 10px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:9999px;font-size:11px;font-weight:800;">${escapeHtml(str)}</span>`;
+  }
+  return escapeHtml(str);
+}
+
 export function emailLayout(
   hospitalName: string,
   title: string,
@@ -27,34 +43,113 @@ export function emailLayout(
   note?: string,
 ): string {
   const details = rows
-    .map(([label, value]) => `
-      <tr>
-        <td style="padding:10px 12px;color:#64748b;border-bottom:1px solid #e2e8f0;font-size:13px;">${escapeHtml(label)}</td>
-        <td style="padding:10px 12px;color:#0f172a;border-bottom:1px solid #e2e8f0;font-size:13px;font-weight:700;text-align:right;">${escapeHtml(value)}</td>
-      </tr>`)
+    .map(([label, value], index) => {
+      const bg = index % 2 === 0 ? "#ffffff" : "#f8fafc";
+      const formatted = renderValueBadge(value);
+      return `
+      <tr style="background:${bg};">
+        <td style="padding:12px 16px;color:#64748b;border-bottom:1px solid #e2e8f0;font-size:13px;font-weight:600;">${escapeHtml(label)}</td>
+        <td style="padding:12px 16px;color:#0f172a;border-bottom:1px solid #e2e8f0;font-size:13px;font-weight:700;text-align:right;">${formatted}</td>
+      </tr>`;
+    })
     .join("");
+
   const action = cta?.href
-    ? `<p style="margin:28px 0 8px;text-align:center;"><a href="${escapeHtml(cta.href)}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:700;">${escapeHtml(cta.label)}</a></p>`
+    ? `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:28px auto 12px;text-align:center;">
+        <tr>
+          <td align="center" style="border-radius:10px;background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);box-shadow:0 4px 12px rgba(2, 132, 199, 0.25);">
+            <a href="${escapeHtml(cta.href)}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:800;color:#ffffff;text-decoration:none;letter-spacing:0.3px;border-radius:10px;">
+              ${escapeHtml(cta.label)} &rarr;
+            </a>
+          </td>
+        </tr>
+       </table>`
+    : "";
+
+  const noteBox = note
+    ? `<div style="margin-top:24px;padding:14px 16px;background:#f0f9ff;border-left:4px solid #0284c7;border-radius:8px;">
+        <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Important Notice</div>
+        <div style="font-size:12px;line-height:1.5;color:#334155;">${escapeHtml(note)}</div>
+       </div>`
     : "";
 
   return `<!doctype html>
-  <html><body style="margin:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#0f172a;">
-    <div style="max-width:640px;margin:0 auto;padding:28px 16px;">
-      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
-        <div style="background:#2563eb;color:#fff;padding:22px 28px;">
-          <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.85;">${escapeHtml(hospitalName)}</div>
-          <h1 style="font-size:24px;line-height:1.25;margin:8px 0 0;">${escapeHtml(title)}</h1>
-        </div>
-        <div style="padding:26px 28px;">
-          <p style="font-size:15px;line-height:1.65;color:#475569;margin:0 0 20px;">${escapeHtml(introduction)}</p>
-          ${rows.length ? `<table style="border-collapse:collapse;width:100%;border:1px solid #e2e8f0;border-radius:10px;">${details}</table>` : ""}
-          ${action}
-          ${note ? `<p style="font-size:12px;line-height:1.5;color:#64748b;margin:22px 0 0;">${escapeHtml(note)}</p>` : ""}
-        </div>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;-webkit-font-smoothing:antialiased;">
+  <div style="max-width:600px;margin:0 auto;padding:32px 16px;">
+    
+    <!-- Outer Card -->
+    <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px -5px rgba(0,0,0,0.05),0 8px 10px -6px rgba(0,0,0,0.01);">
+      
+      <!-- Top Brand Accent Bar -->
+      <div style="height:4px;background:linear-gradient(to right, #0284c7, #38bdf8, #0369a1);"></div>
+
+      <!-- Header Banner -->
+      <div style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%);color:#ffffff;padding:26px 30px;">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width:100%;">
+          <tr>
+            <td>
+              <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#38bdf8;margin-bottom:6px;">
+                ✚ ${escapeHtml(hospitalName)}
+              </div>
+              <h1 style="font-size:22px;font-weight:900;line-height:1.3;margin:0;color:#ffffff;letter-spacing:-0.3px;">
+                ${escapeHtml(title)}
+              </h1>
+            </td>
+          </tr>
+        </table>
       </div>
-      <p style="font-size:11px;color:#94a3b8;text-align:center;margin:14px 0 0;">Automated notification from ${escapeHtml(hospitalName)}. Please do not send clinical information by replying to this email.</p>
+
+      <!-- Body Content -->
+      <div style="padding:28px 30px;">
+        <p style="font-size:15px;line-height:1.65;color:#334155;margin:0 0 22px;font-weight:400;">
+          ${escapeHtml(introduction)}
+        </p>
+
+        <!-- Details Grid Table -->
+        ${
+          rows.length
+            ? `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:20px;">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;text-align:left;">
+                  <tbody>
+                    ${details}
+                  </tbody>
+                </table>
+               </div>`
+            : ""
+        }
+
+        <!-- CTA Button -->
+        ${action}
+
+        <!-- Security / Privacy Note -->
+        ${noteBox}
+      </div>
+
+      <!-- Card Footer -->
+      <div style="background:#f8fafc;padding:16px 30px;border-top:1px solid #e2e8f0;text-align:center;">
+        <p style="font-size:11px;color:#64748b;margin:0;font-weight:600;">
+          Confidential Notification &bull; ${escapeHtml(hospitalName)}
+        </p>
+      </div>
     </div>
-  </body></html>`;
+
+    <!-- Sub-footer Disclaimer -->
+    <div style="text-align:center;margin-top:18px;padding:0 10px;">
+      <p style="font-size:11px;line-height:1.5;color:#94a3b8;margin:0;">
+        This automated email was dispatched by the hospital management notification system.
+        <br>Please do not transmit personal health information or clinical details by replying directly to this message.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>`;
 }
 
 export function getZonedParts(date: Date, timezone: string): ZonedParts {

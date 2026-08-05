@@ -5,6 +5,7 @@ import {
   BellRing,
   CheckCircle2,
   Clock3,
+  Eye,
   Loader2,
   Mail,
   Send,
@@ -14,6 +15,7 @@ import {
   updateEmailNotificationSettingsAction,
 } from "@/app/hospital/settings/actions";
 import StatusModal from "@/components/hospital/StatusModal";
+import EmailTemplatePreviewModal from "@/components/hospital/EmailTemplatePreviewModal";
 import {
   DEFAULT_EMAIL_NOTIFICATION_SETTINGS,
   type EmailNotificationSettingsInput,
@@ -96,6 +98,7 @@ export function EmailNotificationSettingsPanel({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [status, setStatus] = useState<{
     type: "success" | "error";
     title: string;
@@ -268,15 +271,25 @@ export function EmailNotificationSettingsPanel({
                 </p>
               </div>
             </div>
-            <label className="flex items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">
-              <input
-                type="checkbox"
-                checked={form.enabled}
-                onChange={(event) => update("enabled", event.target.checked)}
-                className="h-5 w-5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-              />
-              Enable email delivery
-            </label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setPreviewModalOpen(true)}
+                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition-colors"
+              >
+                <Eye size={16} className="text-brand-600" />
+                Preview Templates
+              </button>
+              <label className="flex items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.enabled}
+                  onChange={(event) => update("enabled", event.target.checked)}
+                  className="h-5 w-5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                />
+                Enable email delivery
+              </label>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-xs leading-relaxed text-blue-800">
@@ -571,6 +584,11 @@ export function EmailNotificationSettingsPanel({
         title={status?.title || ""}
         message={status?.message || ""}
         onClose={() => setStatus(null)}
+      />
+
+      <EmailTemplatePreviewModal
+        isOpen={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
       />
     </>
   );
