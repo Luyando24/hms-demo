@@ -185,6 +185,7 @@ export function EmailNotificationSettingsPanel({
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
+    event.stopPropagation();
     setSaving(true);
     const result = await updateEmailNotificationSettingsAction(form);
     setSaving(false);
@@ -199,7 +200,7 @@ export function EmailNotificationSettingsPanel({
     setStatus({
       type: "success",
       title: "Email Settings Saved",
-      message: form.enabled
+      message: result.settings.enabled
         ? "The scheduler will now use these reminder and report preferences."
         : "Preferences were saved. Email delivery remains disabled.",
     });

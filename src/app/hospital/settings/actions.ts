@@ -122,18 +122,21 @@ export async function updateEmailNotificationSettingsAction(
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await adminSupabase
+    const { data: savedSettings, error } = await adminSupabase
       .from('email_notification_settings')
-      .upsert(
-        { ...payload, singleton_key: true },
-        { onConflict: 'singleton_key' },
-      );
+      .update(payload)
+      .eq('singleton_key', true)
+      .select('*')
+      .single();
     if (error) throw error;
+    if (savedSettings.enabled !== settings.enabled) {
+      throw new Error('The saved email delivery state did not match the submitted value.');
+    }
 
     revalidatePath('/hospital/settings');
-    return { success: true };
+    return { success: true as const, settings: savedSettings };
   } catch (error) {
-    return { success: false, error: actionError(error) };
+    return { success: false as const, error: actionError(error) };
   }
 }
 

@@ -209,7 +209,8 @@ export default function SystemSettingsPage() {
       </div>
 
       {/* Settings Forms */}
-      <form onSubmit={handleSubmit} className="space-y-8">
+      {activeTab !== 'notifications' && (
+        <form onSubmit={handleSubmit} className="space-y-8">
         {/* Tab 1: General & Branding */}
         {activeTab === 'general' && (
           <section className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6 animate-in fade-in duration-300">
@@ -494,15 +495,8 @@ export default function SystemSettingsPage() {
           </section>
         )}
 
-        {/* Tab 5: Email Notifications */}
-        {activeTab === 'notifications' && (
-          <div className="animate-in fade-in duration-300">
-            <EmailNotificationSettingsPanel canEdit={userRole === 'ADMIN'} />
-          </div>
-        )}
-
         {/* Global Save Button (for settings tabs 1-4) */}
-        {userRole === 'ADMIN' && activeTab !== 'notifications' && (
+        {userRole === 'ADMIN' && (
           <div className="flex justify-end pt-2">
             <button 
               disabled={saving}
@@ -514,7 +508,15 @@ export default function SystemSettingsPage() {
             </button>
           </div>
         )}
-      </form>
+        </form>
+      )}
+
+      {/* Tab 5: Email Notifications uses its own independent form. */}
+      {activeTab === 'notifications' && (
+        <div className="animate-in fade-in duration-300">
+          <EmailNotificationSettingsPanel canEdit={userRole === 'ADMIN'} />
+        </div>
+      )}
 
       <StatusModal
         isOpen={!!status}
