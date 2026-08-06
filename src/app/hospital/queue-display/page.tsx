@@ -66,7 +66,7 @@ export default function QueueDisplayPage() {
   const supabase = createClient();
   const prevCallingId = useRef<string | null>(null);
 
-  // Live Digital Clock
+  // Live Digital Clock & Fullscreen change listener
   useEffect(() => {
     const updateClock = () => {
       const now = new Date();
@@ -75,7 +75,16 @@ export default function QueueDisplayPage() {
     };
     updateClock();
     const interval = setInterval(updateClock, 1000);
-    return () => clearInterval(interval);
+
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
   }, []);
 
   // Fetch Hospital Name & Settings
@@ -221,105 +230,98 @@ export default function QueueDisplayPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between overflow-hidden select-none">
-      {/* ── Top Header ────────────────────────────────────────────── */}
-      <header className="bg-white/90 border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-xs backdrop-blur-md">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/hospital/dashboard"
-            className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-2xl transition-all flex items-center gap-2 text-xs font-semibold"
-            title="Return to Hospital Console Dashboard"
-          >
-            <ArrowLeft size={18} />
-            <span className="hidden sm:inline">Console</span>
-          </Link>
-          <div className="p-2.5 bg-brand-50 border border-brand-200 text-brand-600 rounded-2xl flex items-center justify-center">
-            <Tv size={24} className="animate-pulse" />
+      {/* ── Top Header (Hidden in Fullscreen mode) ──────────────────── */}
+      {!isFullscreen && (
+        <header className="bg-white/90 border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-xs backdrop-blur-md">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/hospital/dashboard"
+              className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-2xl transition-all flex items-center gap-2 text-xs font-semibold"
+              title="Return to Hospital Console Dashboard"
+            >
+              <ArrowLeft size={18} />
+              <span className="hidden sm:inline">Console</span>
+            </Link>
+            <div className="p-2.5 bg-brand-50 border border-brand-200 text-brand-600 rounded-2xl flex items-center justify-center">
+              <Tv size={24} className="animate-pulse" />
+            </div>
+            <div>
+              <h1 className="text-xl lg:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+                {hospitalName}
+                <span className="text-[11px] bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold tracking-wide">
+                  OPD Waiting Room
+                </span>
+              </h1>
+              <p className="text-xs text-slate-500 font-medium">Real-time Patient Queue & Room Announcements</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl lg:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
-              {hospitalName}
-              <span className="text-[11px] bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold tracking-wide">
-                OPD Waiting Room
-              </span>
-            </h1>
-            <p className="text-xs text-slate-500 font-medium">Real-time Patient Queue & Room Announcements</p>
-          </div>
-        </div>
 
-        {/* Right Controls: Department Filter, Sound, Fullscreen, Clock */}
-        <div className="flex items-center gap-3">
-          {/* Department Filter Tabs */}
-          {departments.length > 0 && (
-            <div className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
-              <button
-                onClick={() => setSelectedDept('ALL')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  selectedDept === 'ALL'
-                    ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                All Rooms
-              </button>
-              {departments.map((dept) => (
+          {/* Right Controls: Department Filter, Sound, Fullscreen */}
+          <div className="flex items-center gap-3">
+            {/* Department Filter Tabs */}
+            {departments.length > 0 && (
+              <div className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
                 <button
-                  key={dept}
-                  onClick={() => setSelectedDept(dept)}
+                  onClick={() => setSelectedDept('ALL')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                    selectedDept === dept
+                    selectedDept === 'ALL'
                       ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  {dept}
+                  All Rooms
                 </button>
-              ))}
-            </div>
-          )}
+                {departments.map((dept) => (
+                  <button
+                    key={dept}
+                    onClick={() => setSelectedDept(dept)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      selectedDept === dept
+                        ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {dept}
+                  </button>
+                ))}
+              </div>
+            )}
 
-          {/* Sound Audio Toggle */}
-          <button
-            onClick={toggleSound}
-            className={`p-2.5 rounded-2xl border transition-all flex items-center gap-2 text-xs font-semibold ${
-              soundEnabled
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                : 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
-            }`}
-            title="Toggle Voice Announcements"
-          >
-            {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
-            <span className="hidden sm:inline">{soundEnabled ? 'Voice ON' : 'Voice OFF'}</span>
-          </button>
+            {/* Sound Audio Toggle */}
+            <button
+              onClick={toggleSound}
+              className={`p-2.5 rounded-2xl border transition-all flex items-center gap-2 text-xs font-semibold ${
+                soundEnabled
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                  : 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+              }`}
+              title="Toggle Voice Announcements"
+            >
+              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+              <span className="hidden sm:inline">{soundEnabled ? 'Voice ON' : 'Voice OFF'}</span>
+            </button>
 
-          {/* Refresh Data Button */}
-          <button
-            onClick={() => void loadQueueData()}
-            className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-2xl transition-all"
-            title="Refresh Display"
-          >
-            <RefreshCw size={18} className={loading ? 'animate-spin text-brand-600' : ''} />
-          </button>
+            {/* Refresh Data Button */}
+            <button
+              onClick={() => void loadQueueData()}
+              className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-2xl transition-all"
+              title="Refresh Display"
+            >
+              <RefreshCw size={18} className={loading ? 'animate-spin text-brand-600' : ''} />
+            </button>
 
-          {/* Fullscreen Button */}
-          <button
-            onClick={toggleFullscreen}
-            className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-2xl transition-all"
-            title="Toggle Fullscreen Mode"
-          >
-            {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-          </button>
-
-          {/* Clock */}
-          <div className="bg-slate-100 border border-slate-200 px-3.5 py-1.5 rounded-2xl text-right min-w-[120px]">
-            <div className="text-lg font-bold tracking-wider text-slate-900 font-mono leading-none">
-              {currentTime || '--:--:--'}
-            </div>
-            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">
-              {currentDate}
-            </div>
+            {/* Fullscreen Button */}
+            <button
+              onClick={toggleFullscreen}
+              className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-2xl transition-all flex items-center gap-1.5 text-xs font-bold"
+              title="Toggle Fullscreen Mode"
+            >
+              <Maximize2 size={18} />
+              <span className="hidden sm:inline">Fullscreen</span>
+            </button>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* ── Main Content Grid ────────────────────────────────────── */}
       <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
@@ -337,18 +339,55 @@ export default function QueueDisplayPage() {
                   <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-600"></span>
                 </span>
                 <h2 className="text-lg lg:text-xl font-bold uppercase tracking-wider text-emerald-800">
-                  Now Calling / Next In Room
+                  Now Calling
                 </h2>
               </div>
-              {nowCalling && (
-                <button
-                  onClick={() => announcePatientCall(nowCalling)}
-                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xs transition-all"
-                >
-                  <Radio size={16} className="animate-pulse" />
-                  <span>Repeat Announcement</span>
-                </button>
-              )}
+
+              <div className="flex items-center gap-3">
+                {nowCalling && (
+                  <button
+                    onClick={() => announcePatientCall(nowCalling)}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all"
+                  >
+                    <Radio size={15} className="animate-pulse" />
+                    <span className="hidden sm:inline">Repeat</span>
+                  </button>
+                )}
+
+                {/* Digital Clock in NOW CALLING Section */}
+                <div className="bg-white border border-slate-200 px-4 py-1.5 rounded-2xl text-right min-w-[125px] shadow-xs">
+                  <div className="text-lg font-bold tracking-wider text-slate-900 font-mono leading-none">
+                    {currentTime || '--:--:--'}
+                  </div>
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">
+                    {currentDate}
+                  </div>
+                </div>
+
+                {/* In Fullscreen mode, provide voice toggle and minimize button */}
+                {isFullscreen && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={toggleSound}
+                      className={`p-2 rounded-xl border transition-all text-xs font-semibold ${
+                        soundEnabled
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                          : 'bg-rose-50 border-rose-200 text-rose-700'
+                      }`}
+                      title="Toggle Voice Announcements"
+                    >
+                      {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                    </button>
+                    <button
+                      onClick={toggleFullscreen}
+                      className="p-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-xl transition-all"
+                      title="Exit Fullscreen"
+                    >
+                      <Minimize2 size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {nowCalling ? (
