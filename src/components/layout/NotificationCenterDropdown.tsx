@@ -95,7 +95,6 @@ export function NotificationCenterDropdown() {
           };
 
           addNotification(newNotif);
-          playVoiceNotification(newNotif.title, newNotif.message, 'info');
         }
       })
       .subscribe();

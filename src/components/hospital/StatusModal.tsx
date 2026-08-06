@@ -3,7 +3,6 @@
 import { useEffect } from 'react'
 import { CheckCircle2, AlertCircle, X } from 'lucide-react'
 import clsx from 'clsx'
-import { playVoiceNotification } from '@/utils/voiceNotification'
 
 interface StatusModalProps {
   isOpen: boolean
@@ -19,14 +18,13 @@ export default function StatusModal({
   onClose, 
   type, 
   title, 
-  message, 
-  actionLabel = 'Continue' 
+  message,
+  actionLabel = 'Continue'
 }: StatusModalProps) {
+  // StatusModal relies on visual confirmation rather than spoken TTS voice announcements
   useEffect(() => {
-    if (isOpen && title) {
-      playVoiceNotification(title, message, type)
-    }
-  }, [isOpen, title, message, type])
+    // Silent confirmation
+  }, [isOpen]);
 
   if (!isOpen) return null
 
