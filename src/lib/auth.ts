@@ -13,6 +13,7 @@ const KNOWN_ROLES: readonly UserRole[] = [
   'RADIOLOGIST',
   'ACCOUNTANT',
   'RECEPTIONIST',
+  'WAITING_ROOM',
   'STAFF',
   'PATIENT',
 ];

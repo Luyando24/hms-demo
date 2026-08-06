@@ -9,6 +9,10 @@ import {
   Loader2,
   Mail,
   Send,
+  Volume2,
+  VolumeX,
+  Play,
+  Sliders,
 } from "lucide-react";
 import {
   getEmailNotificationSettingsAction,
@@ -21,6 +25,13 @@ import {
   DEFAULT_EMAIL_NOTIFICATION_SETTINGS,
   type EmailNotificationSettingsInput,
 } from "@/types/email-notifications";
+import {
+  isVoiceEnabled,
+  setVoiceEnabled,
+  getVoiceGenderPreference,
+  setVoiceGenderPreference,
+  playVoiceNotification,
+} from "@/utils/voiceNotification";
 
 interface EmailDeliverySummary {
   id: string;
@@ -99,11 +110,27 @@ export function EmailNotificationSettingsPanel({
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(true);
+  const [voiceGender, setVoiceGender] = useState<'auto' | 'female' | 'male'>('auto');
+  const [isTestingVoice, setIsTestingVoice] = useState(false);
   const [status, setStatus] = useState<{
     type: "success" | "error";
     title: string;
     message: string;
   } | null>(null);
+
+  useEffect(() => {
+    setVoiceActive(isVoiceEnabled());
+    setVoiceGender(getVoiceGenderPreference() as any);
+    const handleSettingChange = () => {
+      setVoiceActive(isVoiceEnabled());
+      setVoiceGender(getVoiceGenderPreference() as any);
+    };
+    window.addEventListener('hms-voice-setting-changed', handleSettingChange);
+    return () => {
+      window.removeEventListener('hms-voice-setting-changed', handleSettingChange);
+    };
+  }, []);
 
   const loadSettings = useCallback(async () => {
     if (!canEdit) {
@@ -251,7 +278,93 @@ export function EmailNotificationSettingsPanel({
   };
 
   return (
-    <>
+    <div className="space-y-8">
+      {/* Voice & Sound Notifications Card */}
+      <section className="space-y-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+              <Volume2 size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-slate-900">Voice & Sound Announcements</h2>
+              <p className="text-xs font-medium text-slate-500">
+                Real-time human text-to-speech audio alerts for OPD check-ins, clinical actions, and stock warnings.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !voiceActive;
+                setVoiceEnabled(next);
+                setVoiceActive(next);
+                if (next) playVoiceNotification('Voice notifications enabled', 'Audio alerts are now active.', 'success');
+              }}
+              className={`w-12 h-6 rounded-full transition-colors p-0.5 relative flex items-center ${
+                voiceActive ? 'bg-purple-600' : 'bg-slate-300'
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full bg-white shadow-md transition-transform transform ${
+                voiceActive ? 'translate-x-6' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="ml-1 text-xs font-bold uppercase tracking-widest text-slate-700">
+              Voice Accent & Preference
+            </label>
+            <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
+              {(['auto', 'female', 'male'] as const).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => {
+                    setVoiceGenderPreference(g);
+                    setVoiceGender(g);
+                    if (voiceActive) playVoiceNotification('Voice preference updated', `Selected voice profile set to ${g}.`, 'info');
+                  }}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition-all ${
+                    voiceGender === g
+                      ? 'bg-slate-900 text-white shadow-md'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="ml-1 text-xs font-bold uppercase tracking-widest text-slate-700">
+              Test Audio Output
+            </label>
+            <button
+              type="button"
+              disabled={!voiceActive || isTestingVoice}
+              onClick={() => {
+                setIsTestingVoice(true);
+                playVoiceNotification(
+                  'Audio System Ready',
+                  'Voice notifications are active and functioning correctly for Kunda Health Care.',
+                  'success'
+                );
+                setTimeout(() => setIsTestingVoice(false), 3000);
+              }}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-extrabold text-slate-800 hover:bg-slate-100 disabled:opacity-50 transition-all"
+            >
+              <Play size={14} className={isTestingVoice ? 'animate-spin' : 'fill-purple-600 text-purple-600'} />
+              {isTestingVoice ? 'Speaking Test Audio...' : 'Play Sample Voice Announcement'}
+            </button>
+          </div>
+        </div>
+      </section>
+
       <form onSubmit={handleSave} className="space-y-8">
         <section className="space-y-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 md:flex-row md:items-center md:justify-between">
@@ -585,6 +698,6 @@ export function EmailNotificationSettingsPanel({
         isOpen={previewModalOpen}
         onClose={() => setPreviewModalOpen(false)}
       />
-    </>
+    </div>
   );
 }

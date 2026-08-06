@@ -7,6 +7,7 @@ import { useMobileNav } from "./mobile-nav-context";
 import { useEffect, useState } from "react";
 import { patientSignOut } from "@/app/patient/login/actions";
 import { createClient } from "@/utils/supabase/client";
+import { NotificationCenterDropdown } from "./NotificationCenterDropdown";
 
 export function Header() {
   const { toggle } = useMobileNav();
@@ -102,10 +103,7 @@ export function Header() {
       {/* Right Controls */}
       <div className="flex items-center gap-6">
         {/* Notifications */}
-        <button className="relative p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-full hover:bg-slate-50">
-          <Bell size={20} strokeWidth={2} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
-        </button>
+        <NotificationCenterDropdown />
 
         <div className="w-px h-6 bg-slate-200" />
 

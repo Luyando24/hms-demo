@@ -9,6 +9,8 @@ import { signOut } from "@/app/login/actions";
 import { createClient } from "@/utils/supabase/client";
 import OPDCheckInModal from "../hospital/OPDCheckInModal";
 
+import { NotificationCenterDropdown } from "./NotificationCenterDropdown";
+
 export function HospitalHeader() {
   const { toggle } = useMobileNav();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -105,10 +107,7 @@ export function HospitalHeader() {
         <div className="w-px h-6 bg-slate-200 hidden md:block" />
 
         {/* Notifications */}
-        <button className="relative p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-full hover:bg-slate-50">
-          <Bell size={20} strokeWidth={2} />
-          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-brand-500 rounded-full border-2 border-white" />
-        </button>
+        <NotificationCenterDropdown />
 
         {/* User Profile Dropdown */}
         <div className="relative">

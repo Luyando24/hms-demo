@@ -17,11 +17,13 @@ import {
   X,
   ShieldAlert,
   CheckCircle2,
-  Filter
+  Filter,
+  Volume2
 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { formatCurrencyAmount } from "@/utils/currency";
+import { playVoiceNotification } from "@/utils/voiceNotification";
 import clsx from "clsx";
 
 interface AlertLog {
@@ -325,7 +327,7 @@ export default function HospitalDashboard() {
       <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Hospital Overview</h1>
-          <p className="text-slate-500 mt-1 font-medium">Real-time operational status and clinical metrics for HMSdemo Hospital.</p>
+          <p className="text-slate-500 mt-1 font-medium">Real-time operational status and clinical metrics for HMS - Kunda Health Care.</p>
         </div>
         <div className="flex items-center gap-3">
           <button 

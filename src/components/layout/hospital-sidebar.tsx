@@ -17,7 +17,8 @@ import {
   Settings,
   LogOut,
   Building,
-  DoorOpen
+  DoorOpen,
+  Tv
 } from "lucide-react";
 import clsx from "clsx";
 import { useMobileNav } from "./mobile-nav-context";
@@ -37,6 +38,7 @@ const navGroups = [
     title: "Front Office",
     items: [
       { name: "Reception", href: "/hospital/reception", icon: Users },
+      { name: "Waiting Room Display", href: "/hospital/queue-display", icon: Tv },
       { name: "Patient Directory", href: "/hospital/patients", icon: Users },
     ]
   },

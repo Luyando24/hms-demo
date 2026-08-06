@@ -176,7 +176,7 @@ export async function sendTestNotificationEmailAction() {
       throw new Error('Set a hospital manager email in settings before sending a test email.');
     }
 
-    const hospitalName = hospSettings?.hospital_name || 'HMS Hospital';
+    const hospitalName = hospSettings?.hospital_name || 'HMS - Kunda Health Care';
     const address = hospSettings?.address?.trim() || '';
     const phone = hospSettings?.phone?.trim() || '';
     const email = hospSettings?.email?.trim() || '';

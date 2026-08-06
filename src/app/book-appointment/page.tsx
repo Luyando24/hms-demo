@@ -22,7 +22,7 @@ export default async function PublicBookAppointmentPage() {
       .order('first_name'),
   ]);
 
-  const hospitalTitle = settings?.brand_title?.trim() || settings?.hospital_name || 'HMS Hospital';
+  const hospitalTitle = settings?.brand_title?.trim() || settings?.hospital_name || 'HMS - Kunda Health Care';
   const logoUrl = settings?.logo_url || '';
   const tagline = settings?.tagline || 'Integrated Healthcare & Clinical Operations';
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Users, ChevronUp, Bell, X, User } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { playVoiceNotification } from '@/utils/voiceNotification';
 import clsx from 'clsx';
 
 export default function QueueFloatingIndicator() {
@@ -60,6 +61,11 @@ export default function QueueFloatingIndicator() {
     if (data) {
       setLatestPatient(data);
       setIsExpanded(true);
+      playVoiceNotification(
+        'New Patient Arrival',
+        `Patient ${data.first_name} ${data.last_name} has checked in for OPD.`,
+        'info'
+      );
       // Auto-collapse after 10 seconds
       setTimeout(() => setIsExpanded(false), 10000);
     }

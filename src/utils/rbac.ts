@@ -9,6 +9,7 @@ export type UserRole =
   | 'RADIOLOGIST' 
   | 'ACCOUNTANT' 
   | 'RECEPTIONIST' 
+  | 'WAITING_ROOM' 
   | 'STAFF' 
   | 'PATIENT';
 
@@ -26,6 +27,7 @@ export const ROLE_LANDING_DESTINATIONS: Record<UserRole, RoleLandingDestination>
   RADIOLOGIST: { subdomain: 'staff', path: '/hospital/radiology' },
   ACCOUNTANT: { subdomain: 'staff', path: '/hospital/finance' },
   RECEPTIONIST: { subdomain: 'staff', path: '/hospital/reception' },
+  WAITING_ROOM: { subdomain: 'staff', path: '/hospital/queue-display' },
   STAFF: { subdomain: 'staff', path: '/hospital/dashboard' },
   PATIENT: { subdomain: 'patient', path: '/patient/portal' },
 };
@@ -53,6 +55,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/hr',
     '/hospital/reports',
     '/hospital/settings',
+    '/hospital/queue-display',
   ],
   DOCTOR: [
     '/hospital/dashboard',
@@ -65,6 +68,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/laboratory',
     '/hospital/inventory',
     '/hospital/settings',
+    '/hospital/queue-display',
   ],
   NURSE: [
     '/hospital/dashboard',
@@ -78,6 +82,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/inventory',
     '/hospital/bloodbank',
     '/hospital/settings',
+    '/hospital/queue-display',
   ],
   PHARMACIST: [
     '/hospital/dashboard',
@@ -112,11 +117,17 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/patients',
     '/hospital/billing',
     '/hospital/settings',
+    '/hospital/queue-display',
+  ],
+  WAITING_ROOM: [
+    '/hospital/queue-display',
+    '/hospital/settings',
   ],
   STAFF: [
     '/hospital/dashboard',
     '/hospital/patients',
     '/hospital/settings',
+    '/hospital/queue-display',
   ]
 };
 

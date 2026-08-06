@@ -8,7 +8,7 @@ import { Doctors, DoctorProfile } from "@/components/landing/doctors";
 import { Footer } from "@/components/landing/footer";
 
 export const metadata: Metadata = {
-  title: "Healthcare Services & Patient Care Portal",
+  title: "HMS - Kunda Health Care",
   description:
     "Explore hospital departments, specialist physicians, emergency services, and secure patient portal access.",
 };

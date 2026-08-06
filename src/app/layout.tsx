@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  applicationName: "HMS Hospital",
-  title: "HMS Hospital",
+  applicationName: "HMS - Kunda Health Care",
+  title: "HMS - Kunda Health Care",
   description: "Integrated hospital services, clinical operations, and patient care.",
   manifest: "/manifest.webmanifest",
   icons: {
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "HMSdemo",
+    title: "HMS - Kunda",
     statusBarStyle: "default",
   },
 };

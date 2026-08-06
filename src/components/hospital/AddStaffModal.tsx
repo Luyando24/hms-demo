@@ -222,8 +222,10 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
                       >
                         <option value="DOCTOR">Medical Doctor</option>
                         <option value="NURSE">Nurse / Clinical Staff</option>
+                        <option value="RECEPTIONIST">Receptionist / Front Desk</option>
                         <option value="PHARMACIST">Pharmacist</option>
                         <option value="ACCOUNTANT">Accountant / Billing</option>
+                        <option value="WAITING_ROOM">Waiting Room Display Kiosk</option>
                         <option value="ADMIN">Administrator</option>
                       </select>
                     </div>

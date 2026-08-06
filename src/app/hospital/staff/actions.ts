@@ -19,6 +19,7 @@ const staffSchema = z
       'RADIOLOGIST',
       'ACCOUNTANT',
       'RECEPTIONIST',
+      'WAITING_ROOM',
       'STAFF',
     ]),
     staffNumber: z.string().trim().max(60).optional(),
@@ -34,6 +35,7 @@ function generateSecureStaffId(role: string): string {
     RADIOLOGIST: 'RAD-IMG',
     ACCOUNTANT: 'FIN-ACC',
     RECEPTIONIST: 'ADM-RCP',
+    WAITING_ROOM: 'DISP-WR',
     ADMIN: 'SYS-ADM',
     STAFF: 'HMS-STF',
   };

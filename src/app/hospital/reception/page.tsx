@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react";
-import { Users, Search, Plus, Calendar, Clock, UserPlus, FileText, CheckCircle2, MoreVertical, LogIn, ArrowRight, RefreshCw, AlertCircle } from "lucide-react";
+import { Users, Search, Plus, Calendar, Clock, UserPlus, FileText, CheckCircle2, MoreVertical, LogIn, ArrowRight, RefreshCw, AlertCircle, Tv } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import RegisterPatientModal from "@/components/hospital/RegisterPatientModal";
 import StatusModal from "@/components/hospital/StatusModal";
@@ -214,11 +214,19 @@ export default function ReceptionDashboard() {
             Refresh
           </button>
           <Link
+            href="/hospital/queue-display"
+            target="_blank"
+            className="bg-slate-900 text-white border border-slate-800 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-md"
+          >
+            <Tv size={16} className="text-emerald-400 animate-pulse" />
+            TV Queue Screen
+          </Link>
+          <Link
             href="/hospital/patients"
-            className="bg-white border border-slate-200 text-slate-600 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
+            className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
           >
             <Users size={16} />
-            Patient Directory
+            Directory
           </Link>
           <button 
             onClick={() => setIsRegisterModalOpen(true)}

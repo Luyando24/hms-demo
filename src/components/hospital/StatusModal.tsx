@@ -1,8 +1,9 @@
 'use client'
 
-import React from 'react'
+import { useEffect } from 'react'
 import { CheckCircle2, AlertCircle, X } from 'lucide-react'
 import clsx from 'clsx'
+import { playVoiceNotification } from '@/utils/voiceNotification'
 
 interface StatusModalProps {
   isOpen: boolean
@@ -21,6 +22,12 @@ export default function StatusModal({
   message, 
   actionLabel = 'Continue' 
 }: StatusModalProps) {
+  useEffect(() => {
+    if (isOpen && title) {
+      playVoiceNotification(title, message, type)
+    }
+  }, [isOpen, title, message, type])
+
   if (!isOpen) return null
 
   return (

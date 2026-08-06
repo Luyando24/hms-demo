@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'HMSdemo Hospital Management System',
-    short_name: 'HMSdemo',
+    name: 'HMS - Kunda Health Care',
+    short_name: 'HMS - Kunda',
     description: 'Secure hospital operations and patient portal.',
     id: '/',
     start_url: '/',

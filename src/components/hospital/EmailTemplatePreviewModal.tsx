@@ -30,7 +30,7 @@ export function renderClientEmailTemplate(
     ? { hospitalName: hospital, address: "Capital Healthcare District, Suite 400", phone: "+1 (800) 555-0199", email: "info@medicloud.health", appUrl: "https://kundahealthcare.org" }
     : hospital;
 
-  const hospitalName = info.hospitalName || "HMS Hospital";
+  const hospitalName = info.hospitalName || "HMS - Kunda Health Care";
   const address = info.address?.trim() || "";
   const phone = info.phone?.trim() || "";
   const email = info.email?.trim() || "";

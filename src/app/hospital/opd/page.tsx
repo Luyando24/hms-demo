@@ -14,7 +14,8 @@ import {
   Loader2,
   DoorOpen,
   RefreshCw,
-  UserCheck
+  UserCheck,
+  Tv
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
@@ -136,6 +137,14 @@ export default function OutpatientDashboard() {
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
             Refresh
           </button>
+          <Link
+            href="/hospital/queue-display"
+            target="_blank"
+            className="bg-slate-900 text-white border border-slate-800 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-md"
+          >
+            <Tv size={16} className="text-emerald-400 animate-pulse" />
+            TV Queue Screen
+          </Link>
           <Link
             href="/hospital/reception"
             className="bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"

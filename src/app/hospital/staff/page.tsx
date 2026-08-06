@@ -151,8 +151,10 @@ export default function StaffDirectory() {
             <option value="ALL">All Staff Roles</option>
             <option value="DOCTOR">Medical Doctors</option>
             <option value="NURSE">Nurses & Clinical Staff</option>
+            <option value="RECEPTIONIST">Receptionists</option>
             <option value="PHARMACIST">Pharmacists</option>
             <option value="ACCOUNTANT">Accountants & Billing</option>
+            <option value="WAITING_ROOM">Waiting Room Displays</option>
             <option value="ADMIN">System Administrators</option>
           </select>
         </div>
@@ -210,6 +212,7 @@ export default function StaffDirectory() {
                           member.role === 'DOCTOR' ? "bg-purple-100 text-purple-700" :
                           member.role === 'NURSE' ? "bg-blue-100 text-blue-700" :
                           member.role === 'ADMIN' ? "bg-rose-100 text-rose-700" :
+                          member.role === 'WAITING_ROOM' ? "bg-amber-100 text-amber-800 border border-amber-300" :
                           "bg-slate-100 text-slate-700"
                         )}>
                           {member.role || 'STAFF'}

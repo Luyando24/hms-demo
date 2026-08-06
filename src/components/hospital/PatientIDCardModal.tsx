@@ -71,7 +71,7 @@ export default function PatientIDCardModal({ isOpen, onClose, patient }: Patient
                 <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
                   <ShieldCheck size={18} className="text-white" />
                 </div>
-                <p className="text-[10px] font-black uppercase tracking-widest">HMSdemo Health</p>
+                <p className="text-[10px] font-black uppercase tracking-widest">HMS - Kunda Health Care</p>
               </div>
               <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Hospital Identity</p>
             </div>
