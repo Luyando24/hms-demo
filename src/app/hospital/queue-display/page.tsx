@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { 
   Volume2, 
   VolumeX, 
@@ -8,12 +9,12 @@ import {
   Minimize2, 
   DoorOpen, 
   Stethoscope, 
-  Sparkles, 
   Radio, 
   Tv,
   CheckCircle2,
   Users,
-  RefreshCw
+  RefreshCw,
+  ArrowLeft
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { playVoiceNotification, isVoiceEnabled, setVoiceEnabled } from '@/utils/voiceNotification';
@@ -219,35 +220,43 @@ export default function QueueDisplayPage() {
   const waitingList = filteredQueue.filter(i => i.status === 'WAITING' || i.status === 'TRIAGED');
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans flex flex-col justify-between overflow-hidden select-none">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between overflow-hidden select-none">
       {/* ── Top Header ────────────────────────────────────────────── */}
-      <header className="bg-slate-900/90 border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-2xl backdrop-blur-md">
+      <header className="bg-white/90 border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-xs backdrop-blur-md">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-brand-600/20 border border-brand-500/30 text-brand-400 rounded-2xl flex items-center justify-center shadow-inner">
-            <Tv size={28} className="animate-pulse" />
+          <Link
+            href="/hospital/dashboard"
+            className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-2xl transition-all flex items-center gap-2 text-xs font-semibold"
+            title="Return to Hospital Console Dashboard"
+          >
+            <ArrowLeft size={18} />
+            <span className="hidden sm:inline">Console</span>
+          </Link>
+          <div className="p-2.5 bg-brand-50 border border-brand-200 text-brand-600 rounded-2xl flex items-center justify-center">
+            <Tv size={24} className="animate-pulse" />
           </div>
           <div>
-            <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-white flex items-center gap-3">
+            <h1 className="text-xl lg:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
               {hospitalName}
-              <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-bold uppercase tracking-widest">
+              <span className="text-[11px] bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold tracking-wide">
                 OPD Waiting Room
               </span>
             </h1>
-            <p className="text-xs text-slate-400 font-medium">Real-time Patient Queue & Room Announcements</p>
+            <p className="text-xs text-slate-500 font-medium">Real-time Patient Queue & Room Announcements</p>
           </div>
         </div>
 
         {/* Right Controls: Department Filter, Sound, Fullscreen, Clock */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {/* Department Filter Tabs */}
           {departments.length > 0 && (
-            <div className="hidden lg:flex items-center gap-1 bg-slate-800/80 p-1 rounded-2xl border border-slate-700">
+            <div className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
               <button
                 onClick={() => setSelectedDept('ALL')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                   selectedDept === 'ALL'
-                    ? 'bg-brand-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 All Rooms
@@ -256,10 +265,10 @@ export default function QueueDisplayPage() {
                 <button
                   key={dept}
                   onClick={() => setSelectedDept(dept)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                     selectedDept === dept
-                      ? 'bg-brand-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   {dept}
@@ -271,41 +280,41 @@ export default function QueueDisplayPage() {
           {/* Sound Audio Toggle */}
           <button
             onClick={toggleSound}
-            className={`p-3 rounded-2xl border transition-all flex items-center gap-2 text-xs font-extrabold ${
+            className={`p-2.5 rounded-2xl border transition-all flex items-center gap-2 text-xs font-semibold ${
               soundEnabled
-                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30'
-                : 'bg-rose-500/20 border-rose-500/40 text-rose-400 hover:bg-rose-500/30'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                : 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
             }`}
             title="Toggle Voice Announcements"
           >
-            {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
             <span className="hidden sm:inline">{soundEnabled ? 'Voice ON' : 'Voice OFF'}</span>
           </button>
 
           {/* Refresh Data Button */}
           <button
             onClick={() => void loadQueueData()}
-            className="p-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-2xl transition-all"
+            className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-2xl transition-all"
             title="Refresh Display"
           >
-            <RefreshCw size={20} className={loading ? 'animate-spin text-brand-400' : ''} />
+            <RefreshCw size={18} className={loading ? 'animate-spin text-brand-600' : ''} />
           </button>
 
           {/* Fullscreen Button */}
           <button
             onClick={toggleFullscreen}
-            className="p-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-2xl transition-all"
+            className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-2xl transition-all"
             title="Toggle Fullscreen Mode"
           >
-            {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+            {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
           </button>
 
           {/* Clock */}
-          <div className="bg-slate-950 border border-slate-800 px-4 py-2 rounded-2xl text-right min-w-[130px]">
-            <div className="text-xl font-black tracking-widest text-brand-400 font-mono leading-none">
+          <div className="bg-slate-100 border border-slate-200 px-3.5 py-1.5 rounded-2xl text-right min-w-[120px]">
+            <div className="text-lg font-bold tracking-wider text-slate-900 font-mono leading-none">
               {currentTime || '--:--:--'}
             </div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">
               {currentDate}
             </div>
           </div>
@@ -315,27 +324,26 @@ export default function QueueDisplayPage() {
       {/* ── Main Content Grid ────────────────────────────────────── */}
       <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
         
-        {/* Left Column (8 cols): Hero "NOW CALLING" Banner + Room Cards Grid */}
-        <div className="lg:col-span-8 flex flex-col gap-6 overflow-y-auto pr-1">
+        {/* Left Column (7 cols): Hero "NOW CALLING" Spotlight Card */}
+        <div className="lg:col-span-7 flex flex-col overflow-hidden">
           
           {/* NOW CALLING Spotlight Card */}
-          <div className="relative bg-gradient-to-r from-brand-950 via-slate-900 to-slate-950 border-2 border-brand-500/50 rounded-3xl p-6 lg:p-8 shadow-2xl overflow-hidden">
-            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative flex-1 bg-gradient-to-br from-emerald-50/90 via-white to-sky-50/70 border-2 border-emerald-500/40 rounded-3xl p-8 lg:p-12 shadow-xs flex flex-col justify-between overflow-hidden">
             
-            <div className="flex items-center justify-between border-b border-brand-500/20 pb-4 mb-6">
+            <div className="flex items-center justify-between border-b border-slate-200/80 pb-4 mb-6">
               <div className="flex items-center gap-3">
                 <span className="relative flex h-4 w-4">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-600"></span>
                 </span>
-                <h2 className="text-xl lg:text-2xl font-black uppercase tracking-widest text-emerald-400">
-                  NOW CALLING / NEXT IN ROOM
+                <h2 className="text-lg lg:text-xl font-bold uppercase tracking-wider text-emerald-800">
+                  Now Calling / Next In Room
                 </h2>
               </div>
               {nowCalling && (
                 <button
                   onClick={() => announcePatientCall(nowCalling)}
-                  className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg transition-all"
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xs transition-all"
                 >
                   <Radio size={16} className="animate-pulse" />
                   <span>Repeat Announcement</span>
@@ -344,46 +352,46 @@ export default function QueueDisplayPage() {
             </div>
 
             {nowCalling ? (
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+              <div className="my-auto grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
                 {/* Large Token Badge */}
-                <div className="md:col-span-5 bg-gradient-to-br from-brand-600 to-indigo-700 rounded-3xl p-6 text-center text-white shadow-2xl border border-brand-400/40">
-                  <span className="text-xs font-extrabold uppercase tracking-widest text-brand-200 block mb-1">
+                <div className="md:col-span-5 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-8 text-center text-white shadow-lg border border-emerald-500/30">
+                  <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-100 block mb-2">
                     Token Number
                   </span>
-                  <div className="text-5xl lg:text-6xl font-black tracking-tight font-mono">
+                  <div className="text-6xl lg:text-7xl font-black tracking-tight font-mono">
                     {nowCalling.token_number || nowCalling.id.slice(0, 5).toUpperCase()}
                   </div>
-                  <div className="mt-3 inline-block bg-white/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                  <div className="mt-4 inline-block bg-white/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider">
                     {nowCalling.priority} Priority
                   </div>
                 </div>
 
                 {/* Patient & Room Details */}
-                <div className="md:col-span-7 space-y-3">
+                <div className="md:col-span-7 space-y-4">
                   <div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Patient Name</span>
-                    <h3 className="text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">Patient Name</span>
+                    <h3 className="text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
                       {nowCalling.patients ? `${nowCalling.patients.first_name} ${nowCalling.patients.last_name}` : 'Walk-in Patient'}
                     </h3>
                   </div>
 
-                  <div className="pt-2 flex flex-wrap items-center gap-4">
-                    <div className="bg-slate-800/90 border border-slate-700 px-4 py-2.5 rounded-2xl flex items-center gap-3">
-                      <DoorOpen className="text-emerald-400" size={24} />
+                  <div className="pt-2 flex flex-wrap items-center gap-3">
+                    <div className="bg-white border border-slate-200 px-5 py-3 rounded-2xl flex items-center gap-3 shadow-xs">
+                      <DoorOpen className="text-emerald-600" size={26} />
                       <div>
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">Proceed to Room</span>
-                        <span className="text-lg font-black text-emerald-400">
+                        <span className="text-lg font-bold text-emerald-700">
                           {nowCalling.rooms?.name || 'General Consultation'}
                         </span>
                       </div>
                     </div>
 
                     {nowCalling.departments?.name && (
-                      <div className="bg-slate-800/90 border border-slate-700 px-4 py-2.5 rounded-2xl flex items-center gap-3">
-                        <Stethoscope className="text-brand-400" size={24} />
+                      <div className="bg-white border border-slate-200 px-5 py-3 rounded-2xl flex items-center gap-3 shadow-xs">
+                        <Stethoscope className="text-brand-600" size={26} />
                         <div>
                           <span className="text-[10px] uppercase font-bold text-slate-400 block">Department</span>
-                          <span className="text-sm font-bold text-white">
+                          <span className="text-base font-semibold text-slate-800">
                             {nowCalling.departments.name}
                           </span>
                         </div>
@@ -393,112 +401,35 @@ export default function QueueDisplayPage() {
                 </div>
               </div>
             ) : (
-              <div className="py-8 text-center text-slate-400 font-semibold space-y-2">
-                <Sparkles size={36} className="mx-auto text-slate-600" />
-                <p className="text-lg text-slate-300 font-bold">No active calls right now</p>
-                <p className="text-xs text-slate-500">Patients will be announced automatically as doctors call them into consultation rooms.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Consultation Rooms Grid */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                <DoorOpen className="text-brand-400" size={20} />
-                Consultation Rooms Status
-              </h2>
-              <span className="text-xs font-bold text-slate-500">
-                {rooms.filter(r => r.status !== 'AVAILABLE').length} / {rooms.length} Rooms Occupied
-              </span>
-            </div>
-
-            {rooms.length === 0 ? (
-              <div className="p-8 bg-slate-900/60 border border-slate-800 rounded-3xl text-center text-slate-500 text-sm">
-                No consultation rooms configured.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {rooms.map((room) => {
-                  const p = room.currentPatient?.patients;
-                  const isBusy = room.status !== 'AVAILABLE';
-                  const isCalling = room.status === 'CALLING';
-
-                  return (
-                    <div 
-                      key={room.id}
-                      className={`p-5 rounded-3xl border transition-all ${
-                        isCalling
-                          ? 'bg-brand-950/80 border-emerald-500/70 shadow-xl shadow-emerald-500/10 animate-pulse'
-                          : isBusy
-                          ? 'bg-slate-900/90 border-slate-800'
-                          : 'bg-slate-900/40 border-slate-800/60 opacity-80'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full ${
-                            isCalling ? 'bg-emerald-400 animate-ping' :
-                            isBusy ? 'bg-amber-400' : 'bg-slate-600'
-                          }`} />
-                          <h3 className="font-extrabold text-sm text-white truncate">
-                            {room.name}
-                          </h3>
-                        </div>
-                        <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
-                          isCalling ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' :
-                          isBusy ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          {room.status}
-                        </span>
-                      </div>
-
-                      {p ? (
-                        <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-mono font-black text-brand-400">
-                              {room.currentPatient?.token_number || 'IN ROOM'}
-                            </span>
-                            <span className="text-[10px] text-slate-500">Serving Now</span>
-                          </div>
-                          <p className="text-sm font-black text-white truncate">
-                            {p.first_name} {p.last_name}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="py-3 text-center text-xs text-slate-500 font-bold bg-slate-950/30 rounded-2xl border border-slate-800/40">
-                          Room Available
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="my-auto py-16 text-center text-slate-500 font-medium space-y-3">
+                <p className="text-xl text-slate-700 font-bold">No active calls right now</p>
+                <p className="text-sm text-slate-400 max-w-md mx-auto">Patients will be announced automatically as doctors call them into consultation rooms.</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right Column (4 cols): Waiting Patients Queue List */}
-        <div className="lg:col-span-4 bg-slate-900/90 border border-slate-800 rounded-3xl p-6 flex flex-col shadow-2xl overflow-hidden">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+        {/* Right Column (5 cols): Waiting Patients Queue List */}
+        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-3xl p-6 flex flex-col shadow-xs overflow-hidden">
+          <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 mb-4">
             <div className="flex items-center gap-2">
-              <Users className="text-brand-400" size={20} />
-              <h2 className="text-lg font-black uppercase tracking-wider text-white">
+              <Users className="text-brand-600" size={18} />
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">
                 Waiting List
               </h2>
             </div>
-            <span className="text-xs font-black bg-brand-500/20 text-brand-400 px-3 py-1 rounded-full border border-brand-500/30">
+            <span className="text-xs font-bold bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full border border-brand-200">
               {waitingList.length} In Queue
             </span>
           </div>
 
           {/* Scrollable Queue List */}
-          <div className="flex-1 overflow-y-auto space-y-3 pr-1 divide-y divide-slate-800/40">
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-100">
             {waitingList.length === 0 ? (
-              <div className="py-16 text-center text-slate-500 space-y-2">
-                <CheckCircle2 size={36} className="mx-auto text-emerald-500/50" />
-                <p className="text-sm font-bold text-slate-400">All caught up!</p>
-                <p className="text-xs text-slate-600">No waiting patients in the OPD queue right now.</p>
+              <div className="py-16 text-center text-slate-400 space-y-2">
+                <CheckCircle2 size={32} className="mx-auto text-emerald-500/70" />
+                <p className="text-sm font-semibold text-slate-600">All caught up!</p>
+                <p className="text-xs text-slate-400">No waiting patients in the OPD queue right now.</p>
               </div>
             ) : (
               waitingList.map((item, index) => {
@@ -509,24 +440,24 @@ export default function QueueDisplayPage() {
                 return (
                   <div 
                     key={item.id}
-                    className="pt-3 flex items-center justify-between gap-3 hover:bg-slate-800/40 p-2.5 rounded-2xl transition-colors"
+                    className="pt-2.5 flex items-center justify-between gap-3 hover:bg-slate-50 p-2 rounded-xl transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       {/* Index / Token Badge */}
-                      <div className="w-12 h-12 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-brand-400 font-mono font-black text-base shrink-0 shadow-inner">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-brand-700 font-mono font-bold text-sm shrink-0">
                         {token}
                       </div>
 
                       <div className="min-w-0">
-                        <h4 className="text-sm font-black text-white truncate">
+                        <h4 className="text-xs font-bold text-slate-900 truncate">
                           {patientName}
                         </h4>
-                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400 font-medium">
+                        <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 font-medium">
                           <span>{item.departments?.name || 'OPD General'}</span>
                           <span>•</span>
-                          <span className={`font-bold ${
-                            item.priority === 'URGENT' ? 'text-rose-400' :
-                            item.priority === 'HIGH' ? 'text-amber-400' : 'text-slate-400'
+                          <span className={`font-semibold ${
+                            item.priority === 'URGENT' ? 'text-rose-600' :
+                            item.priority === 'HIGH' ? 'text-amber-600' : 'text-slate-500'
                           }`}>
                             {item.priority}
                           </span>
@@ -535,10 +466,10 @@ export default function QueueDisplayPage() {
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-xl border ${
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${
                         item.status === 'TRIAGED'
-                          ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
-                          : 'bg-slate-800 border-slate-700 text-slate-400'
+                          ? 'bg-purple-50 border-purple-200 text-purple-700'
+                          : 'bg-slate-100 border-slate-200 text-slate-600'
                       }`}>
                         {item.status}
                       </span>
@@ -551,26 +482,6 @@ export default function QueueDisplayPage() {
         </div>
 
       </main>
-
-      {/* ── Bottom Broadcast Announcement Ticker ───────────────────── */}
-      <footer className="bg-slate-900 border-t border-slate-800 px-6 py-3 flex items-center gap-4 text-xs font-bold">
-        <div className="flex items-center gap-2 bg-brand-600 text-white px-3 py-1.5 rounded-xl uppercase tracking-wider text-[11px] font-black shrink-0 shadow-md">
-          <Radio size={14} className="animate-pulse" />
-          <span>Notice Board</span>
-        </div>
-        
-        <div className="flex-1 overflow-hidden whitespace-nowrap text-slate-300 font-medium">
-          <div className="inline-block animate-marquee tracking-wide space-x-8">
-            <span>Welcome to {hospitalName}. Please present your token number to the nursing station when your name is announced.</span>
-            <span>•</span>
-            <span>Emergency & Urgent Triage cases are prioritized in clinical workflow.</span>
-            <span>•</span>
-            <span>Pharmacy & Laboratory services are located on Ground Floor Block B.</span>
-            <span>•</span>
-            <span>For assistance, please visit the main Reception desk.</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

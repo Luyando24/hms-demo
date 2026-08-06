@@ -36,6 +36,18 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
         return false;
       }
     }
+    if (step === 2) {
+      if (!formData.role) {
+        setStepError('Please select a valid staff role.');
+        return false;
+      }
+    }
+    if (step === 3) {
+      if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+        setStepError('Please enter a valid work email address.');
+        return false;
+      }
+    }
     setStepError(null);
     return true;
   };
@@ -53,8 +65,24 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevent submission on early steps if user presses Enter
+    if (currentStep < 3) {
+      handleNext();
+      return;
+    }
+
     if (!validateStep(1)) {
       setCurrentStep(1);
+      return;
+    }
+
+    if (!validateStep(2)) {
+      setCurrentStep(2);
+      return;
+    }
+
+    if (!validateStep(3)) {
       return;
     }
 
