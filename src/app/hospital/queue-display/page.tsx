@@ -55,6 +55,7 @@ export default function QueueDisplayPage() {
   const [departments, setDepartments] = useState<string[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
   const [nowCalling, setNowCalling] = useState<PatientQueueItem | null>(null);
+  const [activeSlideIndex, setActiveSlideIndex] = useState<number>(0);
   
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
@@ -64,7 +65,7 @@ export default function QueueDisplayPage() {
   const [hospitalName, setHospitalName] = useState<string>('HMS - Kunda Health Care');
 
   const supabase = createClient();
-  const prevCallingId = useRef<string | null>(null);
+  const announcedIdsRef = useRef<Set<string>>(new Set());
 
   // Live Digital Clock & Fullscreen change listener
   useEffect(() => {
@@ -124,17 +125,12 @@ export default function QueueDisplayPage() {
       });
       setDepartments(Array.from(deptsSet));
 
-      // Determine currently called patient
-      const callingItem = items.find(i => i.status === 'CALLING') || items.find(i => i.status === 'CONSULTATION');
-      if (callingItem) {
-        setNowCalling(callingItem);
-        // Announce voice alert if new patient is called
-        if (callingItem.id !== prevCallingId.current) {
-          prevCallingId.current = callingItem.id;
-          announcePatientCall(callingItem);
-        }
-      } else {
-        setNowCalling(null);
+      // Determine active calling items across all rooms
+      const callingList = items.filter(i => i.status === 'CALLING');
+      const unannounced = callingList.filter(i => !announcedIdsRef.current.has(i.id));
+      if (unannounced.length > 0) {
+        unannounced.forEach(i => announcedIdsRef.current.add(i.id));
+        announceAllCallingPatients(callingList);
       }
 
       // 2. Fetch Rooms
@@ -168,17 +164,8 @@ export default function QueueDisplayPage() {
     // Subscribe to real-time walkin_queue changes
     const channel = supabase
       .channel('tv-queue-display-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'walkin_queue' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'walkin_queue' }, () => {
         void loadQueueData();
-        // If a new CALLING status comes in
-        if (payload.eventType === 'UPDATE' && payload.new?.status === 'CALLING') {
-          const p = payload.new;
-          playVoiceNotification(
-            'Patient Announcement',
-            `Token ${p.token_number || p.id.slice(0, 4)}. Please proceed to room.`,
-            'info'
-          );
-        }
       })
       .subscribe();
 
@@ -188,15 +175,20 @@ export default function QueueDisplayPage() {
   }, []);
 
   const announcePatientCall = (item: PatientQueueItem) => {
-    const patientName = item.patients ? `${item.patients.first_name} ${item.patients.last_name}` : 'Patient';
-    const token = item.token_number ? `Token ${item.token_number}` : '';
-    const roomName = item.rooms?.name ? `Room ${item.rooms.name}` : 'the designated Consultation Room';
-    
-    playVoiceNotification(
-      'Attention Please',
-      `${token} ${patientName}. Please report to ${roomName}.`,
-      'info'
-    );
+    announceAllCallingPatients([item]);
+  };
+
+  const announceAllCallingPatients = (callingItems: PatientQueueItem[]) => {
+    if (!callingItems || callingItems.length === 0) return;
+
+    const announcements = callingItems.map(item => {
+      const patientName = item.patients ? `${item.patients.first_name} ${item.patients.last_name}` : 'Patient';
+      const token = item.token_number ? `Token ${item.token_number}` : '';
+      const roomName = item.rooms?.name ? `Room ${item.rooms.name}` : 'Consultation Room';
+      return `${token} ${patientName}, please report to ${roomName}.`;
+    });
+
+    playVoiceNotification('Attention Please', announcements.join(' '), 'info');
   };
 
   const toggleSound = () => {
@@ -227,6 +219,23 @@ export default function QueueDisplayPage() {
   });
 
   const waitingList = filteredQueue.filter(i => i.status === 'WAITING' || i.status === 'TRIAGED');
+  const nowCallingList = filteredQueue.filter(i => i.status === 'CALLING' || i.status === 'CONSULTATION');
+
+  // Auto-slide through active calls every 4.5 seconds
+  useEffect(() => {
+    if (nowCallingList.length <= 1) {
+      setActiveSlideIndex(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setActiveSlideIndex((prev) => (prev + 1) % nowCallingList.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [nowCallingList.length]);
+
+  const currentCallingItem = nowCallingList.length > 0
+    ? nowCallingList[activeSlideIndex % nowCallingList.length]
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between overflow-hidden select-none">
@@ -330,7 +339,7 @@ export default function QueueDisplayPage() {
         <div className="lg:col-span-7 flex flex-col overflow-hidden">
           
           {/* NOW CALLING Spotlight Card */}
-          <div className="relative flex-1 bg-gradient-to-br from-emerald-50/90 via-white to-sky-50/70 border-2 border-emerald-500/40 rounded-3xl p-8 lg:p-12 shadow-xs flex flex-col justify-between overflow-hidden">
+          <div className="relative flex-1 bg-white border-2 border-emerald-500/40 rounded-3xl p-8 lg:p-12 shadow-xs flex flex-col justify-between overflow-hidden">
             
             <div className="flex items-center justify-between border-b border-slate-200/80 pb-4 mb-6">
               <div className="flex items-center gap-3">
@@ -344,9 +353,9 @@ export default function QueueDisplayPage() {
               </div>
 
               <div className="flex items-center gap-3">
-                {nowCalling && (
+                {nowCallingList.length > 0 && (
                   <button
-                    onClick={() => announcePatientCall(nowCalling)}
+                    onClick={() => announceAllCallingPatients(nowCallingList)}
                     className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all"
                   >
                     <Radio size={15} className="animate-pulse" />
@@ -390,54 +399,80 @@ export default function QueueDisplayPage() {
               </div>
             </div>
 
-            {nowCalling ? (
-              <div className="my-auto grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
-                {/* Large Token Badge */}
-                <div className="md:col-span-5 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-8 text-center text-white shadow-lg border border-emerald-500/30">
-                  <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-100 block mb-2">
-                    Token Number
-                  </span>
-                  <div className="text-6xl lg:text-7xl font-black tracking-tight font-mono">
-                    {nowCalling.token_number || nowCalling.id.slice(0, 5).toUpperCase()}
-                  </div>
-                  <div className="mt-4 inline-block bg-white/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider">
-                    {nowCalling.priority} Priority
-                  </div>
-                </div>
-
-                {/* Patient & Room Details */}
-                <div className="md:col-span-7 space-y-4">
-                  <div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">Patient Name</span>
-                    <h3 className="text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                      {nowCalling.patients ? `${nowCalling.patients.first_name} ${nowCalling.patients.last_name}` : 'Walk-in Patient'}
-                    </h3>
+            {currentCallingItem ? (
+              <div className="my-auto flex flex-col justify-between flex-1 overflow-hidden">
+                <div 
+                  key={currentCallingItem.id}
+                  className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center my-auto transition-all duration-500 ease-in-out animate-in fade-in slide-in-from-right-4"
+                >
+                  {/* Large Token Badge */}
+                  <div className="md:col-span-5 bg-emerald-600 rounded-3xl p-8 text-center text-white shadow-lg border border-emerald-500/30">
+                    <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-100 block mb-2">
+                      Token Number
+                    </span>
+                    <div className="text-6xl lg:text-7xl font-black tracking-tight font-mono">
+                      {currentCallingItem.token_number || currentCallingItem.id.slice(0, 5).toUpperCase()}
+                    </div>
+                    <div className="mt-4 inline-block bg-white/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider">
+                      {currentCallingItem.priority} Priority
+                    </div>
                   </div>
 
-                  <div className="pt-2 flex flex-wrap items-center gap-3">
-                    <div className="bg-white border border-slate-200 px-5 py-3 rounded-2xl flex items-center gap-3 shadow-xs">
-                      <DoorOpen className="text-emerald-600" size={26} />
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Proceed to Room</span>
-                        <span className="text-lg font-bold text-emerald-700">
-                          {nowCalling.rooms?.name || 'General Consultation'}
-                        </span>
-                      </div>
+                  {/* Patient & Room Details */}
+                  <div className="md:col-span-7 space-y-4">
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">Patient Name</span>
+                      <h3 className="text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight uppercase">
+                        {currentCallingItem.patients ? `${currentCallingItem.patients.first_name} ${currentCallingItem.patients.last_name}` : 'Walk-in Patient'}
+                      </h3>
                     </div>
 
-                    {nowCalling.departments?.name && (
+                    <div className="pt-2 flex flex-wrap items-center gap-3">
                       <div className="bg-white border border-slate-200 px-5 py-3 rounded-2xl flex items-center gap-3 shadow-xs">
-                        <Stethoscope className="text-brand-600" size={26} />
+                        <DoorOpen className="text-emerald-600" size={26} />
                         <div>
-                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Department</span>
-                          <span className="text-base font-semibold text-slate-800">
-                            {nowCalling.departments.name}
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Proceed to Room</span>
+                          <span className="text-lg font-bold text-emerald-700 uppercase">
+                            {currentCallingItem.rooms?.name || 'General Consultation'}
                           </span>
                         </div>
                       </div>
-                    )}
+
+                      {currentCallingItem.departments?.name && (
+                        <div className="bg-white border border-slate-200 px-5 py-3 rounded-2xl flex items-center gap-3 shadow-xs">
+                          <Stethoscope className="text-brand-600" size={26} />
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Department</span>
+                            <span className="text-base font-semibold text-slate-800 uppercase">
+                              {currentCallingItem.departments.name}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
+
+                {/* Carousel Pagination Dots for Multiple Calling Rooms */}
+                {nowCallingList.length > 1 && (
+                  <div className="flex items-center justify-center gap-2 pt-4 border-t border-slate-100/80 mt-auto">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-2">
+                      Active Call {(activeSlideIndex % nowCallingList.length) + 1} of {nowCallingList.length}
+                    </span>
+                    {nowCallingList.map((item, idx) => (
+                      <button
+                        key={item.id}
+                        onClick={() => setActiveSlideIndex(idx)}
+                        className={`h-2.5 rounded-full transition-all ${
+                          idx === (activeSlideIndex % nowCallingList.length)
+                            ? 'w-8 bg-emerald-600'
+                            : 'w-2.5 bg-slate-200 hover:bg-slate-300'
+                        }`}
+                        title={`View Call for ${item.rooms?.name || 'Room'}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="my-auto py-16 text-center text-slate-500 font-medium space-y-3">
@@ -462,8 +497,8 @@ export default function QueueDisplayPage() {
             </span>
           </div>
 
-          {/* Scrollable Queue List */}
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-100">
+          {/* Queue List (Scrollbar hidden) */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-100 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {waitingList.length === 0 ? (
               <div className="py-16 text-center text-slate-400 space-y-2">
                 <CheckCircle2 size={32} className="mx-auto text-emerald-500/70" />
@@ -488,11 +523,11 @@ export default function QueueDisplayPage() {
                       </div>
 
                       <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-slate-900 truncate">
+                        <h4 className="text-xs font-bold text-slate-900 truncate uppercase">
                           {patientName}
                         </h4>
                         <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 font-medium">
-                          <span>{item.departments?.name || 'OPD General'}</span>
+                          <span className="uppercase">{item.rooms?.name || item.departments?.name || 'OPD General'}</span>
                           <span>•</span>
                           <span className={`font-semibold ${
                             item.priority === 'URGENT' ? 'text-rose-600' :

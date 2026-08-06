@@ -186,8 +186,8 @@ export function playVoiceNotification(
   // 2. Prepare speech text
   let speechText = title;
   if (message && message !== title) {
-    // Keep sentence brief and natural
-    const shortMsg = message.length > 100 ? message.substring(0, 100) + '...' : message;
+    // Keep sentence natural for announcements
+    const shortMsg = message.length > 300 ? message.substring(0, 300) + '...' : message;
     speechText = `${title}. ${shortMsg}`;
   }
 
