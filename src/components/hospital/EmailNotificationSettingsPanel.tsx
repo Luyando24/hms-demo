@@ -11,6 +11,7 @@ import {
   Send,
 } from "lucide-react";
 import {
+  getEmailNotificationSettingsAction,
   sendTestNotificationEmailAction,
   updateEmailNotificationSettingsAction,
 } from "@/app/hospital/settings/actions";
@@ -20,7 +21,6 @@ import {
   DEFAULT_EMAIL_NOTIFICATION_SETTINGS,
   type EmailNotificationSettingsInput,
 } from "@/types/email-notifications";
-import { createClient } from "@/utils/supabase/client";
 
 interface EmailDeliverySummary {
   id: string;
@@ -110,28 +110,21 @@ export function EmailNotificationSettingsPanel({
       setLoading(false);
       return;
     }
-    const supabase = createClient();
-    const [{ data: settings, error: settingsError }, { data: recentDeliveries }] =
-      await Promise.all([
-        supabase
-          .from("email_notification_settings")
-          .select("*")
-          .eq("singleton_key", true)
-          .maybeSingle(),
-        supabase
-          .from("email_deliveries")
-          .select("id, notification_type, recipient_email, status, subject, created_at")
-          .order("created_at", { ascending: false })
-          .limit(6),
-      ]);
 
-    if (settingsError) {
+    const result = await getEmailNotificationSettingsAction();
+
+    if (!result.success) {
       setStatus({
         type: "error",
         title: "Notification Settings Unavailable",
-        message: settingsError.message,
+        message: result.error,
       });
-    } else if (settings) {
+      setLoading(false);
+      return;
+    }
+
+    const settings = result.settings;
+    if (settings) {
       setForm({
         enabled: settings.enabled,
         manager_report_email: settings.manager_report_email || "",
@@ -176,7 +169,7 @@ export function EmailNotificationSettingsPanel({
         ),
       });
     }
-    setDeliveries((recentDeliveries || []) as EmailDeliverySummary[]);
+    setDeliveries(result.deliveries as EmailDeliverySummary[]);
     setLoading(false);
   }, [canEdit]);
 

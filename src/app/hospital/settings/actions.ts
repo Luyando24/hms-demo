@@ -69,6 +69,44 @@ function actionError(error: unknown): string {
   return error instanceof Error ? error.message : 'The operation could not be completed.';
 }
 
+export async function getEmailNotificationSettingsAction() {
+  try {
+    await requireRole(['ADMIN']);
+    const adminSupabase = createAdminClient();
+    const [
+      { data: settings, error: settingsError },
+      { data: deliveries },
+    ] = await Promise.all([
+      adminSupabase
+        .from('email_notification_settings')
+        .select('*')
+        .eq('singleton_key', true)
+        .maybeSingle(),
+      adminSupabase
+        .from('email_deliveries')
+        .select('id, notification_type, recipient_email, status, subject, created_at')
+        .order('created_at', { ascending: false })
+        .limit(6),
+    ]);
+
+    if (settingsError) throw settingsError;
+    if (!settings) throw new Error('Email notification settings have not been initialized.');
+
+    return {
+      success: true as const,
+      settings,
+      deliveries: deliveries ?? [],
+    };
+  } catch (error) {
+    return {
+      success: false as const,
+      error: actionError(error),
+      settings: null,
+      deliveries: [],
+    };
+  }
+}
+
 export async function updateEmailNotificationSettingsAction(
   input: EmailNotificationSettingsInput,
 ) {
