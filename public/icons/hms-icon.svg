@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">HMSdemo app icon</title>
+  <desc id="description">A white medical cross inside an emerald shield on a dark blue background.</desc>
+  <defs>
+    <linearGradient id="background" x1="128" y1="96" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="344" y1="256" x2="700" y2="794" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34d399"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#background)"/>
+  <circle cx="512" cy="512" r="340" fill="#0f766e" opacity="0.24"/>
+  <path d="M512 214c78 58 161 84 246 89v177c0 159-95 275-246 334-151-59-246-175-246-334V303c85-5 168-31 246-89Z" fill="url(#shield)" stroke="#a7f3d0" stroke-width="24" stroke-linejoin="round"/>
+  <rect x="454" y="342" width="116" height="340" rx="34" fill="#fff"/>
+  <rect x="342" y="454" width="340" height="116" rx="34" fill="#fff"/>
+</svg>

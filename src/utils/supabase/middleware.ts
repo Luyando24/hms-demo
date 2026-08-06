@@ -61,9 +61,16 @@ export async function updateSession(request: NextRequest) {
 
   const isWorkforceLoginRoute = pathname === '/login'
   const isPatientLoginRoute = pathname === '/patient/login'
+  const isPwaAssetRoute =
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/sw.js' ||
+    pathname === '/offline.html' ||
+    pathname.startsWith('/icons/') ||
+    /^\/swe-worker-.+\.js$/.test(pathname)
   const isPublicRoute =
     isWorkforceLoginRoute ||
     isPatientLoginRoute ||
+    isPwaAssetRoute ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/book-appointment')
 

@@ -20,6 +20,12 @@
 # production
 /build
 
+# Serwist generated service-worker bundles
+/public/sw.js
+/public/sw.js.map
+/public/swe-worker-*.js
+/public/swe-worker-*.js.map
+
 # misc
 .DS_Store
 *.pem
