@@ -36,6 +36,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ADMIN: [
     '/hospital/dashboard',
     '/hospital/reception',
+    '/hospital/appointments',
     '/hospital/patients',
     '/hospital/er',
     '/hospital/ipd',
@@ -59,6 +60,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
   DOCTOR: [
     '/hospital/dashboard',
+    '/hospital/appointments',
     '/hospital/patients',
     '/hospital/er',
     '/hospital/ipd',
@@ -73,6 +75,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   NURSE: [
     '/hospital/dashboard',
     '/hospital/reception',
+    '/hospital/appointments',
     '/hospital/patients',
     '/hospital/er',
     '/hospital/ipd',
@@ -105,6 +108,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ACCOUNTANT: [
     '/hospital/dashboard',
     '/hospital/reception',
+    '/hospital/appointments',
     '/hospital/patients',
     '/hospital/billing',
     '/hospital/finance',
@@ -114,6 +118,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   RECEPTIONIST: [
     '/hospital/dashboard',
     '/hospital/reception',
+    '/hospital/appointments',
     '/hospital/patients',
     '/hospital/billing',
     '/hospital/settings',
@@ -125,6 +130,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
   STAFF: [
     '/hospital/dashboard',
+    '/hospital/appointments',
     '/hospital/patients',
     '/hospital/settings',
     '/hospital/queue-display',
