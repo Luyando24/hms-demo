@@ -403,7 +403,7 @@ export function PublicAppointmentBookingForm({ departments, doctors, settings }:
                   </div>
                   <div>
                     <div className="font-extrabold text-sm">Dr. {doc.first_name} {doc.last_name}</div>
-                    <div className="text-[11px] text-slate-500 font-medium">{doc.department_name || doc.role}</div>
+                    <div className="text-[11px] text-slate-500 font-medium">{doc.department_name || 'Medical Specialist'}</div>
                   </div>
                 </button>
               ))}

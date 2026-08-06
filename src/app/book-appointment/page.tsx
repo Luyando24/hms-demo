@@ -18,7 +18,7 @@ export default async function PublicBookAppointmentPage() {
     adminSupabase
       .from('profiles')
       .select('id, first_name, last_name, role, department_id, departments(name)')
-      .neq('role', 'PATIENT')
+      .eq('role', 'DOCTOR')
       .order('first_name'),
   ]);
 

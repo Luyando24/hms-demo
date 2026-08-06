@@ -70,8 +70,13 @@ async function processAppointmentJob(
   const [{ data: patient, error: patientError }, { data: provider }] =
     await Promise.all([patientRequest, providerRequest]);
   if (patientError) throw patientError;
-  if (!patient?.email) {
-    return { skipped: true, reason: "The patient does not have an email address." };
+  const recipients = [...new Set([
+    ...(patient?.email ? [patient.email.trim().toLowerCase()] : []),
+    ...(settings.manager_report_email ? [settings.manager_report_email.trim().toLowerCase()] : []),
+  ])];
+
+  if (!recipients.length) {
+    return { skipped: true, reason: "No recipient email address available for appointment notification." };
   }
 
   const appointmentWhen = formatDateTime(
@@ -115,25 +120,86 @@ async function processAppointmentJob(
     rows.push(["Provider", providerName]);
   }
   const portalUrl = APP_URL ? `${APP_URL}/patient/portal/appointments` : "";
-  const html = emailLayout(
-    hospitalName,
-    content.title,
-    content.intro,
-    rows,
-    portalUrl ? { label: "View appointment", href: portalUrl } : undefined,
-    "For privacy, this email does not include medical or appointment-reason details.",
-  );
+  const adminUrl = APP_URL ? `${APP_URL}/hospital/opd` : "";
 
-  await sendEmail(admin, {
-    notificationType: job.notification_type,
-    recipient: patient.email,
-    subject: `${hospitalName}: ${content.title}`,
-    html,
-    text: plainText(html),
-    idempotencyKey: `job/${job.id}/${patient.email.toLowerCase()}`,
-    jobId: job.id,
-    metadata: { appointment_id: job.entity_id },
-  });
+  const managerEmail = settings.manager_report_email?.trim().toLowerCase() || null;
+  const patientEmail = patient?.email?.trim().toLowerCase() || null;
+
+  for (const recipient of recipients) {
+    const isManager = recipient === managerEmail && recipient !== patientEmail;
+
+    let subject: string;
+    let html: string;
+
+    if (isManager) {
+      const managerCopy: Record<string, { title: string; intro: string }> = {
+        appointment_confirmation: {
+          title: `New appointment booked — ${patientName}`,
+          intro: `A new patient appointment has been registered in the system for ${patientName}.`,
+        },
+        appointment_rescheduled: {
+          title: `Appointment rescheduled — ${patientName}`,
+          intro: `The appointment schedule for ${patientName} has been updated.`,
+        },
+        appointment_cancelled: {
+          title: `Appointment cancelled — ${patientName}`,
+          intro: `The appointment for ${patientName} has been cancelled.`,
+        },
+        appointment_reminder_24h: {
+          title: `Upcoming appointment tomorrow — ${patientName}`,
+          intro: `Reminder: ${patientName} has an appointment scheduled for tomorrow.`,
+        },
+        appointment_reminder_2h: {
+          title: `Upcoming appointment in 2 hours — ${patientName}`,
+          intro: `Reminder: ${patientName} has an appointment scheduled in 2 hours.`,
+        },
+      };
+      const mgrContent = managerCopy[job.notification_type] || {
+        title: `Appointment update — ${patientName}`,
+        intro: `An appointment update occurred for ${patientName}.`,
+      };
+
+      const mgrRows: Array<[string, string]> = [
+        ["Patient name", patientName],
+        ["Patient email", patientEmail || "Not provided"],
+        ["Date and time", appointmentWhen],
+      ];
+      if (job.notification_type !== "appointment_cancelled") {
+        mgrRows.push(["Assigned provider", providerName]);
+      }
+
+      subject = `${hospitalName}: ${mgrContent.title}`;
+      html = emailLayout(
+        hospitalName,
+        mgrContent.title,
+        mgrContent.intro,
+        mgrRows,
+        adminUrl ? { label: "Open OPD / Appointments", href: adminUrl } : undefined,
+        "Administrative notification for hospital operations.",
+      );
+    } else {
+      subject = `${hospitalName}: ${content.title}`;
+      html = emailLayout(
+        hospitalName,
+        content.title,
+        content.intro,
+        rows,
+        portalUrl ? { label: "View appointment", href: portalUrl } : undefined,
+        "For privacy, this email does not include medical or appointment-reason details.",
+      );
+    }
+
+    await sendEmail(admin, {
+      notificationType: job.notification_type,
+      recipient,
+      subject,
+      html,
+      text: plainText(html),
+      idempotencyKey: `job/${job.id}/${recipient}`,
+      jobId: job.id,
+      metadata: { appointment_id: job.entity_id },
+    });
+  }
   return { skipped: false, reason: null };
 }
 
