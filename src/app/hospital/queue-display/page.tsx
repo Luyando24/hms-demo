@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   Volume2, 
   VolumeX, 
@@ -14,7 +15,8 @@ import {
   CheckCircle2,
   Users,
   RefreshCw,
-  ArrowLeft
+  ArrowLeft,
+  LogOut
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { playVoiceNotification, isVoiceEnabled, setVoiceEnabled } from '@/utils/voiceNotification';
@@ -64,8 +66,14 @@ export default function QueueDisplayPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [hospitalName, setHospitalName] = useState<string>('HMS - Kunda Health Care');
 
+  const router = useRouter();
   const supabase = createClient();
   const announcedIdsRef = useRef<Set<string>>(new Set());
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   // Live Digital Clock & Fullscreen change listener
   useEffect(() => {
@@ -243,14 +251,14 @@ export default function QueueDisplayPage() {
       {!isFullscreen && (
         <header className="bg-white/90 border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-xs backdrop-blur-md">
           <div className="flex items-center gap-4">
-            <Link
-              href="/hospital/dashboard"
-              className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-2xl transition-all flex items-center gap-2 text-xs font-semibold"
-              title="Return to Hospital Console Dashboard"
+            <button
+              onClick={handleLogout}
+              className="p-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-2xl transition-all flex items-center gap-2 text-xs font-semibold shadow-xs"
+              title="Sign out of Waiting Room Display"
             >
-              <ArrowLeft size={18} />
-              <span className="hidden sm:inline">Console</span>
-            </Link>
+              <LogOut size={18} />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
             <div className="p-2.5 bg-brand-50 border border-brand-200 text-brand-600 rounded-2xl flex items-center justify-center">
               <Tv size={24} className="animate-pulse" />
             </div>
