@@ -75,11 +75,19 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
         throw new Error(result.error);
       }
 
-      setStatus({
-        type: 'success',
-        title: 'Staff Member Added',
-        message: `${formData.firstName} ${formData.lastName} has been registered and invited to set a secure password.`
-      });
+      if (result.tempPassword) {
+        setStatus({
+          type: 'success',
+          title: 'Staff Account Created',
+          message: `${formData.firstName} ${formData.lastName} (${result.staffNumber}) has been registered. Initial Password: ${result.tempPassword}`
+        });
+      } else {
+        setStatus({
+          type: 'success',
+          title: 'Staff Member Added',
+          message: `${formData.firstName} ${formData.lastName} (${result.staffNumber}) has been registered and sent an invitation email.`
+        });
+      }
 
     } catch (err: unknown) {
       setStatus({

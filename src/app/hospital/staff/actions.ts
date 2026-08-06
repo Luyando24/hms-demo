@@ -65,6 +65,10 @@ export async function createStaffMember(input: unknown) {
       formData.staffNumber || generateSecureStaffId(formData.role);
     const adminSupabase = createAdminClient();
 
+    let staffId: string | null = null;
+    let tempPassword: string | undefined = undefined;
+
+    // 1. Try sending invitation email first
     const { data: invitation, error: inviteError } =
       await adminSupabase.auth.admin.inviteUserByEmail(formData.email, {
         data: {
@@ -72,11 +76,38 @@ export async function createStaffMember(input: unknown) {
           last_name: formData.lastName,
         },
       });
-    if (inviteError || !invitation.user) {
-      throw inviteError || new Error('Supabase did not return the invited staff user.');
+
+    if (inviteError || !invitation?.user) {
+      // 2. Fallback to direct admin user creation if email rate limit is exceeded
+      tempPassword = `Hms@${Math.random().toString(36).slice(-6)}${Math.floor(10 + Math.random() * 90)}!`;
+      const { data: created, error: createError } = await adminSupabase.auth.admin.createUser({
+        email: formData.email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+        },
+        app_metadata: {
+          role: formData.role,
+          staff_number: assignedStaffNumber,
+        },
+      });
+
+      if (createError || !created?.user) {
+        throw createError || inviteError || new Error('Could not create staff user account.');
+      }
+
+      staffId = created.user.id;
+    } else {
+      staffId = invitation.user.id;
     }
 
-    const staffId = invitation.user.id;
+    if (!staffId) {
+      throw new Error('Could not determine staff user ID.');
+    }
+
+    // 3. Ensure app_metadata & user_metadata are updated
     const { error: metadataError } = await adminSupabase.auth.admin.updateUserById(staffId, {
       app_metadata: {
         role: formData.role,
@@ -88,16 +119,17 @@ export async function createStaffMember(input: unknown) {
       },
     });
 
+    // 4. Upsert profile record
     const { error: profileError } = await adminSupabase
       .from('profiles')
-      .update({
+      .upsert({
+        id: staffId,
         first_name: formData.firstName,
         last_name: formData.lastName,
         email: formData.email,
         staff_number: assignedStaffNumber,
         role: formData.role,
-      })
-      .eq('id', staffId);
+      });
 
     if (metadataError || profileError) {
       await adminSupabase.auth.admin.deleteUser(staffId);
@@ -109,6 +141,7 @@ export async function createStaffMember(input: unknown) {
       success: true,
       userId: staffId,
       staffNumber: assignedStaffNumber,
+      tempPassword,
     };
   } catch (error) {
     return { success: false, error: actionError(error) };
