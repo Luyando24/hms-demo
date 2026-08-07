@@ -87,21 +87,35 @@ export async function bookPublicAppointmentAction(input: unknown) {
       fileNumber = newPatient.file_number;
     }
 
-    // 3. Create appointment
-    const { data: appointment, error: appointmentError } = await admin
+    // 3. Check if an active appointment already exists for this patient and time slot
+    const { data: existingAppt } = await admin
       .from('appointments')
-      .insert({
-        patient_id: patientId,
-        provider_id: data.provider_id,
-        appointment_date: appointmentDate.toISOString(),
-        reason: data.reason,
-        status: 'SCHEDULED',
-      })
       .select('id, appointment_date, status')
-      .single();
+      .eq('patient_id', patientId)
+      .eq('appointment_date', appointmentDate.toISOString())
+      .neq('status', 'CANCELLED')
+      .limit(1)
+      .maybeSingle();
 
-    if (appointmentError) {
-      return { error: `Failed to book appointment: ${appointmentError.message}` };
+    let appointment = existingAppt;
+
+    if (!appointment) {
+      const { data: newAppt, error: appointmentError } = await admin
+        .from('appointments')
+        .insert({
+          patient_id: patientId,
+          provider_id: data.provider_id,
+          appointment_date: appointmentDate.toISOString(),
+          reason: data.reason,
+          status: 'SCHEDULED',
+        })
+        .select('id, appointment_date, status')
+        .single();
+
+      if (appointmentError) {
+        return { error: `Failed to book appointment: ${appointmentError.message}` };
+      }
+      appointment = newAppt;
     }
 
     // Note: email_notification_jobs is enqueued automatically by the

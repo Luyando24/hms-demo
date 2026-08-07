@@ -126,7 +126,7 @@ async function processAppointmentJob(
   const patientEmail = patient?.email?.trim().toLowerCase() || null;
 
   for (const recipient of recipients) {
-    const isManager = recipient === managerEmail && recipient !== patientEmail;
+    const isManager = recipient === managerEmail;
 
     let subject: string;
     let html: string;
