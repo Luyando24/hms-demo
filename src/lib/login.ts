@@ -22,11 +22,16 @@ export type LoginResult =
       limit?: string;
     };
 
+function parseCoordinate(val: unknown): number | null {
+  if (val === null || val === undefined || val === '') return null;
+  const num = Number(val);
+  if (isNaN(num) || !isFinite(num) || num === 0) return null;
+  return num;
+}
+
 const loginSchema = z.object({
   identifier: z.string().trim().min(3).max(254),
   password: z.string().min(8).max(256),
-  latitude: z.union([z.coerce.number(), z.null()]).optional(),
-  longitude: z.union([z.coerce.number(), z.null()]).optional(),
 });
 
 function isRoleAllowedForAudience(
@@ -44,21 +49,18 @@ export async function authenticateLogin(
   formData: FormData,
   audience: LoginAudience,
 ): Promise<LoginResult> {
-  const rawLat = formData.get('latitude');
-  const rawLng = formData.get('longitude');
-
   const parsed = loginSchema.safeParse({
     identifier: formData.get('identifier'),
     password: formData.get('password'),
-    latitude: rawLat !== null && rawLat !== '' ? rawLat : null,
-    longitude: rawLng !== null && rawLng !== '' ? rawLng : null,
   });
 
   if (!parsed.success) {
     return { ok: false, reason: 'invalid-input' };
   }
 
-  const { identifier, password, latitude, longitude } = parsed.data;
+  const { identifier, password } = parsed.data;
+  const latitude = parseCoordinate(formData.get('latitude'));
+  const longitude = parseCoordinate(formData.get('longitude'));
   let effectiveEmail = identifier;
 
   if (!identifier.includes('@')) {

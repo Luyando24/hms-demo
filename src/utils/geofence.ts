@@ -69,6 +69,17 @@ export function isLocationWithinGeofence(
 ): GeofenceCheckResult {
   const roleUpper = userRole.toUpperCase();
 
+  // 0. Sanity check user coordinates
+  if (!userLat || !userLng || userLat === 0 || userLng === 0) {
+    return {
+      allowed: false,
+      distanceMeters: 0,
+      formattedDistance: 'Location Unknown',
+      formattedLimit: formatDistance(config.radiusMeters),
+      reason: 'out-of-bounds',
+    };
+  }
+
   // 1. If geofence is disabled globally
   if (!config.enabled) {
     return {
