@@ -11,10 +11,11 @@ import {
   Lock,
   Stethoscope,
   User,
-  MapPin,
   Loader2,
   RefreshCw,
   CheckCircle2,
+  Compass,
+  ShieldCheck,
   Info,
 } from "lucide-react";
 
@@ -80,6 +81,9 @@ function LoginContent({ audience, action }: LoginFormProps) {
   const pageContent = content[audience];
   const IdentifierIcon = pageContent.Icon;
 
+  // Screen step: 1 = Initial Location Check (workforce only), 2 = Credentials Screen
+  const [step, setStep] = useState<1 | 2>(audience === 'workforce' ? 1 : 2);
+
   const [coords, setCoords] = useState<{ lat: number | null; lng: number | null }>({
     lat: null,
     lng: null,
@@ -115,6 +119,11 @@ function LoginContent({ audience, action }: LoginFormProps) {
         setCoords({ lat: latitude, lng: longitude });
         setLocationStatus('acquired');
         setLocating(false);
+
+        // Auto-advance smoothly to Screen 2 after brief verification confirmation
+        setTimeout(() => {
+          setStep(2);
+        }, 500);
       },
       (err) => {
         console.warn('Auto GPS acquisition error:', err.code, err.message);
@@ -122,15 +131,15 @@ function LoginContent({ audience, action }: LoginFormProps) {
         if (err.code === 1) {
           setLocationStatus('denied');
           setLocationError(
-            'Location access denied. On Safari iOS, tap "aA" in address bar -> Website Settings -> Location: Allow.'
+            'Location access denied. On Safari iOS, tap the website settings icon (aA) in the address bar -> Website Settings -> Location: Allow.'
           );
         } else if (err.code === 3) {
           setLocationStatus('timeout');
-          setLocationError('GPS detection timed out. Tap retry button to check location again.');
+          setLocationError('GPS detection timed out. Tap "Retry Location Check" below.');
         } else {
           setLocationStatus('error');
           setLocationError(
-            'Unable to acquire GPS position. Please check Location Services on device.'
+            'Unable to acquire GPS position. Please check device Location Services.'
           );
         }
       },
@@ -142,7 +151,7 @@ function LoginContent({ audience, action }: LoginFormProps) {
     );
   }, []);
 
-  // Automatic GPS acquisition on mount
+  // Automatic GPS acquisition on mount for Screen 1
   useEffect(() => {
     if (audience === 'workforce') {
       requestLocation();
@@ -172,55 +181,65 @@ function LoginContent({ audience, action }: LoginFormProps) {
           {serverError && (
             <div
               role="alert"
-              className="mb-6 flex items-start gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-rose-700"
+              className="mb-6 flex items-start gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-rose-700 animate-in fade-in"
             >
               <AlertCircle size={20} className="shrink-0 mt-0.5" />
               <div className="text-[13px] font-medium leading-relaxed">
-                <p className="font-bold">Sign In Error</p>
+                <p className="font-bold">Access Error</p>
                 <p>{serverError}</p>
               </div>
             </div>
           )}
 
-          <form action={action} className="space-y-5">
-            {audience === 'workforce' && (
-              <div className="space-y-2">
-                <input
-                  type="hidden"
-                  name="latitude"
-                  value={coords.lat !== null ? String(coords.lat) : ''}
-                />
-                <input
-                  type="hidden"
-                  name="longitude"
-                  value={coords.lng !== null ? String(coords.lng) : ''}
-                />
+          {/* SCREEN 1: FIRST SCREEN LOCATION VERIFICATION ANIMATION */}
+          {audience === 'workforce' && step === 1 && (
+            <div className="py-4 space-y-6 text-center animate-in fade-in duration-300">
+              {locating ? (
+                <div className="space-y-5">
+                  <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400/40 opacity-75" />
+                    <div className="relative w-20 h-20 rounded-3xl bg-brand-50 border border-brand-200 text-brand-600 flex items-center justify-center shadow-inner">
+                      <Compass className="animate-spin text-brand-600" size={36} />
+                    </div>
+                  </div>
 
-                {/* Auto GPS Detection Banner */}
-                <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-3.5 border border-slate-200 text-[12px]">
-                  <div className="flex items-center gap-2.5">
-                    {locationStatus === 'acquired' ? (
-                      <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-                    ) : locating ? (
-                      <Loader2 size={18} className="animate-spin text-brand-600 shrink-0" />
-                    ) : (
-                      <MapPin size={18} className="text-amber-500 shrink-0" />
-                    )}
-                    <div className="flex flex-col">
-                      <span className="font-bold text-slate-900">
-                        {locationStatus === 'acquired'
-                          ? "GPS Active"
-                          : locating
-                          ? "Detecting GPS Location..."
-                          : "Location Pending"}
-                      </span>
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        {coords.lat !== null
-                          ? `${coords.lat.toFixed(5)}, ${coords.lng?.toFixed(5)}`
-                          : locationError
-                          ? "Access required"
-                          : "Acquiring coordinates..."}
-                      </span>
+                  <div className="space-y-1.5">
+                    <h2 className="text-lg font-black text-slate-900">
+                      Verifying Location...
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium max-w-xs mx-auto leading-relaxed">
+                      Checking physical proximity to hospital geo-fence perimeter.
+                    </p>
+                  </div>
+
+                  <div className="w-full max-w-xs mx-auto bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                    <div className="bg-brand-600 h-full w-3/4 animate-pulse rounded-full" />
+                  </div>
+                </div>
+              ) : locationStatus === 'acquired' ? (
+                <div className="space-y-4">
+                  <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shadow-inner">
+                    <CheckCircle2 size={40} className="animate-bounce" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-emerald-950">Within Range</h2>
+                    <p className="text-xs text-emerald-700 font-medium mt-1">
+                      Proceeding to sign in...
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  <div className="w-20 h-20 mx-auto rounded-3xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-inner">
+                    <AlertCircle size={36} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <h2 className="text-lg font-black text-slate-900">
+                      Location Access Needed
+                    </h2>
+                    <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-medium text-left leading-relaxed">
+                      {locationError || 'Location permissions are required to access workforce systems.'}
                     </div>
                   </div>
 
@@ -228,89 +247,126 @@ function LoginContent({ audience, action }: LoginFormProps) {
                     type="button"
                     onClick={requestLocation}
                     disabled={locating}
-                    className="text-xs font-bold text-brand-700 hover:text-brand-800 flex items-center gap-1 transition-colors px-2.5 py-1.5 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-xl disabled:opacity-50"
+                    className="w-full py-3.5 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20 disabled:opacity-70"
                   >
-                    <RefreshCw size={12} className={locating ? "animate-spin" : ""} />
-                    <span>{locationStatus === 'acquired' ? "Refresh" : "Detect"}</span>
+                    <RefreshCw className={locating ? "animate-spin" : ""} size={18} />
+                    <span>Retry Location Check</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="block w-full text-center text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors pt-1"
+                  >
+                    Proceed to Login Credentials &rarr;
                   </button>
                 </div>
+              )}
 
-                {locationError && (
-                  <div className="flex items-start gap-2 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-[12px] font-medium leading-relaxed">
-                    <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
-                    <span>{locationError}</span>
-                  </div>
-                )}
-
-                {isInsecureMobile && (
-                  <div className="flex items-start gap-2 p-3 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-[11px] font-medium leading-relaxed">
-                    <Info size={14} className="text-blue-600 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>Safari iOS Note:</strong> Geolocation requires HTTPS or <code>localhost</code>.
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div>
-              <label
-                htmlFor={`${audience}-identifier`}
-                className="mb-2 block text-[13px] font-bold text-slate-900"
-              >
-                {pageContent.identifierLabel}
-              </label>
-              <div className="relative">
-                <IdentifierIcon
-                  size={18}
-                  aria-hidden="true"
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  id={`${audience}-identifier`}
-                  name="identifier"
-                  type="text"
-                  required
-                  minLength={3}
-                  maxLength={254}
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3.5 pl-10 pr-4 text-[14px] text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 font-bold"
-                  placeholder={pageContent.identifierPlaceholder}
-                />
-              </div>
+              {isInsecureMobile && (
+                <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-[11px] font-medium leading-relaxed text-left flex items-start gap-2">
+                  <Info size={14} className="text-blue-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Safari iOS Note:</strong> Geolocation requires HTTPS or <code>localhost</code>.
+                  </span>
+                </div>
+              )}
             </div>
+          )}
 
-            <div>
-              <label
-                htmlFor={`${audience}-password`}
-                className="mb-2 block text-[13px] font-bold text-slate-900"
-              >
-                Password
-              </label>
-              <div className="relative">
-                <Lock
-                  size={18}
-                  aria-hidden="true"
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  id={`${audience}-password`}
-                  name="password"
-                  type="password"
-                  required
-                  minLength={8}
-                  maxLength={256}
-                  autoComplete="current-password"
-                  className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3.5 pl-10 pr-4 text-[14px] tracking-widest text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 font-bold"
-                  placeholder="••••••••"
-                />
+          {/* SCREEN 2: LOGIN CREDENTIALS FORM */}
+          {(audience === 'patient' || step === 2) && (
+            <form action={action} className="space-y-5 animate-in fade-in duration-300">
+              {audience === 'workforce' && (
+                <>
+                  <input
+                    type="hidden"
+                    name="latitude"
+                    value={coords.lat !== null ? String(coords.lat) : ''}
+                  />
+                  <input
+                    type="hidden"
+                    name="longitude"
+                    value={coords.lng !== null ? String(coords.lng) : ''}
+                  />
+
+                  {/* Clean Status Badge: Within Range (No raw coordinates) */}
+                  <div className="flex items-center justify-between rounded-2xl bg-emerald-50/90 border border-emerald-200/80 px-4 py-3 text-[13px]">
+                    <div className="flex items-center gap-2.5">
+                      <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
+                      <span className="font-bold text-emerald-950">Within Range</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      className="text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 transition-colors px-2.5 py-1 bg-emerald-100/80 hover:bg-emerald-200/80 rounded-xl"
+                    >
+                      <RefreshCw size={11} /> Re-verify
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label
+                  htmlFor={`${audience}-identifier`}
+                  className="mb-2 block text-[13px] font-bold text-slate-900"
+                >
+                  {pageContent.identifierLabel}
+                </label>
+                <div className="relative">
+                  <IdentifierIcon
+                    size={18}
+                    aria-hidden="true"
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    id={`${audience}-identifier`}
+                    name="identifier"
+                    type="text"
+                    required
+                    minLength={3}
+                    maxLength={254}
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3.5 pl-10 pr-4 text-[14px] text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 font-bold"
+                    placeholder={pageContent.identifierPlaceholder}
+                  />
+                </div>
               </div>
-            </div>
 
-            <SubmitButton />
-          </form>
+              <div>
+                <label
+                  htmlFor={`${audience}-password`}
+                  className="mb-2 block text-[13px] font-bold text-slate-900"
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock
+                    size={18}
+                    aria-hidden="true"
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    id={`${audience}-password`}
+                    name="password"
+                    type="password"
+                    required
+                    minLength={8}
+                    maxLength={256}
+                    autoComplete="current-password"
+                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3.5 pl-10 pr-4 text-[14px] tracking-widest text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 font-bold"
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+
+              <SubmitButton />
+            </form>
+          )}
 
           {/* Switch audience link */}
           <div className="mt-8 border-t border-slate-100 pt-6 text-center">
