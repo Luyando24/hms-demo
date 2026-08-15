@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -126,6 +126,7 @@ export type Database = {
           appointment_date: string
           created_at: string | null
           id: string
+          notification_email: string | null
           patient_id: string | null
           provider_id: string | null
           reason: string | null
@@ -136,6 +137,7 @@ export type Database = {
           appointment_date: string
           created_at?: string | null
           id?: string
+          notification_email?: string | null
           patient_id?: string | null
           provider_id?: string | null
           reason?: string | null
@@ -146,6 +148,7 @@ export type Database = {
           appointment_date?: string
           created_at?: string | null
           id?: string
+          notification_email?: string | null
           patient_id?: string | null
           provider_id?: string | null
           reason?: string | null
@@ -585,6 +588,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      email_dispatch_health: {
+        Row: {
+          created_at: string
+          last_completed_at: string | null
+          last_error: string | null
+          last_result: Json
+          last_started_at: string | null
+          last_success_at: string | null
+          singleton_key: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          last_completed_at?: string | null
+          last_error?: string | null
+          last_result?: Json
+          last_started_at?: string | null
+          last_success_at?: string | null
+          singleton_key?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          last_completed_at?: string | null
+          last_error?: string | null
+          last_result?: Json
+          last_started_at?: string | null
+          last_success_at?: string | null
+          singleton_key?: boolean
+          updated_at?: string
+        }
+        Relationships: []
       }
       email_notification_jobs: {
         Row: {
@@ -2209,6 +2245,12 @@ export type Database = {
           currency_symbol: string | null
           default_currency: string | null
           email: string | null
+          geofence_allow_admin_bypass: boolean | null
+          geofence_enabled: boolean | null
+          geofence_enforce_roles: string[] | null
+          geofence_latitude: number | null
+          geofence_longitude: number | null
+          geofence_radius_meters: number | null
           hospital_name: string | null
           id: string
           insurance_providers: string[] | null
@@ -2226,6 +2268,12 @@ export type Database = {
           currency_symbol?: string | null
           default_currency?: string | null
           email?: string | null
+          geofence_allow_admin_bypass?: boolean | null
+          geofence_enabled?: boolean | null
+          geofence_enforce_roles?: string[] | null
+          geofence_latitude?: number | null
+          geofence_longitude?: number | null
+          geofence_radius_meters?: number | null
           hospital_name?: string | null
           id?: string
           insurance_providers?: string[] | null
@@ -2243,6 +2291,12 @@ export type Database = {
           currency_symbol?: string | null
           default_currency?: string | null
           email?: string | null
+          geofence_allow_admin_bypass?: boolean | null
+          geofence_enabled?: boolean | null
+          geofence_enforce_roles?: string[] | null
+          geofence_latitude?: number | null
+          geofence_longitude?: number | null
+          geofence_radius_meters?: number | null
           hospital_name?: string | null
           id?: string
           insurance_providers?: string[] | null
@@ -2405,6 +2459,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      enqueue_appointment_confirmation: {
+        Args: { target_appointment_id: string }
+        Returns: boolean
+      }
       adjust_inventory: {
         Args: {
           movement_reason?: string

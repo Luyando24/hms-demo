@@ -1,20 +1,33 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react';
-import { Settings as SettingsIcon, DollarSign, Building, Save, Loader2, ShieldAlert, CreditCard, Shield, Plus, X, Mail } from 'lucide-react';
+import { Settings as SettingsIcon, DollarSign, Building, Save, Loader2, ShieldAlert, CreditCard, Shield, Plus, X, Mail, MapPin, Navigation, Crosshair } from 'lucide-react';
 import clsx from 'clsx';
 import { createClient } from '@/utils/supabase/client';
 import { SUPPORTED_CURRENCIES, formatCurrencyAmount } from '@/utils/currency';
 import StatusModal from '@/components/hospital/StatusModal';
 import { EmailNotificationSettingsPanel } from '@/components/hospital/EmailNotificationSettingsPanel';
 import { updateSystemSettingsAction } from '@/app/hospital/actions';
+import { formatDistance } from '@/utils/geofence';
+
+const WORKFORCE_ROLES = [
+  'DOCTOR',
+  'NURSE',
+  'RECEPTIONIST',
+  'PHARMACIST',
+  'LAB_TECH',
+  'RADIOLOGIST',
+  'ACCOUNTANT',
+  'STAFF',
+] as const;
 
 export default function SystemSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [detectingGps, setDetectingGps] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'financial' | 'payments' | 'insurance' | 'notifications'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'financial' | 'payments' | 'insurance' | 'notifications' | 'geofence'>('general');
 
   const [form, setForm] = useState({
     hospital_name: '',
@@ -29,7 +42,13 @@ export default function SystemSettingsPage() {
     email: '',
     address: '',
     payment_methods: ['CASH', 'CARD', 'MOBILE_MONEY', 'INSURANCE', 'BANK_TRANSFER', 'CHEQUE'],
-    insurance_providers: ['NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct']
+    insurance_providers: ['NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct'],
+    geofence_enabled: false,
+    geofence_latitude: -15.3875,
+    geofence_longitude: 28.3228,
+    geofence_radius_meters: 500,
+    geofence_enforce_roles: ['DOCTOR', 'NURSE', 'RECEPTIONIST', 'PHARMACIST', 'LAB_TECH', 'RADIOLOGIST', 'ACCOUNTANT', 'STAFF'],
+    geofence_allow_admin_bypass: true,
   });
 
   const [newPaymentMethod, setNewPaymentMethod] = useState('');
@@ -71,7 +90,13 @@ export default function SystemSettingsPage() {
         email: data.email || '',
         address: data.address || '',
         payment_methods: data.payment_methods || ['CASH', 'CARD', 'MOBILE_MONEY', 'INSURANCE', 'BANK_TRANSFER', 'CHEQUE'],
-        insurance_providers: data.insurance_providers || ['NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct']
+        insurance_providers: data.insurance_providers || ['NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct'],
+        geofence_enabled: data.geofence_enabled ?? false,
+        geofence_latitude: data.geofence_latitude ?? -15.3875,
+        geofence_longitude: data.geofence_longitude ?? 28.3228,
+        geofence_radius_meters: data.geofence_radius_meters ?? 500,
+        geofence_enforce_roles: data.geofence_enforce_roles || ['DOCTOR', 'NURSE', 'RECEPTIONIST', 'PHARMACIST', 'LAB_TECH', 'RADIOLOGIST', 'ACCOUNTANT', 'STAFF'],
+        geofence_allow_admin_bypass: data.geofence_allow_admin_bypass ?? true,
       });
     }
     setLoading(false);
@@ -152,11 +177,46 @@ export default function SystemSettingsPage() {
     );
   }
 
+  const handleDetectCurrentLocation = () => {
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    setDetectingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setForm((prev) => ({
+          ...prev,
+          geofence_latitude: Number(pos.coords.latitude.toFixed(6)),
+          geofence_longitude: Number(pos.coords.longitude.toFixed(6)),
+        }));
+        setDetectingGps(false);
+      },
+      (err) => {
+        alert(`Failed to detect GPS location: ${err.message}`);
+        setDetectingGps(false);
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
+  const handleToggleEnforcedRole = (role: string) => {
+    setForm((prev) => {
+      const exists = prev.geofence_enforce_roles.includes(role);
+      const updated = exists
+        ? prev.geofence_enforce_roles.filter((r) => r !== role)
+        : [...prev.geofence_enforce_roles, role];
+      return { ...prev, geofence_enforce_roles: updated };
+    });
+  };
+
   const navTabs = [
     { id: 'general', label: 'General & Branding', icon: Building },
     { id: 'financial', label: 'Currency & Finance', icon: DollarSign },
     { id: 'payments', label: 'Payment Options', icon: CreditCard },
     { id: 'insurance', label: 'Insurance Providers', icon: Shield },
+    { id: 'geofence', label: 'Geo-Fence & Security', icon: MapPin },
     { id: 'notifications', label: 'Email & Notifications', icon: Mail },
   ] as const;
 
@@ -491,6 +551,230 @@ export default function SystemSettingsPage() {
                   </button>
                 </div>
               )}
+            </div>
+          </section>
+        )}
+
+        {/* Tab 5: Geo-Fence & Security */}
+        {activeTab === 'geofence' && (
+          <section className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-8 animate-in fade-in duration-300">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black">
+                  <MapPin size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">Geographical Fencing & Access Controls</h2>
+                  <p className="text-xs text-slate-500 font-medium">Restrict workforce system access strictly within designated physical facility boundaries.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={clsx(
+                  "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider",
+                  form.geofence_enabled ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"
+                )}>
+                  {form.geofence_enabled ? "Geo-fence Active" : "Geo-fence Disabled"}
+                </span>
+              </div>
+            </div>
+
+            {/* Enable Toggle Card */}
+            <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <Navigation size={16} className="text-brand-600" />
+                  Enable Geographical Access Restriction
+                </h3>
+                <p className="text-xs text-slate-500 font-medium max-w-xl">
+                  When enabled, workforce users attempting to log in outside the designated GPS radius will be denied access to clinical and administrative portals.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input 
+                  type="checkbox" 
+                  checked={form.geofence_enabled}
+                  onChange={e => setForm({ ...form, geofence_enabled: e.target.checked })}
+                  disabled={userRole !== 'ADMIN'}
+                  className="sr-only peer"
+                />
+                <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-brand-600"></div>
+              </label>
+            </div>
+
+            {/* Location Coordinates & Radius */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-700">Facility Center Coordinates & Allowed Radius</h3>
+                {userRole === 'ADMIN' && (
+                  <button
+                    type="button"
+                    onClick={handleDetectCurrentLocation}
+                    disabled={detectingGps}
+                    className="text-xs font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  >
+                    {detectingGps ? <Loader2 size={14} className="animate-spin" /> : <Crosshair size={14} />}
+                    Detect My Current GPS Location
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider ml-1">Latitude (°N/S)</label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={form.geofence_latitude}
+                    onChange={e => setForm({ ...form, geofence_latitude: parseFloat(e.target.value) || 0 })}
+                    disabled={userRole !== 'ADMIN'}
+                    placeholder="-15.387500"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider ml-1">Longitude (°E/W)</label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={form.geofence_longitude}
+                    onChange={e => setForm({ ...form, geofence_longitude: parseFloat(e.target.value) || 0 })}
+                    disabled={userRole !== 'ADMIN'}
+                    placeholder="28.322800"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider ml-1">Allowed Radius (Meters)</label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="100000"
+                    value={form.geofence_radius_meters}
+                    onChange={e => setForm({ ...form, geofence_radius_meters: parseInt(e.target.value) || 500 })}
+                    disabled={userRole !== 'ADMIN'}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Preset Pills */}
+              {userRole === 'ADMIN' && (
+                <div className="flex items-center gap-2 pt-1 overflow-x-auto">
+                  <span className="text-xs font-bold text-slate-400 mr-2">Quick Presets:</span>
+                  {[
+                    { label: '100m (Building)', value: 100 },
+                    { label: '250m (Campus)', value: 250 },
+                    { label: '500m (Default)', value: 500 },
+                    { label: '1km (Zone)', value: 1000 },
+                    { label: '5km (District)', value: 5000 },
+                  ].map(preset => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, geofence_radius_meters: preset.value })}
+                      className={clsx(
+                        "px-3 py-1.5 rounded-xl text-xs font-bold transition-all border",
+                        form.geofence_radius_meters === preset.value
+                          ? "bg-brand-50 border-brand-300 text-brand-700 shadow-sm"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                      )}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Targeted Roles */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-700">Enforced Workforce Roles</h3>
+                  <p className="text-xs text-slate-500 font-medium">Select which personnel roles require physical presence within the geo-fence boundary to log in.</p>
+                </div>
+                {userRole === 'ADMIN' && (
+                  <div className="flex items-center gap-3 text-xs font-bold text-brand-600">
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, geofence_enforce_roles: [...WORKFORCE_ROLES] })}
+                      className="hover:underline"
+                    >
+                      Select All
+                    </button>
+                    <span>&bull;</span>
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, geofence_enforce_roles: [] })}
+                      className="hover:underline text-slate-400"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {WORKFORCE_ROLES.map(role => {
+                  const checked = form.geofence_enforce_roles.includes(role);
+                  return (
+                    <label
+                      key={role}
+                      className={clsx(
+                        "flex items-center gap-2.5 p-3 rounded-2xl border text-xs font-bold cursor-pointer transition-all",
+                        checked
+                          ? "bg-slate-900 border-slate-900 text-white shadow-sm"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => handleToggleEnforcedRole(role)}
+                        disabled={userRole !== 'ADMIN'}
+                        className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      <span>{role}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Admin Bypass Option */}
+            <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-2xl flex items-center justify-between gap-4">
+              <div className="space-y-0.5">
+                <h4 className="text-xs font-black text-amber-900 uppercase tracking-wider">System Administrator Remote Access Bypass</h4>
+                <p className="text-xs text-amber-700 font-medium">Exempt users with ADMIN role from geo-fencing checks so system administrators can perform remote maintenance.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={form.geofence_allow_admin_bypass}
+                  onChange={e => setForm({ ...form, geofence_allow_admin_bypass: e.target.checked })}
+                  disabled={userRole !== 'ADMIN'}
+                  className="sr-only peer"
+                />
+                <div className="w-12 h-6 bg-amber-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-amber-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+              </label>
+            </div>
+
+            {/* Config Summary Card */}
+            <div className="p-6 bg-slate-900 text-white rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-md">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <MapPin size={16} className="text-emerald-400" />
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Configured Geo-Fence Parameters</p>
+                </div>
+                <p className="text-sm font-bold text-slate-200">
+                  Center: <span className="font-mono text-emerald-400">{form.geofence_latitude.toFixed(6)}, {form.geofence_longitude.toFixed(6)}</span> &bull; Radius: <span className="text-emerald-400 font-bold">{formatDistance(form.geofence_radius_meters)}</span>
+                </p>
+              </div>
+              <div className="text-xs text-slate-400 font-medium text-right">
+                <span className="font-bold text-white">{form.geofence_enforce_roles.length}</span> of {WORKFORCE_ROLES.length} roles subject to GPS restriction
+              </div>
             </div>
           </section>
         )}

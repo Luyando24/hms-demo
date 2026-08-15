@@ -3,7 +3,59 @@ import type { EmailMessage, JsonRecord, ZonedParts } from "./notification-types.
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL");
+const RESEND_FROM_NAME = (Deno.env.get("RESEND_FROM_NAME") ?? "HMS - Kunda Health Care")
+  .replace(/[\r\n]/g, " ")
+  .trim();
+const RESEND_MIN_INTERVAL_MS = 225;
+let lastSendStartedAt = 0;
+let sendGate: Promise<void> = Promise.resolve();
 export const APP_URL = (Deno.env.get("HMS_APP_URL") ?? Deno.env.get("NEXT_PUBLIC_APP_URL") ?? "").replace(/\/$/, "");
+
+export class EmailDeliveryError extends Error {
+  readonly retryable: boolean;
+  readonly retryAfterMs?: number;
+
+  constructor(message: string, retryable = true, retryAfterMs?: number) {
+    super(message);
+    this.name = "EmailDeliveryError";
+    this.retryable = retryable;
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+function configuredFromAddress(): string | null {
+  if (!RESEND_FROM_EMAIL) return null;
+  const sender = RESEND_FROM_EMAIL.replace(/[\r\n]/g, " ").trim();
+  if (!sender || sender.includes("<")) return sender || null;
+  return `${RESEND_FROM_NAME} <${sender}>`;
+}
+
+function waitForSendSlot(): Promise<void> {
+  const scheduled = sendGate.then(async () => {
+    const waitMs = Math.max(0, lastSendStartedAt + RESEND_MIN_INTERVAL_MS - Date.now());
+    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    lastSendStartedAt = Date.now();
+  });
+  sendGate = scheduled.catch(() => undefined);
+  return scheduled;
+}
+
+function retryAfterMilliseconds(response: Response): number | undefined {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+    const date = Date.parse(retryAfter);
+    if (Number.isFinite(date)) return Math.max(0, date - Date.now());
+  }
+
+  const reset = Number(response.headers.get("ratelimit-reset"));
+  if (Number.isFinite(reset) && reset > 0) {
+    const resetAt = reset > 10_000_000_000 ? reset : reset * 1000;
+    return Math.max(0, resetAt - Date.now());
+  }
+  return undefined;
+}
 
 export interface HospitalInfo {
   hospitalName: string;
@@ -280,15 +332,59 @@ export async function getHospitalName(admin: SupabaseClient): Promise<string> {
   return info.hospitalName;
 }
 
+async function updateDelivery(
+  admin: SupabaseClient,
+  deliveryId: string,
+  payload: JsonRecord,
+): Promise<void> {
+  const { error } = await admin
+    .from("email_deliveries")
+    .update(payload)
+    .eq("id", deliveryId);
+  if (error) throw new EmailDeliveryError(`Could not persist email delivery state: ${error.message}`);
+}
+
+async function providerIdempotencyKey(value: string): Promise<string> {
+  if (value.length <= 240) return value;
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  const hash = [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  return `${value.slice(0, 160)}/${hash}`;
+}
+
+export function combineEmailErrors(errors: unknown[]): EmailDeliveryError {
+  const deliveryErrors = errors.filter(
+    (error): error is EmailDeliveryError => error instanceof EmailDeliveryError,
+  );
+  const retryableError = deliveryErrors.find((error) => error.retryable);
+  const selected = retryableError ?? deliveryErrors[0];
+  const messages = [...new Set(errors.map((error) =>
+    error instanceof Error ? error.message : "Email delivery failed."
+  ))];
+  return new EmailDeliveryError(
+    `${errors.length} recipient delivery${errors.length === 1 ? "" : "ies"} failed: ${messages.join("; ")}`,
+    selected?.retryable ?? true,
+    retryableError?.retryAfterMs,
+  );
+}
+
 export async function sendEmail(admin: SupabaseClient, message: EmailMessage) {
   const recipient = message.recipient.trim().toLowerCase();
-  const { data: existing } = await admin
+  const { data: existing, error: existingError } = await admin
     .from("email_deliveries")
     .select("id, status, provider_message_id")
     .eq("idempotency_key", message.idempotencyKey)
     .maybeSingle();
+  if (existingError) throw new EmailDeliveryError(existingError.message);
 
-  if (existing && existing.status !== "failed") {
+  if (
+    existing &&
+    (existing.provider_message_id || !["queued", "failed"].includes(existing.status))
+  ) {
     return { duplicate: true, providerMessageId: existing.provider_message_id as string | null };
   }
 
@@ -306,64 +402,99 @@ export async function sendEmail(admin: SupabaseClient, message: EmailMessage) {
 
   let deliveryId = existing?.id as string | undefined;
   if (deliveryId) {
-    const { error } = await admin.from("email_deliveries").update(deliveryPayload).eq("id", deliveryId);
-    if (error) throw error;
+    await updateDelivery(admin, deliveryId, deliveryPayload);
   } else {
     const { data, error } = await admin
       .from("email_deliveries")
       .insert(deliveryPayload)
       .select("id")
       .single();
-    if (error) throw error;
+    if (error) throw new EmailDeliveryError(error.message);
     deliveryId = data.id;
   }
 
-  if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) {
+  if (!deliveryId) {
+    throw new EmailDeliveryError("Email delivery record did not return an identifier.");
+  }
+  const from = configuredFromAddress();
+  if (!RESEND_API_KEY || !from) {
     const errorMessage = "Resend API key or sender address is not configured.";
-    await admin
-      .from("email_deliveries")
-      .update({ status: "failed", last_error: errorMessage })
-      .eq("id", deliveryId);
-    throw new Error(errorMessage);
+    await updateDelivery(admin, deliveryId, {
+      status: "failed",
+      last_error: errorMessage,
+    });
+    throw new EmailDeliveryError(errorMessage, false);
   }
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-      "Idempotency-Key": message.idempotencyKey,
-    },
-    body: JSON.stringify({
-      from: RESEND_FROM_EMAIL,
-      to: [recipient],
-      subject: message.subject,
-      html: message.html,
-      text: message.text,
-    }),
-  });
+  let response: Response;
+  try {
+    await waitForSendSlot();
+    response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": await providerIdempotencyKey(message.idempotencyKey),
+      },
+      body: JSON.stringify({
+        from,
+        to: [recipient],
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (error) {
+    const detail = error instanceof Error
+      ? `Resend request failed: ${error.message}`
+      : "Resend request failed before a response was received.";
+    await updateDelivery(admin, deliveryId, {
+      status: "failed",
+      last_error: detail,
+    });
+    throw new EmailDeliveryError(detail, true);
+  }
   const responseBody = await response.json().catch(() => ({})) as JsonRecord;
 
   if (!response.ok || typeof responseBody.id !== "string") {
     const detail = typeof responseBody.message === "string"
       ? responseBody.message
       : `Resend returned HTTP ${response.status}.`;
-    await admin
-      .from("email_deliveries")
-      .update({ status: "failed", last_error: detail })
-      .eq("id", deliveryId);
-    throw new Error(detail);
+    await updateDelivery(admin, deliveryId, {
+      status: "failed",
+      last_error: detail,
+    });
+    const retryable = response.status === 408 || response.status === 425 ||
+      response.status === 429 || response.status >= 500;
+    throw new EmailDeliveryError(
+      detail,
+      retryable,
+      retryAfterMilliseconds(response),
+    );
   }
 
-  await admin
-    .from("email_deliveries")
-    .update({
-      status: "sent",
-      provider_message_id: responseBody.id,
-      sent_at: new Date().toISOString(),
-      last_error: null,
-    })
-    .eq("id", deliveryId);
+  await updateDelivery(admin, deliveryId, {
+    status: "sent",
+    provider_message_id: responseBody.id,
+    sent_at: new Date().toISOString(),
+    last_error: null,
+  });
 
   return { duplicate: false, providerMessageId: responseBody.id };
+}
+
+export async function sendEmails(
+  admin: SupabaseClient,
+  messages: EmailMessage[],
+): Promise<void> {
+  const errors: unknown[] = [];
+  for (const message of messages) {
+    try {
+      await sendEmail(admin, message);
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length) throw combineEmailErrors(errors);
 }

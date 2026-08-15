@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -11,6 +11,8 @@ import {
   Lock,
   Stethoscope,
   User,
+  MapPin,
+  Loader2,
 } from "lucide-react";
 
 type LoginAction = (formData: FormData) => void | Promise<void>;
@@ -45,17 +47,27 @@ const content = {
   },
 } as const;
 
-function SubmitButton() {
+function SubmitButton({ locating }: { locating?: boolean }) {
   const { pending } = useFormStatus();
+  const isLoading = pending || locating;
 
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={isLoading}
       className="group flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 text-[15px] font-medium text-white transition-all hover:bg-brand-700 hover:shadow-lg hover:shadow-brand-600/20 disabled:cursor-not-allowed disabled:opacity-70"
     >
-      {pending ? "Signing in..." : "Sign In"}
-      {!pending && <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />}
+      {isLoading ? (
+        <>
+          <Loader2 className="animate-spin" size={18} />
+          <span>{locating ? "Acquiring GPS location..." : "Signing in..."}</span>
+        </>
+      ) : (
+        <>
+          <span>Sign In</span>
+          <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+        </>
+      )}
     </button>
   );
 }
@@ -65,6 +77,61 @@ function LoginContent({ audience, action }: LoginFormProps) {
   const error = searchParams.get("error");
   const pageContent = content[audience];
   const IdentifierIcon = pageContent.Icon;
+
+  const [coords, setCoords] = useState<{ lat: number | null; lng: number | null }>({
+    lat: null,
+    lng: null,
+  });
+  const [locating, setLocating] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'acquired' | 'denied'>('idle');
+
+  useEffect(() => {
+    if (audience === 'workforce' && typeof window !== 'undefined' && 'geolocation' in navigator) {
+      setLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setLocationStatus('acquired');
+          setLocating(false);
+        },
+        (err) => {
+          console.warn('Geolocation acquisition error:', err.message);
+          setLocationStatus('denied');
+          setLocating(false);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+      );
+    }
+  }, [audience]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    if (audience === 'workforce' && coords.lat === null && typeof window !== 'undefined' && 'geolocation' in navigator) {
+      e.preventDefault();
+      setLocating(true);
+      const formEl = e.currentTarget;
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setLocationStatus('acquired');
+          setLocating(false);
+          // Set values on hidden inputs dynamically before submit
+          const latInput = formEl.querySelector<HTMLInputElement>('input[name="latitude"]');
+          const lngInput = formEl.querySelector<HTMLInputElement>('input[name="longitude"]');
+          if (latInput) latInput.value = String(pos.coords.latitude);
+          if (lngInput) lngInput.value = String(pos.coords.longitude);
+          formEl.submit();
+        },
+        (err) => {
+          console.warn('Geolocation acquisition failed on submit:', err.message);
+          setLocationStatus('denied');
+          setLocating(false);
+          formEl.submit();
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    }
+  };
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#f8f9fa] p-4 font-sans">
@@ -93,7 +160,39 @@ function LoginContent({ audience, action }: LoginFormProps) {
             </div>
           )}
 
-          <form action={action} className="space-y-5">
+          <form action={action} onSubmit={handleSubmit} className="space-y-5">
+            {audience === 'workforce' && (
+              <>
+                <input
+                  type="hidden"
+                  name="latitude"
+                  value={coords.lat !== null ? String(coords.lat) : ''}
+                />
+                <input
+                  type="hidden"
+                  name="longitude"
+                  value={coords.lng !== null ? String(coords.lng) : ''}
+                />
+
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-2 border border-slate-100 text-[12px]">
+                  <div className="flex items-center gap-2 text-slate-600 font-medium">
+                    <MapPin size={14} className={locationStatus === 'acquired' ? 'text-emerald-500' : 'text-amber-500'} />
+                    <span>Geo-location verification</span>
+                  </div>
+                  {locating ? (
+                    <span className="flex items-center gap-1 text-slate-400 font-medium">
+                      <Loader2 className="animate-spin" size={12} />
+                      Detecting...
+                    </span>
+                  ) : locationStatus === 'acquired' ? (
+                    <span className="font-semibold text-emerald-600">GPS Active</span>
+                  ) : (
+                    <span className="font-medium text-slate-400">Standard</span>
+                  )}
+                </div>
+              </>
+            )}
+
             <div>
               <label htmlFor={`${audience}-identifier`} className="mb-2 block text-[13px] font-bold text-slate-900">
                 {pageContent.identifierLabel}
@@ -144,7 +243,7 @@ function LoginContent({ audience, action }: LoginFormProps) {
               </div>
             </div>
 
-            <SubmitButton />
+            <SubmitButton locating={locating} />
           </form>
 
           <div className="mt-8 border-t border-slate-100 pt-6 text-center">

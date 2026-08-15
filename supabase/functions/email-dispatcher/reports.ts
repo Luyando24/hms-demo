@@ -2,15 +2,17 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@^2.105.1";
 import {
   APP_URL,
   addLocalDays,
+  combineEmailErrors,
   emailLayout,
   getZonedParts,
   isPastConfiguredTime,
   localDateKey,
   plainText,
-  sendEmail,
+  sendEmails,
   zonedDateToUtc,
 } from "../_shared/email.ts";
 import type {
+  EmailMessage,
   JsonRecord,
   NotificationSettings,
   ZonedParts,
@@ -178,8 +180,7 @@ async function sendManagerReport(
     settings.manager_report_email.toLowerCase(),
     ...(settings.report_cc_emails ?? []).map((email) => email.toLowerCase()),
   ])];
-  for (const recipient of recipients) {
-    await sendEmail(admin, {
+  await sendEmails(admin, recipients.map((recipient): EmailMessage => ({
       notificationType: `manager_${reportType}_report`,
       recipient,
       subject: `${hospitalName}: ${reportName} — ${periodKey}`,
@@ -192,8 +193,7 @@ async function sendManagerReport(
         start: start.toISOString(),
         end: end.toISOString(),
       },
-    });
-  }
+    })));
   return recipients.length;
 }
 
@@ -218,7 +218,7 @@ async function sendProviderSchedules(
     .eq("role", "DOCTOR")
     .not("email", "is", null);
   if (error) throw error;
-  let sent = 0;
+  const messages: EmailMessage[] = [];
   for (const provider of providers ?? []) {
     const { count, error: countError } = await admin
       .from("appointments")
@@ -242,7 +242,7 @@ async function sendProviderSchedules(
         : undefined,
       "Patient names and clinical details are intentionally omitted from email.",
     );
-    await sendEmail(admin, {
+    messages.push({
       notificationType: "provider_daily_schedule",
       recipient: provider.email,
       subject: `${hospitalName}: Today's appointment schedule`,
@@ -252,9 +252,9 @@ async function sendProviderSchedules(
       periodKey: dateKey,
       metadata: { provider_id: provider.id, appointment_count: count },
     });
-    sent += 1;
   }
-  return sent;
+  await sendEmails(admin, messages);
+  return messages.length;
 }
 
 async function sendClinicalDigest(
@@ -281,6 +281,7 @@ async function sendClinicalDigest(
   if (error) throw error;
   if (!count) return 0;
   const recipients = await roleRecipients(admin, [role]);
+  const messages: EmailMessage[] = [];
   for (const recipient of recipients) {
     const title = `${area === "laboratory" ? "Laboratory" : "Radiology"} worklist summary`;
     const html = emailLayout(
@@ -291,7 +292,7 @@ async function sendClinicalDigest(
       APP_URL ? { label: "Open worklist", href: `${APP_URL}${path}` } : undefined,
       "Patient names and clinical details are intentionally omitted from email.",
     );
-    await sendEmail(admin, {
+    messages.push({
       notificationType: `${area}_daily_digest`,
       recipient,
       subject: `${hospitalName}: ${title}`,
@@ -302,6 +303,7 @@ async function sendClinicalDigest(
       metadata: { pending_count: count },
     });
   }
+  await sendEmails(admin, messages);
   return recipients.length;
 }
 
@@ -349,8 +351,7 @@ async function sendInventoryDigest(
       ? { label: "Open inventory", href: `${APP_URL}/hospital/inventory` }
       : undefined,
   );
-  for (const recipient of recipients) {
-    await sendEmail(admin, {
+  await sendEmails(admin, recipients.map((recipient): EmailMessage => ({
       notificationType: "inventory_daily_digest",
       recipient,
       subject: `${hospitalName}: ${lowItems.length} low-stock item${lowItems.length === 1 ? "" : "s"}`,
@@ -359,8 +360,7 @@ async function sendInventoryDigest(
       idempotencyKey: `inventory-digest/${dateKey}/${recipient}`,
       periodKey: dateKey,
       metadata: { low_stock_count: lowItems.length },
-    });
-  }
+    })));
   return recipients.length;
 }
 
@@ -373,15 +373,23 @@ export async function runScheduledDigests(
   const parts = getZonedParts(now, settings.timezone);
   const dateKey = localDateKey(parts);
   let sent = 0;
+  const failures: unknown[] = [];
+  const run = async (task: () => Promise<number>) => {
+    try {
+      sent += await task();
+    } catch (error) {
+      failures.push(error);
+    }
+  };
 
-  sent += await sendProviderSchedules(admin, settings, hospitalName, parts);
-  sent += await sendClinicalDigest(admin, settings, hospitalName, parts, "laboratory");
-  sent += await sendClinicalDigest(admin, settings, hospitalName, parts, "radiology");
-  sent += await sendInventoryDigest(admin, settings, hospitalName, parts);
+  await run(() => sendProviderSchedules(admin, settings, hospitalName, parts));
+  await run(() => sendClinicalDigest(admin, settings, hospitalName, parts, "laboratory"));
+  await run(() => sendClinicalDigest(admin, settings, hospitalName, parts, "radiology"));
+  await run(() => sendInventoryDigest(admin, settings, hospitalName, parts));
 
   if (settings.daily_report_enabled && isPastConfiguredTime(parts, settings.daily_report_time)) {
     const start = zonedDateToUtc(parts.year, parts.month, parts.day, settings.timezone);
-    sent += await sendManagerReport(admin, settings, hospitalName, "daily", dateKey, start, now);
+    await run(() => sendManagerReport(admin, settings, hospitalName, "daily", dateKey, start, now));
   }
 
   if (
@@ -397,7 +405,7 @@ export async function runScheduledDigests(
       settings.timezone,
     );
     const end = zonedDateToUtc(parts.year, parts.month, parts.day, settings.timezone);
-    sent += await sendManagerReport(
+    await run(() => sendManagerReport(
       admin,
       settings,
       hospitalName,
@@ -405,7 +413,7 @@ export async function runScheduledDigests(
       `${localDateKey(startParts)} to ${dateKey}`,
       start,
       end,
-    );
+    ));
   }
 
   if (
@@ -423,7 +431,7 @@ export async function runScheduledDigests(
     );
     const monthKey =
       `${previousMonth.getUTCFullYear()}-${String(previousMonth.getUTCMonth() + 1).padStart(2, "0")}`;
-    sent += await sendManagerReport(
+    await run(() => sendManagerReport(
       admin,
       settings,
       hospitalName,
@@ -431,8 +439,9 @@ export async function runScheduledDigests(
       monthKey,
       start,
       end,
-    );
+    ));
   }
 
+  if (failures.length) throw combineEmailErrors(failures);
   return sent;
 }

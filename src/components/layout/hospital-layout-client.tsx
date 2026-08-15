@@ -7,6 +7,7 @@ import { MobileNavProvider } from "@/components/layout/mobile-nav-context";
 import { HospitalBottomNav } from "@/components/layout/hospital-bottom-nav";
 import QueueFloatingIndicator from "@/components/hospital/QueueFloatingIndicator";
 import StaffPendingActionPopup from "@/components/hospital/StaffPendingActionPopup";
+import { GeofenceGuard } from "@/components/hospital/GeofenceGuard";
 
 export function HospitalLayoutClient({
   children,
@@ -28,6 +29,7 @@ export function HospitalLayoutClient({
         <HospitalBottomNav />
         <QueueFloatingIndicator />
         <StaffPendingActionPopup />
+        <GeofenceGuard />
         <div className="lg:ml-72 pt-20 flex flex-col min-h-screen">
           <main className="flex-1 p-4 lg:p-8">{children}</main>
         </div>

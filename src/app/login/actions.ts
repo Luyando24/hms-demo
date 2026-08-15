@@ -14,9 +14,14 @@ export async function signInWorkforce(formData: FormData) {
   const result = await authenticateLogin(formData, 'workforce');
 
   if (!result.ok) {
-    const message = result.reason === 'invalid-input'
-      ? 'Enter a valid email or staff ID and password.'
-      : 'Invalid sign-in credentials.';
+    let message = 'Invalid sign-in credentials.';
+    if (result.reason === 'invalid-input') {
+      message = 'Enter a valid email or staff ID and password.';
+    } else if (result.reason === 'location-required') {
+      message = 'Location permission is required to verify system access within the hospital geo-fence zone. Please enable location access in your browser and try again.';
+    } else if (result.reason === 'geofence-denied') {
+      message = `Access Denied: You are outside the authorized hospital geo-fence zone (Current distance: ${result.distance ?? 'Unknown'}, Permitted radius: ${result.limit ?? 'Unknown'}).`;
+    }
     loginError(message);
   }
 

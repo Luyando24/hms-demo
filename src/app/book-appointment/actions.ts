@@ -2,6 +2,10 @@
 
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
+import {
+  DEFAULT_APPOINTMENT_TIMEZONE,
+  localDateTimeToUtc,
+} from '@/lib/date-time';
 import { createAdminClient } from '@/utils/supabase/admin';
 
 const publicBookingSchema = z.object({
@@ -13,7 +17,9 @@ const publicBookingSchema = z.object({
   gender: z.enum(['MALE', 'FEMALE', 'OTHER']),
   provider_id: z.string().uuid().or(z.literal('')).transform(val => val || null),
   department_id: z.string().uuid().or(z.literal('')).transform(val => val || null),
-  appointment_date: z.string().min(1, 'Appointment date and time are required.'),
+  appointment_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, 'Appointment date and time are required.'),
   reason: z.string().trim().min(3, 'Please specify the reason for your visit.').max(500),
 });
 
@@ -22,13 +28,24 @@ export type PublicBookingInput = z.infer<typeof publicBookingSchema>;
 export async function bookPublicAppointmentAction(input: unknown) {
   try {
     const data = publicBookingSchema.parse(input);
-    const appointmentDate = new Date(data.appointment_date);
+    const admin = createAdminClient();
+    const { data: notificationSettings, error: settingsError } = await admin
+      .from('email_notification_settings')
+      .select('timezone')
+      .eq('singleton_key', true)
+      .maybeSingle();
+    if (settingsError) {
+      return { error: `Failed to load the appointment timezone: ${settingsError.message}` };
+    }
+
+    const appointmentDate = localDateTimeToUtc(
+      data.appointment_date,
+      notificationSettings?.timezone || DEFAULT_APPOINTMENT_TIMEZONE,
+    );
 
     if (!Number.isFinite(appointmentDate.getTime()) || appointmentDate <= new Date()) {
       return { error: 'Please choose a future date and time for your appointment.' };
     }
-
-    const admin = createAdminClient();
 
     // 1. Check if patient already exists by phone or email
     let patientId: string | null = null;
@@ -90,7 +107,7 @@ export async function bookPublicAppointmentAction(input: unknown) {
     // 3. Check if an active appointment already exists for this patient and time slot
     const { data: existingAppt } = await admin
       .from('appointments')
-      .select('id, appointment_date, status')
+      .select('id, appointment_date, status, notification_email')
       .eq('patient_id', patientId)
       .eq('appointment_date', appointmentDate.toISOString())
       .neq('status', 'CANCELLED')
@@ -106,16 +123,40 @@ export async function bookPublicAppointmentAction(input: unknown) {
           patient_id: patientId,
           provider_id: data.provider_id,
           appointment_date: appointmentDate.toISOString(),
+          notification_email: data.email,
           reason: data.reason,
           status: 'SCHEDULED',
         })
-        .select('id, appointment_date, status')
+        .select('id, appointment_date, status, notification_email')
         .single();
 
       if (appointmentError) {
         return { error: `Failed to book appointment: ${appointmentError.message}` };
       }
       appointment = newAppt;
+    } else {
+      if (data.email && data.email !== appointment.notification_email) {
+        const { data: updatedAppointment, error: updateError } = await admin
+          .from('appointments')
+          .update({ notification_email: data.email })
+          .eq('id', appointment.id)
+          .select('id, appointment_date, status, notification_email')
+          .single();
+        if (updateError) {
+          return { error: `Failed to update the appointment email: ${updateError.message}` };
+        }
+        appointment = updatedAppointment;
+      }
+
+      // Duplicate submissions reuse the appointment. The database helper queues
+      // at most one confirmation every five minutes, including when an email was
+      // first supplied after the original booking.
+      const { error: confirmationError } = await admin.rpc('enqueue_appointment_confirmation', {
+        target_appointment_id: appointment.id,
+      });
+      if (confirmationError) {
+        return { error: `Appointment exists, but its confirmation could not be queued: ${confirmationError.message}` };
+      }
     }
 
     // Note: email_notification_jobs is enqueued automatically by the

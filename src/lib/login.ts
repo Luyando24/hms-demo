@@ -5,15 +5,28 @@ import { createAdminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
 import { ROLE_PERMISSIONS, type UserRole } from '@/utils/rbac';
 
+import { isLocationWithinGeofence } from '@/utils/geofence';
+
 export type LoginAudience = 'patient' | 'workforce';
 
 export type LoginResult =
   | { ok: true; role: UserRole }
-  | { ok: false; reason: 'invalid-input' | 'invalid-credentials' };
+  | {
+      ok: false;
+      reason:
+        | 'invalid-input'
+        | 'invalid-credentials'
+        | 'location-required'
+        | 'geofence-denied';
+      distance?: string;
+      limit?: string;
+    };
 
 const loginSchema = z.object({
   identifier: z.string().trim().min(3).max(254),
   password: z.string().min(8).max(256),
+  latitude: z.union([z.coerce.number(), z.null()]).optional(),
+  longitude: z.union([z.coerce.number(), z.null()]).optional(),
 });
 
 function isRoleAllowedForAudience(
@@ -31,16 +44,21 @@ export async function authenticateLogin(
   formData: FormData,
   audience: LoginAudience,
 ): Promise<LoginResult> {
+  const rawLat = formData.get('latitude');
+  const rawLng = formData.get('longitude');
+
   const parsed = loginSchema.safeParse({
     identifier: formData.get('identifier'),
     password: formData.get('password'),
+    latitude: rawLat !== null && rawLat !== '' ? rawLat : null,
+    longitude: rawLng !== null && rawLng !== '' ? rawLng : null,
   });
 
   if (!parsed.success) {
     return { ok: false, reason: 'invalid-input' };
   }
 
-  const { identifier, password } = parsed.data;
+  const { identifier, password, latitude, longitude } = parsed.data;
   let effectiveEmail = identifier;
 
   if (!identifier.includes('@')) {
@@ -93,6 +111,53 @@ export async function authenticateLogin(
   if (profileError || !isRoleAllowedForAudience(role, audience)) {
     await supabase.auth.signOut();
     return { ok: false, reason: 'invalid-credentials' };
+  }
+
+  // Geofence check for workforce sign-in
+  if (audience === 'workforce') {
+    const adminSupabase = createAdminClient();
+    const { data: settings } = await adminSupabase
+      .from('system_settings')
+      .select(
+        'geofence_enabled, geofence_latitude, geofence_longitude, geofence_radius_meters, geofence_enforce_roles, geofence_allow_admin_bypass'
+      )
+      .limit(1)
+      .maybeSingle();
+
+    if (settings && settings.geofence_enabled) {
+      const geofenceConfig = {
+        enabled: settings.geofence_enabled,
+        latitude: settings.geofence_latitude ?? 0,
+        longitude: settings.geofence_longitude ?? 0,
+        radiusMeters: settings.geofence_radius_meters ?? 500,
+        enforceRoles: (settings.geofence_enforce_roles as string[]) || [],
+        allowAdminBypass: settings.geofence_allow_admin_bypass ?? true,
+      };
+
+      const isEnforced =
+        role !== 'ADMIN' || !geofenceConfig.allowAdminBypass;
+      const isRoleTargeted = geofenceConfig.enforceRoles.some(
+        (r) => r.toUpperCase() === role
+      );
+
+      if (isEnforced && isRoleTargeted) {
+        if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
+          await supabase.auth.signOut();
+          return { ok: false, reason: 'location-required' };
+        }
+
+        const check = isLocationWithinGeofence(latitude, longitude, role, geofenceConfig);
+        if (!check.allowed) {
+          await supabase.auth.signOut();
+          return {
+            ok: false,
+            reason: 'geofence-denied',
+            distance: check.formattedDistance,
+            limit: check.formattedLimit,
+          };
+        }
+      }
+    }
   }
 
   return { ok: true, role };

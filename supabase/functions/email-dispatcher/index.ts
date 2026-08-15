@@ -40,6 +40,19 @@ async function verifyAdminCaller(ctx: {
   return data?.role === "ADMIN";
 }
 
+async function recordDispatchHealth(
+  admin: SupabaseClient,
+  payload: JsonRecord,
+): Promise<void> {
+  const { error } = await admin
+    .from("email_dispatch_health")
+    .update(payload)
+    .eq("singleton_key", true);
+  if (error) {
+    console.error("Could not update email dispatcher health", error);
+  }
+}
+
 export default {
   fetch: withSupabase({ auth: ["user", "secret"] }, async (request, ctx) => {
     if (request.method !== "POST") {
@@ -69,13 +82,18 @@ export default {
       );
     }
 
+    const isDispatch = mode === "dispatch";
+    if (isDispatch) {
+      await recordDispatchHealth(admin, {
+        last_started_at: new Date().toISOString(),
+        last_error: null,
+      });
+    }
+
     try {
       const settings = await loadSettings(admin);
       if (!settings) {
-        return Response.json(
-          { error: "Notification settings were not found." },
-          { status: 503 },
-        );
+        throw new Error("Notification settings were not found.");
       }
       const hospitalInfo = await getHospitalInfo(admin);
       const hospitalName = hospitalInfo.hospitalName;
@@ -118,11 +136,18 @@ export default {
       }
 
       if (!settings.enabled) {
-        return Response.json({
+        const result = {
           success: true,
           skipped: true,
           reason: "Email notifications are disabled.",
+        };
+        await recordDispatchHealth(admin, {
+          last_completed_at: new Date().toISOString(),
+          last_success_at: new Date().toISOString(),
+          last_error: null,
+          last_result: result,
         });
+        return Response.json(result);
       }
 
       const jobs = await processDueJobs(admin, settings, hospitalName);
@@ -131,15 +156,28 @@ export default {
         settings,
         hospitalName,
       );
-      return Response.json({ success: true, jobs, scheduledEmails });
+      const result = { success: true, jobs, scheduledEmails };
+      await recordDispatchHealth(admin, {
+        last_completed_at: new Date().toISOString(),
+        last_success_at: new Date().toISOString(),
+        last_error: null,
+        last_result: result,
+      });
+      return Response.json(result);
     } catch (error) {
       console.error("Email dispatcher failed", error);
+      const errorMessage = error instanceof Error
+        ? error.message
+        : "Email dispatcher failed.";
+      if (isDispatch) {
+        await recordDispatchHealth(admin, {
+          last_completed_at: new Date().toISOString(),
+          last_error: errorMessage,
+          last_result: { success: false, error: errorMessage },
+        });
+      }
       return Response.json(
-        {
-          error: error instanceof Error
-            ? error.message
-            : "Email dispatcher failed.",
-        },
+        { error: errorMessage },
         { status: 500 },
       );
     }

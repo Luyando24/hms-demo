@@ -74,8 +74,11 @@ export async function getEmailNotificationSettingsAction() {
     await requireRole(['ADMIN']);
     const adminSupabase = createAdminClient();
     const [
-      { data: settings, error: settingsError },
-      { data: deliveries },
+      settingsResult,
+      deliveriesResult,
+      healthResult,
+      pendingResult,
+      failedResult,
     ] = await Promise.all([
       adminSupabase
         .from('email_notification_settings')
@@ -84,18 +87,40 @@ export async function getEmailNotificationSettingsAction() {
         .maybeSingle(),
       adminSupabase
         .from('email_deliveries')
-        .select('id, notification_type, recipient_email, status, subject, created_at')
+        .select('id, notification_type, recipient_email, status, subject, last_error, created_at')
         .order('created_at', { ascending: false })
         .limit(6),
+      adminSupabase
+        .from('email_dispatch_health')
+        .select('last_started_at, last_completed_at, last_success_at, last_error, last_result')
+        .eq('singleton_key', true)
+        .maybeSingle(),
+      adminSupabase
+        .from('email_notification_jobs')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'PENDING'),
+      adminSupabase
+        .from('email_notification_jobs')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'FAILED'),
     ]);
 
-    if (settingsError) throw settingsError;
-    if (!settings) throw new Error('Email notification settings have not been initialized.');
+    const queryError = settingsResult.error || deliveriesResult.error ||
+      healthResult.error || pendingResult.error || failedResult.error;
+    if (queryError) throw queryError;
+    if (!settingsResult.data) {
+      throw new Error('Email notification settings have not been initialized.');
+    }
 
     return {
       success: true as const,
-      settings,
-      deliveries: deliveries ?? [],
+      settings: settingsResult.data,
+      deliveries: deliveriesResult.data ?? [],
+      health: healthResult.data,
+      queueStats: {
+        pending: pendingResult.count ?? 0,
+        failed: failedResult.count ?? 0,
+      },
     };
   } catch (error) {
     return {
@@ -103,6 +128,8 @@ export async function getEmailNotificationSettingsAction() {
       error: actionError(error),
       settings: null,
       deliveries: [],
+      health: null,
+      queueStats: { pending: 0, failed: 0 },
     };
   }
 }
@@ -143,107 +170,22 @@ export async function updateEmailNotificationSettingsAction(
 export async function sendTestNotificationEmailAction() {
   try {
     const { supabase } = await requireRole(['ADMIN']);
-    
-    // First attempt: Invoke Edge Function
     const { data, error } = await supabase.functions.invoke('email-dispatcher', {
       body: { mode: 'test' },
     });
 
-    if (!error && data && !data.error) {
-      return {
-        success: true,
-        message: typeof data.message === 'string' ? data.message : 'Test email accepted for delivery.',
-      };
+    if (error || !data || data.error) {
+      const detail = typeof data?.error === 'string'
+        ? data.error
+        : error?.message || 'The email dispatcher did not return a successful response.';
+      throw new Error(`Email dispatcher test failed: ${detail}`);
     }
-
-    // Fallback: If Edge Function returns non-2xx error, use Next.js server environment variables (process.env.RESEND_API_KEY)
-    const resendApiKey = process.env.RESEND_API_KEY;
-    const resendFrom = process.env.RESEND_FROM_EMAIL;
-
-    if (!resendApiKey || !resendFrom) {
-      const functionErrMsg = error ? (typeof data?.error === 'string' ? data.error : error.message) : '';
-      throw new Error(functionErrMsg || 'RESEND_API_KEY or RESEND_FROM_EMAIL is missing from environment.');
-    }
-
-    const adminSupabase = createAdminClient();
-    const [{ data: settings }, { data: hospSettings }] = await Promise.all([
-      adminSupabase.from('email_notification_settings').select('manager_report_email, timezone').eq('singleton_key', true).maybeSingle(),
-      adminSupabase.from('system_settings').select('hospital_name, address, phone, email').limit(1).maybeSingle(),
-    ]);
-
-    const recipient = settings?.manager_report_email;
-    if (!recipient) {
-      throw new Error('Set a hospital manager email in settings before sending a test email.');
-    }
-
-    const hospitalName = hospSettings?.hospital_name || 'HMS - Kunda Health Care';
-    const address = hospSettings?.address?.trim() || '';
-    const phone = hospSettings?.phone?.trim() || '';
-    const email = hospSettings?.email?.trim() || '';
-    const appUrl = (process.env.HMS_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
-    const websiteDisplay = appUrl.replace(/^https?:\/\//, '');
-
-    const contactParts = [address, phone, email].filter(Boolean);
-
-    const html = `<!doctype html>
-<html>
-<head><meta charset="utf-8"><title>Email Test</title></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:24px;background-color:#f1f5f9;color:#0f172a;">
-  <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
-    <div style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%);color:#ffffff;padding:24px 28px;">
-      <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#38bdf8;margin-bottom:4px;">✚ ${hospitalName}</div>
-      <h1 style="font-size:20px;font-weight:900;margin:0;color:#ffffff;">Email Notification Test</h1>
-    </div>
-    <div style="padding:24px 28px;">
-      <p style="font-size:14px;line-height:1.6;color:#334155;margin:0 0 20px;">
-        This test confirms that your hospital system is connected to Resend and ready to deliver operational reminders and management reports.
-      </p>
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;font-size:13px;color:#475569;">
-        <strong>Target Recipient:</strong> ${recipient}
-      </div>
-      ${appUrl ? `<p style="margin:24px 0 0;text-align:center;"><a href="${appUrl}/hospital/settings" style="display:inline-block;padding:12px 24px;background:#0284c7;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:800;font-size:13px;">Open Settings &rarr;</a></p>` : ''}
-    </div>
-    <div style="background:#f8fafc;padding:20px 28px;border-top:1px solid #e2e8f0;text-align:center;">
-      <p style="font-size:13px;color:#0f172a;margin:0 0 4px;font-weight:800;">${hospitalName}</p>
-      ${contactParts.length ? `<p style="font-size:11px;color:#64748b;margin:0 0 6px;line-height:1.4 font-weight:500;">${contactParts.join(' &bull; ')}</p>` : ''}
-      ${appUrl ? `<p style="font-size:11px;margin:0;font-weight:700;"><a href="${appUrl}" target="_blank" style="color:#0284c7;text-decoration:none;">🌐 ${websiteDisplay}</a></p>` : ''}
-    </div>
-  </div>
-</body>
-</html>`;
-
-    const resendRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: resendFrom,
-        to: [recipient],
-        subject: `${hospitalName}: Email Notification Test`,
-        html,
-      }),
-    });
-
-    const resendData = await resendRes.json();
-    if (!resendRes.ok || !resendData.id) {
-      throw new Error(resendData.message || `Resend API returned HTTP ${resendRes.status}`);
-    }
-
-    await adminSupabase.from('email_deliveries').insert({
-      notification_type: 'configuration_test',
-      recipient_email: recipient,
-      idempotency_key: `configuration-test-fallback-${Date.now()}`,
-      subject: `${hospitalName}: Email Notification Test`,
-      status: 'sent',
-      provider_message_id: resendData.id,
-      sent_at: new Date().toISOString(),
-    });
 
     return {
       success: true,
-      message: 'Test email accepted for delivery.',
+      message: typeof data.message === 'string'
+        ? data.message
+        : 'Test email accepted for delivery.',
     };
   } catch (error) {
     return { success: false, error: actionError(error) };

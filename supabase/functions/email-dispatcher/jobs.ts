@@ -1,12 +1,14 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@^2.105.1";
 import {
   APP_URL,
+  EmailDeliveryError,
   emailLayout,
   formatDateTime,
   plainText,
-  sendEmail,
+  sendEmails,
 } from "../_shared/email.ts";
 import type {
+  EmailMessage,
   NotificationJob,
   NotificationSettings,
 } from "../_shared/notification-types.ts";
@@ -47,7 +49,7 @@ async function processAppointmentJob(
 
   const { data: appointment, error: appointmentError } = await admin
     .from("appointments")
-    .select("appointment_date, patient_id, provider_id, status")
+    .select("appointment_date, patient_id, provider_id, status, notification_email")
     .eq("id", job.entity_id)
     .maybeSingle();
   if (appointmentError) throw appointmentError;
@@ -55,6 +57,22 @@ async function processAppointmentJob(
     return { skipped: true, reason: "Appointment or patient was not found." };
   }
 
+  const appointmentStatus = String(appointment.status || "SCHEDULED").toUpperCase();
+  const isReminder = job.notification_type === "appointment_reminder_24h" ||
+    job.notification_type === "appointment_reminder_2h";
+  if (job.notification_type === "appointment_cancelled" && appointmentStatus !== "CANCELLED") {
+    return { skipped: true, reason: "The appointment is no longer cancelled." };
+  }
+  if (job.notification_type !== "appointment_cancelled" &&
+    ["CANCELLED", "COMPLETED"].includes(appointmentStatus)) {
+    return { skipped: true, reason: `The appointment is ${appointmentStatus.toLowerCase()}.` };
+  }
+  if (isReminder && !["SCHEDULED", "CONFIRMED"].includes(appointmentStatus)) {
+    return { skipped: true, reason: `Appointment status ${appointmentStatus} is not reminder-eligible.` };
+  }
+  if (isReminder && new Date(appointment.appointment_date) <= new Date()) {
+    return { skipped: true, reason: "The appointment time has already passed." };
+  }
   const patientRequest = admin
     .from("patients")
     .select("first_name, last_name, email")
@@ -70,9 +88,17 @@ async function processAppointmentJob(
   const [{ data: patient, error: patientError }, { data: provider }] =
     await Promise.all([patientRequest, providerRequest]);
   if (patientError) throw patientError;
+  const patientEmail = appointment.notification_email?.trim().toLowerCase() ||
+    patient?.email?.trim().toLowerCase() || null;
+  const patientOnly = job.payload.patient_only === true;
+  const includeManager = !patientOnly && [
+    "appointment_confirmation",
+    "appointment_rescheduled",
+    "appointment_cancelled",
+  ].includes(job.notification_type);
   const recipients = [...new Set([
-    ...(patient?.email ? [patient.email.trim().toLowerCase()] : []),
-    ...(settings.manager_report_email ? [settings.manager_report_email.trim().toLowerCase()] : []),
+    ...(patientEmail ? [patientEmail] : []),
+    ...(includeManager && settings.manager_report_email ? [settings.manager_report_email.trim().toLowerCase()] : []),
   ])];
 
   if (!recipients.length) {
@@ -88,7 +114,7 @@ async function processAppointmentJob(
       "To be assigned"
     : "To be assigned";
   const patientName =
-    `${patient.first_name || ""} ${patient.last_name || ""}`.trim() ||
+    `${patient?.first_name || ""} ${patient?.last_name || ""}`.trim() ||
     "Patient";
   const copy: Record<string, { title: string; intro: string }> = {
     appointment_confirmation: {
@@ -122,8 +148,8 @@ async function processAppointmentJob(
   const portalUrl = APP_URL ? `${APP_URL}/patient/portal/appointments` : "";
   const adminUrl = APP_URL ? `${APP_URL}/hospital/opd` : "";
 
+  const messages: EmailMessage[] = [];
   const managerEmail = settings.manager_report_email?.trim().toLowerCase() || null;
-  const patientEmail = patient?.email?.trim().toLowerCase() || null;
 
   for (const recipient of recipients) {
     const isManager = recipient === managerEmail;
@@ -189,7 +215,7 @@ async function processAppointmentJob(
       );
     }
 
-    await sendEmail(admin, {
+    messages.push({
       notificationType: job.notification_type,
       recipient,
       subject,
@@ -200,6 +226,7 @@ async function processAppointmentJob(
       metadata: { appointment_id: job.entity_id },
     });
   }
+  await sendEmails(admin, messages);
   return { skipped: false, reason: null };
 }
 
@@ -243,8 +270,7 @@ async function processCriticalStockJob(
       ? { label: "Open inventory", href: `${APP_URL}/hospital/inventory` }
       : undefined,
   );
-  for (const recipient of recipients) {
-    await sendEmail(admin, {
+  await sendEmails(admin, recipients.map((recipient): EmailMessage => ({
       notificationType: job.notification_type,
       recipient,
       subject: `${hospitalName}: Stock-out — ${item.name}`,
@@ -253,8 +279,7 @@ async function processCriticalStockJob(
       idempotencyKey: `job/${job.id}/${recipient}`,
       jobId: job.id,
       metadata: { inventory_item_id: job.entity_id },
-    });
-  }
+    })));
   return { skipped: false, reason: null };
 }
 
@@ -264,7 +289,7 @@ export async function processDueJobs(
   hospitalName: string,
 ) {
   const staleLock = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  await admin
+  const { error: recoveryError } = await admin
     .from("email_notification_jobs")
     .update({
       status: "PENDING",
@@ -273,6 +298,7 @@ export async function processDueJobs(
     })
     .eq("status", "PROCESSING")
     .lt("locked_at", staleLock);
+  if (recoveryError) throw recoveryError;
 
   const { data, error } = await admin
     .from("email_notification_jobs")
@@ -280,15 +306,17 @@ export async function processDueJobs(
     .eq("status", "PENDING")
     .lte("scheduled_for", new Date().toISOString())
     .order("scheduled_for", { ascending: true })
-    .limit(50);
+    .limit(25);
   if (error) throw error;
 
   let completed = 0;
   let failed = 0;
+  let retried = 0;
+  let skipped = 0;
   for (const rawJob of data ?? []) {
     const job = rawJob as NotificationJob;
     const nextAttempt = job.attempt_count + 1;
-    const { data: claimed } = await admin
+    const { data: claimed, error: claimError } = await admin
       .from("email_notification_jobs")
       .update({
         status: "PROCESSING",
@@ -299,13 +327,14 @@ export async function processDueJobs(
       .eq("status", "PENDING")
       .select("id")
       .maybeSingle();
+    if (claimError) throw claimError;
     if (!claimed) continue;
 
     try {
       const result = job.entity_type === "appointment"
         ? await processAppointmentJob(admin, settings, hospitalName, job)
         : await processCriticalStockJob(admin, settings, hospitalName, job);
-      await admin
+      const { error: completionError } = await admin
         .from("email_notification_jobs")
         .update({
           status: result.skipped ? "SKIPPED" : "COMPLETED",
@@ -314,16 +343,30 @@ export async function processDueJobs(
           processed_at: new Date().toISOString(),
         })
         .eq("id", job.id);
-      completed += 1;
+      if (completionError) throw completionError;
+      if (result.skipped) skipped += 1;
+      else completed += 1;
     } catch (jobError) {
-      const exhausted = nextAttempt >= job.max_attempts;
-      await admin
+      const retryable = !(jobError instanceof EmailDeliveryError) || jobError.retryable;
+      const exhausted = !retryable || nextAttempt >= job.max_attempts;
+      const exponentialDelay = Math.min(
+        60 * 60 * 1000,
+        5 * 60 * 1000 * (2 ** Math.max(0, nextAttempt - 1)),
+      );
+      const retryAfter = jobError instanceof EmailDeliveryError
+        ? jobError.retryAfterMs ?? 0
+        : 0;
+      const retryDelay = Math.min(
+        24 * 60 * 60 * 1000,
+        Math.max(exponentialDelay, retryAfter),
+      );
+      const { error: failureUpdateError } = await admin
         .from("email_notification_jobs")
         .update({
           status: exhausted ? "FAILED" : "PENDING",
           scheduled_for: exhausted
             ? job.scheduled_for
-            : new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+            : new Date(Date.now() + retryDelay).toISOString(),
           last_error: jobError instanceof Error
             ? jobError.message
             : "Email delivery failed.",
@@ -331,8 +374,10 @@ export async function processDueJobs(
           processed_at: exhausted ? new Date().toISOString() : null,
         })
         .eq("id", job.id);
-      failed += 1;
+      if (failureUpdateError) throw failureUpdateError;
+      if (exhausted) failed += 1;
+      else retried += 1;
     }
   }
-  return { completed, failed };
+  return { completed, failed, retried, skipped };
 }

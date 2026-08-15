@@ -39,7 +39,21 @@ interface EmailDeliverySummary {
   recipient_email: string;
   status: string;
   subject: string;
+  last_error: string | null;
   created_at: string;
+}
+
+interface EmailDispatchHealth {
+  last_started_at: string | null;
+  last_completed_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+  last_result: unknown;
+}
+
+interface EmailQueueStats {
+  pending: number;
+  failed: number;
 }
 
 interface EmailNotificationSettingsPanelProps {
@@ -106,7 +120,12 @@ export function EmailNotificationSettingsPanel({
     DEFAULT_EMAIL_NOTIFICATION_SETTINGS,
   );
   const [deliveries, setDeliveries] = useState<EmailDeliverySummary[]>([]);
+  const [health, setHealth] = useState<EmailDispatchHealth | null>(null);
+  const [queueStats, setQueueStats] = useState<EmailQueueStats>({
+    pending: 0, failed: 0,
+  });
   const [loading, setLoading] = useState(true);
+  const [observedAt, setObservedAt] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -197,7 +216,10 @@ export function EmailNotificationSettingsPanel({
       });
     }
     setDeliveries(result.deliveries as EmailDeliverySummary[]);
+    setHealth(result.health as EmailDispatchHealth | null);
+    setQueueStats(result.queueStats);
     setLoading(false);
+    setObservedAt(Date.now());
   }, [canEdit]);
 
   useEffect(() => {
@@ -276,6 +298,11 @@ export function EmailNotificationSettingsPanel({
     delivery_delayed: "bg-amber-50 text-amber-700",
     queued: "bg-slate-100 text-slate-600",
   };
+  const lastSuccessAt = health?.last_success_at
+    ? new Date(health.last_success_at)
+    : null;
+  const schedulerRecent = !!lastSuccessAt && observedAt !== null &&
+    observedAt - lastSuccessAt.getTime() < 15 * 60 * 1000;
 
   return (
     <div className="space-y-8">
@@ -655,6 +682,53 @@ export function EmailNotificationSettingsPanel({
         </div>
       </form>
 
+      <section className="space-y-5 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-black text-slate-900">Email Scheduler Health</h2>
+            <p className="text-xs font-medium text-slate-500">Queue state and the latest five-minute dispatcher heartbeat.</p>
+          </div>
+          <span className={`w-fit rounded-full px-3 py-1 text-[10px] font-black uppercase ${
+            !form.enabled
+              ? "bg-slate-100 text-slate-600"
+              : schedulerRecent && !health?.last_error
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-amber-50 text-amber-700"
+          }`}>
+            {!form.enabled ? "Delivery disabled" : schedulerRecent ? "Scheduler active" : "Needs attention"}
+          </span>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Last success</p>
+            <p className="mt-2 text-sm font-bold text-slate-800">
+              {lastSuccessAt ? lastSuccessAt.toLocaleString() : "No successful run recorded"}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-blue-50 p-4">
+            <p className="text-[10px] font-black uppercase tracking-wider text-blue-500">Pending jobs</p>
+            <p className="mt-2 text-2xl font-black text-blue-800">{queueStats.pending}</p>
+          </div>
+          <div className={`rounded-2xl p-4 ${queueStats.failed ? "bg-rose-50" : "bg-emerald-50"}`}>
+            <p className={`text-[10px] font-black uppercase tracking-wider ${queueStats.failed ? "text-rose-500" : "text-emerald-500"}`}>
+              Failed jobs
+            </p>
+            <p className={`mt-2 text-2xl font-black ${queueStats.failed ? "text-rose-800" : "text-emerald-800"}`}>
+              {queueStats.failed}
+            </p>
+          </div>
+        </div>
+
+        {health?.last_error && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+            <p className="text-xs font-black uppercase text-rose-700">Latest dispatcher error</p>
+            <p className="mt-1 break-words text-sm text-rose-700">{health.last_error}</p>
+          </div>
+        )}
+      </section>
+
+
       <section className="mt-8 space-y-4 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
         <div>
           <h2 className="text-lg font-black text-slate-900">Recent Email Delivery</h2>
@@ -671,6 +745,9 @@ export function EmailNotificationSettingsPanel({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-slate-900">{delivery.subject}</p>
                   <p className="truncate text-xs text-slate-500">{delivery.recipient_email}</p>
+                  {delivery.last_error && (
+                    <p className="mt-1 break-words text-xs font-medium text-rose-600">{delivery.last_error}</p>
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${statusStyles[delivery.status] || "bg-slate-100 text-slate-600"}`}>

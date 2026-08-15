@@ -70,6 +70,12 @@ const systemSettingsSchema = z
     email: optionalEmail,
     payment_methods: z.array(z.string().trim().min(1).max(60)).min(1).max(30),
     insurance_providers: z.array(z.string().trim().min(1).max(150)).max(100),
+    geofence_enabled: z.boolean().optional().default(false),
+    geofence_latitude: z.coerce.number().min(-90).max(90).optional().default(0),
+    geofence_longitude: z.coerce.number().min(-180).max(180).optional().default(0),
+    geofence_radius_meters: z.coerce.number().min(10).max(1000000).optional().default(500),
+    geofence_enforce_roles: z.array(z.string().trim().min(1).max(60)).optional().default([]),
+    geofence_allow_admin_bypass: z.boolean().optional().default(true),
   })
   .strict();
 
