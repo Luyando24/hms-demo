@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -13,6 +13,8 @@ import {
   User,
   MapPin,
   Loader2,
+  RefreshCw,
+  Info,
 } from "lucide-react";
 
 type LoginAction = (formData: FormData) => void | Promise<void>;
@@ -77,35 +79,77 @@ function LoginContent({ audience, action }: LoginFormProps) {
   const error = searchParams.get("error");
   const pageContent = content[audience];
   const IdentifierIcon = pageContent.Icon;
+  const formRef = useRef<HTMLFormElement>(null);
 
   const [coords, setCoords] = useState<{ lat: number | null; lng: number | null }>({
     lat: null,
     lng: null,
   });
   const [locating, setLocating] = useState(false);
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'acquired' | 'denied'>('idle');
+  const [locationStatus, setLocationStatus] = useState<
+    'idle' | 'acquired' | 'denied' | 'timeout' | 'error' | 'unsupported'
+  >('idle');
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isInsecureMobile, setIsInsecureMobile] = useState(false);
+
+  const requestLocation = useCallback(() => {
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+      setLocationStatus('unsupported');
+      return;
+    }
+
+    const isHttp = window.location.protocol === 'http:';
+    const isIpHost = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+    if (isHttp && isIpHost) {
+      setIsInsecureMobile(true);
+    }
+
+    setLocating(true);
+    setLocationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLocationStatus('acquired');
+        setLocating(false);
+      },
+      (err) => {
+        console.warn('Geolocation acquisition error:', err.code, err.message);
+        setLocating(false);
+        if (err.code === 1) {
+          setLocationStatus('denied');
+          setLocationError(
+            'Location access was denied. On Safari iOS, tap the website settings icon (aA) in the address bar to allow location.'
+          );
+        } else if (err.code === 3) {
+          setLocationStatus('timeout');
+          setLocationError('GPS detection timed out. Tap "Detect GPS" to try again.');
+        } else {
+          setLocationStatus('error');
+          setLocationError('Unable to fetch GPS coordinates. Please ensure Location Services are turned ON in device settings.');
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }, []);
 
   useEffect(() => {
-    if (audience === 'workforce' && typeof window !== 'undefined' && 'geolocation' in navigator) {
-      setLocating(true);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-          setLocationStatus('acquired');
-          setLocating(false);
-        },
-        (err) => {
-          console.warn('Geolocation acquisition error:', err.message);
-          setLocationStatus('denied');
-          setLocating(false);
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
-      );
+    if (audience === 'workforce') {
+      requestLocation();
     }
-  }, [audience]);
+  }, [audience, requestLocation]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    if (audience === 'workforce' && coords.lat === null && typeof window !== 'undefined' && 'geolocation' in navigator) {
+    if (
+      audience === 'workforce' &&
+      coords.lat === null &&
+      typeof window !== 'undefined' &&
+      'geolocation' in navigator
+    ) {
       e.preventDefault();
       setLocating(true);
       const formEl = e.currentTarget;
@@ -115,20 +159,30 @@ function LoginContent({ audience, action }: LoginFormProps) {
           setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
           setLocationStatus('acquired');
           setLocating(false);
-          // Set values on hidden inputs dynamically before submit
+
+          // Update hidden fields
           const latInput = formEl.querySelector<HTMLInputElement>('input[name="latitude"]');
           const lngInput = formEl.querySelector<HTMLInputElement>('input[name="longitude"]');
           if (latInput) latInput.value = String(pos.coords.latitude);
           if (lngInput) lngInput.value = String(pos.coords.longitude);
-          formEl.submit();
+
+          // Trigger Server Action submission properly
+          if (typeof formEl.requestSubmit === 'function') {
+            formEl.requestSubmit();
+          } else {
+            formEl.submit();
+          }
         },
         (err) => {
-          console.warn('Geolocation acquisition failed on submit:', err.message);
-          setLocationStatus('denied');
+          console.warn('Geolocation failed on submit:', err.message);
           setLocating(false);
-          formEl.submit();
+          if (typeof formEl.requestSubmit === 'function') {
+            formEl.requestSubmit();
+          } else {
+            formEl.submit();
+          }
         },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
       );
     }
   };
@@ -162,7 +216,7 @@ function LoginContent({ audience, action }: LoginFormProps) {
 
           <form action={action} onSubmit={handleSubmit} className="space-y-5">
             {audience === 'workforce' && (
-              <>
+              <div className="space-y-2">
                 <input
                   type="hidden"
                   name="latitude"
@@ -174,23 +228,51 @@ function LoginContent({ audience, action }: LoginFormProps) {
                   value={coords.lng !== null ? String(coords.lng) : ''}
                 />
 
-                <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-2 border border-slate-100 text-[12px]">
-                  <div className="flex items-center gap-2 text-slate-600 font-medium">
-                    <MapPin size={14} className={locationStatus === 'acquired' ? 'text-emerald-500' : 'text-amber-500'} />
-                    <span>Geo-location verification</span>
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3 border border-slate-200 text-[12px]">
+                  <div className="flex items-center gap-2 text-slate-700 font-bold">
+                    <MapPin size={16} className={locationStatus === 'acquired' ? 'text-emerald-600' : 'text-amber-500'} />
+                    <span>GPS Access Verification</span>
                   </div>
-                  {locating ? (
-                    <span className="flex items-center gap-1 text-slate-400 font-medium">
-                      <Loader2 className="animate-spin" size={12} />
-                      Detecting...
-                    </span>
-                  ) : locationStatus === 'acquired' ? (
-                    <span className="font-semibold text-emerald-600">GPS Active</span>
-                  ) : (
-                    <span className="font-medium text-slate-400">Standard</span>
-                  )}
+
+                  <div className="flex items-center gap-2">
+                    {locating ? (
+                      <span className="flex items-center gap-1.5 text-slate-500 font-semibold bg-slate-200 px-2.5 py-1 rounded-lg">
+                        <Loader2 className="animate-spin" size={12} />
+                        Detecting...
+                      </span>
+                    ) : locationStatus === 'acquired' ? (
+                      <span className="font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200">
+                        GPS Active
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={requestLocation}
+                        className="flex items-center gap-1 font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 px-2.5 py-1 rounded-lg border border-brand-200 transition-colors"
+                      >
+                        <RefreshCw size={12} />
+                        <span>Detect Location</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </>
+
+                {locationError && (
+                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[12px] font-medium leading-relaxed">
+                    <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                    <span>{locationError}</span>
+                  </div>
+                )}
+
+                {isInsecureMobile && (
+                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-[12px] font-medium leading-relaxed">
+                    <Info size={15} className="text-blue-600 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Safari Mobile Note:</strong> iOS Safari requires HTTPS or access via <code>localhost</code> to grant device GPS permissions.
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
 
             <div>

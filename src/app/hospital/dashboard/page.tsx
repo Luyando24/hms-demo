@@ -339,7 +339,7 @@ export default function HospitalDashboard() {
           </button>
           <span className="flex items-center gap-2 text-sm font-bold px-3.5 py-2 bg-emerald-100 text-emerald-800 rounded-xl">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            System Operational
+            System Active
           </span>
         </div>
       </div>
@@ -553,7 +553,7 @@ export default function HospitalDashboard() {
               <div>
                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
                   <ShieldAlert className="text-brand-600" size={24} />
-                  System Operational Logs
+                  System Activity Logs
                 </h2>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">Real-time event logs for emergency triage, inventory, blood bank, and admissions.</p>
               </div>
