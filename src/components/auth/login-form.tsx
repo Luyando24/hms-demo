@@ -143,50 +143,6 @@ function LoginContent({ audience, action }: LoginFormProps) {
     }
   }, [audience, requestLocation]);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    if (
-      audience === 'workforce' &&
-      coords.lat === null &&
-      typeof window !== 'undefined' &&
-      'geolocation' in navigator
-    ) {
-      e.preventDefault();
-      setLocating(true);
-      const formEl = e.currentTarget;
-
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-          setLocationStatus('acquired');
-          setLocating(false);
-
-          // Update hidden fields
-          const latInput = formEl.querySelector<HTMLInputElement>('input[name="latitude"]');
-          const lngInput = formEl.querySelector<HTMLInputElement>('input[name="longitude"]');
-          if (latInput) latInput.value = String(pos.coords.latitude);
-          if (lngInput) lngInput.value = String(pos.coords.longitude);
-
-          // Trigger Server Action submission properly
-          if (typeof formEl.requestSubmit === 'function') {
-            formEl.requestSubmit();
-          } else {
-            formEl.submit();
-          }
-        },
-        (err) => {
-          console.warn('Geolocation failed on submit:', err.message);
-          setLocating(false);
-          if (typeof formEl.requestSubmit === 'function') {
-            formEl.requestSubmit();
-          } else {
-            formEl.submit();
-          }
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-      );
-    }
-  };
-
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#f8f9fa] p-4 font-sans">
       <div className="mb-8 flex flex-col items-center text-center">
@@ -214,7 +170,7 @@ function LoginContent({ audience, action }: LoginFormProps) {
             </div>
           )}
 
-          <form action={action} onSubmit={handleSubmit} className="space-y-5">
+          <form action={action} className="space-y-5">
             {audience === 'workforce' && (
               <div className="space-y-2">
                 <input
