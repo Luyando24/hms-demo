@@ -112,43 +112,52 @@ function LoginContent({ audience, action }: LoginFormProps) {
     setLocating(true);
     setLocationError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const latitude = Number(pos.coords.latitude.toFixed(6));
-        const longitude = Number(pos.coords.longitude.toFixed(6));
-        setCoords({ lat: latitude, lng: longitude });
-        setLocationStatus('acquired');
-        setLocating(false);
+    const attempt = (highAccuracy: boolean) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const latitude = Number(pos.coords.latitude.toFixed(6));
+          const longitude = Number(pos.coords.longitude.toFixed(6));
+          setCoords({ lat: latitude, lng: longitude });
+          setLocationStatus('acquired');
+          setLocating(false);
 
-        // Auto-advance smoothly to Screen 2 after brief verification confirmation
-        setTimeout(() => {
-          setStep(2);
-        }, 500);
-      },
-      (err) => {
-        console.warn('Auto GPS acquisition error:', err.code, err.message);
-        setLocating(false);
-        if (err.code === 1) {
-          setLocationStatus('denied');
-          setLocationError(
-            'Location access denied. On Safari iOS, tap the website settings icon (aA) in the address bar -> Website Settings -> Location: Allow.'
-          );
-        } else if (err.code === 3) {
-          setLocationStatus('timeout');
-          setLocationError('GPS detection timed out. Tap "Retry Location Check" below.');
-        } else {
-          setLocationStatus('error');
-          setLocationError(
-            'Unable to acquire GPS position. Please check device Location Services.'
-          );
+          // Auto-advance smoothly to Screen 2 after brief verification confirmation
+          setTimeout(() => {
+            setStep(2);
+          }, 400);
+        },
+        (err) => {
+          console.warn('Geolocation attempt error (highAccuracy=' + highAccuracy + '):', err.code, err.message);
+          if (highAccuracy) {
+            // High accuracy (satellite GPS fix) failed or timed out indoors. Fallback to Wi-Fi/Cellular positioning!
+            attempt(false);
+          } else {
+            setLocating(false);
+            if (err.code === 1) {
+              setLocationStatus('denied');
+              setLocationError(
+                'Location access was blocked. On Safari iOS, please tap "Retry Location Check" below.'
+              );
+            } else if (err.code === 3) {
+              setLocationStatus('timeout');
+              setLocationError('GPS detection timed out. Tap "Retry Location Check" below.');
+            } else {
+              setLocationStatus('error');
+              setLocationError(
+                'Unable to acquire GPS position. Please check device Location Services.'
+              );
+            }
+          }
+        },
+        {
+          enableHighAccuracy: highAccuracy,
+          timeout: highAccuracy ? 4000 : 10000,
+          maximumAge: 300000,
         }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
-      }
-    );
+      );
+    };
+
+    attempt(true);
   }, []);
 
   // Automatic GPS acquisition on mount for Screen 1
@@ -290,7 +299,7 @@ function LoginContent({ audience, action }: LoginFormProps) {
                     value={coords.lng !== null ? String(coords.lng) : ''}
                   />
 
-                  {/* Clean Status Badge: Within Range (No raw coordinates) */}
+                  {/* Clean Status Badge: Within Range */}
                   <div className="flex items-center justify-between rounded-2xl bg-emerald-50/90 border border-emerald-200/80 px-4 py-3 text-[13px]">
                     <div className="flex items-center gap-2.5">
                       <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
