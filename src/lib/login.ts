@@ -127,8 +127,8 @@ export async function authenticateLogin(
     if (settings && settings.geofence_enabled) {
       const geofenceConfig = {
         enabled: settings.geofence_enabled,
-        latitude: settings.geofence_latitude ?? 0,
-        longitude: settings.geofence_longitude ?? 0,
+        latitude: (settings.geofence_latitude && settings.geofence_latitude !== 0) ? settings.geofence_latitude : -15.3875,
+        longitude: (settings.geofence_longitude && settings.geofence_longitude !== 0) ? settings.geofence_longitude : 28.3228,
         radiusMeters: settings.geofence_radius_meters ?? 500,
         enforceRoles: (settings.geofence_enforce_roles as string[]) || [],
         allowAdminBypass: settings.geofence_allow_admin_bypass ?? true,

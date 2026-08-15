@@ -106,12 +106,16 @@ export function isLocationWithinGeofence(
     };
   }
 
-  // 4. Calculate Haversine distance
+  // 4. Resolve center coordinates (fallback to facility default if unconfigured 0,0)
+  const centerLat = (config.latitude && config.latitude !== 0) ? config.latitude : -15.3875;
+  const centerLng = (config.longitude && config.longitude !== 0) ? config.longitude : 28.3228;
+
+  // 5. Calculate Haversine distance
   const distanceMeters = calculateHaversineDistance(
     userLat,
     userLng,
-    config.latitude,
-    config.longitude
+    centerLat,
+    centerLng
   );
 
   const allowed = distanceMeters <= config.radiusMeters;
