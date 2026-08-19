@@ -246,3 +246,36 @@ export async function verifyTvBroadcastCode(code: string) {
     message: 'Invalid or revoked TV connection code. Please request a new activation code from your Administrator.',
   };
 }
+
+export async function getTvQueueData(code: string) {
+  const verification = await verifyTvBroadcastCode(code);
+  if (!verification.valid) {
+    return { ok: false, error: verification.message, items: [], rooms: [] };
+  }
+
+  const adminSupabase = createAdminClient();
+
+  const { data: queueData, error: queueError } = await adminSupabase
+    .from('walkin_queue')
+    .select('*, patients(first_name, last_name, file_number), rooms(id, name), departments(id, name)')
+    .in('status', ['WAITING', 'TRIAGED', 'CALLING', 'CONSULTATION'])
+    .order('created_at', { ascending: true });
+
+  if (queueError) {
+    console.error('Error fetching TV queue data:', queueError);
+    return { ok: false, error: queueError.message, items: [], rooms: [] };
+  }
+
+  const { data: roomsData } = await adminSupabase
+    .from('rooms')
+    .select('id, name')
+    .order('name', { ascending: true });
+
+  return {
+    ok: true,
+    items: queueData || [],
+    rooms: roomsData || [],
+    hospitalName: verification.name || 'OPD Waiting Room TV',
+  };
+}
+

@@ -16,7 +16,7 @@ import {
   Minimize2
 } from 'lucide-react';
 import { verifyTvBroadcastCode } from './actions';
-import QueueDisplayPage from '@/app/hospital/queue-display/page';
+import QueueDisplayView from '@/components/hospital/QueueDisplayView';
 
 function TvPageContent() {
   const searchParams = useSearchParams();
@@ -181,7 +181,7 @@ function TvPageContent() {
           </div>
         )}
 
-        <QueueDisplayPage />
+        <QueueDisplayView tvConnectionCode={activeCode} />
       </div>
     );
   }
