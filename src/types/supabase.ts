@@ -2454,6 +2454,44 @@ export type Database = {
         }
         Relationships: []
       }
+      tv_broadcast_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          last_connected_at: string | null
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          last_connected_at?: string | null
+          name?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          last_connected_at?: string | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tv_broadcast_codes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

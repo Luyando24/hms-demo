@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react';
-import { Settings as SettingsIcon, DollarSign, Building, Save, Loader2, ShieldAlert, CreditCard, Shield, Plus, X, Mail, MapPin, Navigation, Crosshair } from 'lucide-react';
+import { Settings as SettingsIcon, DollarSign, Building, Save, Loader2, ShieldAlert, CreditCard, Shield, Plus, X, Mail, MapPin, Navigation, Crosshair, Tv, Radio } from 'lucide-react';
 import clsx from 'clsx';
 import { createClient } from '@/utils/supabase/client';
 import { SUPPORTED_CURRENCIES, formatCurrencyAmount } from '@/utils/currency';
@@ -9,6 +9,7 @@ import StatusModal from '@/components/hospital/StatusModal';
 import { EmailNotificationSettingsPanel } from '@/components/hospital/EmailNotificationSettingsPanel';
 import { updateSystemSettingsAction } from '@/app/hospital/actions';
 import { formatDistance } from '@/utils/geofence';
+import { TvBroadcastModal } from '@/components/hospital/TvBroadcastModal';
 
 const WORKFORCE_ROLES = [
   'DOCTOR',
@@ -27,7 +28,8 @@ export default function SystemSettingsPage() {
   const [detectingGps, setDetectingGps] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'financial' | 'payments' | 'insurance' | 'notifications' | 'geofence'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'financial' | 'payments' | 'insurance' | 'notifications' | 'geofence' | 'tv_broadcast'>('general');
+  const [isTvModalOpen, setIsTvModalOpen] = useState(false);
 
   const [form, setForm] = useState({
     hospital_name: '',
@@ -218,6 +220,7 @@ export default function SystemSettingsPage() {
     { id: 'insurance', label: 'Insurance Providers', icon: Shield },
     { id: 'geofence', label: 'Geo-Fence & Security', icon: MapPin },
     { id: 'notifications', label: 'Email & Notifications', icon: Mail },
+    { id: 'tv_broadcast', label: 'TV Broadcast', icon: Tv },
   ] as const;
 
   return (
@@ -801,6 +804,64 @@ export default function SystemSettingsPage() {
           <EmailNotificationSettingsPanel canEdit={userRole === 'ADMIN'} />
         </div>
       )}
+
+      {/* Tab 7: Smart TV Queue Broadcast Management */}
+      {activeTab === 'tv_broadcast' && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-xs space-y-6 animate-in fade-in duration-300">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 shadow-xs">
+                <Tv size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  Smart TV Queue Broadcast
+                  <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    Active Feature
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Broadcasting live OPD queue announcements to Smart TVs using connection links and activation codes.
+                </p>
+              </div>
+            </div>
+
+            {userRole === 'ADMIN' && (
+              <button
+                onClick={() => setIsTvModalOpen(true)}
+                className="px-5 py-3 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition-all shadow-md shadow-amber-600/20 flex items-center justify-center gap-2 shrink-0"
+              >
+                <Radio size={16} className="animate-pulse" />
+                <span>Manage TV Links & Codes</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Radio size={18} className="text-brand-600" />
+                Direct TV Pairing Link
+              </h4>
+              <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                Generates a direct URL (e.g. <code>https://staff.kundahealthcare.org/tv?code=TV-849201</code>) that allows Smart TVs to connect instantly without typing passwords.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Shield size={18} className="text-emerald-600" />
+                6-Digit TV Activation Code
+              </h4>
+              <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                Open <code>/tv</code> on any TV browser and enter the unique 6-digit activation code (e.g. <code>TV-849201</code>). Codes can be revoked at any time by Administrators.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <TvBroadcastModal isOpen={isTvModalOpen} onClose={() => setIsTvModalOpen(false)} />
 
       <StatusModal
         isOpen={!!status}

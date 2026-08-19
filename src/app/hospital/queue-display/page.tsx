@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { playVoiceNotification, isVoiceEnabled, setVoiceEnabled } from '@/utils/voiceNotification';
+import { TvBroadcastModal } from '@/components/hospital/TvBroadcastModal';
+import { checkIsAdmin } from '@/app/tv/actions';
 
 interface PatientQueueItem {
   id: string;
@@ -65,10 +67,16 @@ export default function QueueDisplayPage() {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [hospitalName, setHospitalName] = useState<string>('HMS - Kunda Health Care');
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isTvModalOpen, setIsTvModalOpen] = useState<boolean>(false);
 
   const router = useRouter();
   const supabase = createClient();
   const announcedIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    void checkIsAdmin().then((res) => setIsAdmin(res));
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -336,6 +344,18 @@ export default function QueueDisplayPage() {
               <Maximize2 size={18} />
               <span className="hidden sm:inline">Fullscreen</span>
             </button>
+
+            {/* Admin-only Broadcast to TV Button */}
+            {isAdmin && (
+              <button
+                onClick={() => setIsTvModalOpen(true)}
+                className="p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-2xl transition-all flex items-center gap-2 text-xs font-bold shadow-xs"
+                title="Generate TV Broadcast Link & Connection Code"
+              >
+                <Radio size={18} className="animate-pulse text-amber-600" />
+                <span className="hidden sm:inline">Broadcast to TV</span>
+              </button>
+            )}
           </div>
         </header>
       )}
@@ -564,6 +584,8 @@ export default function QueueDisplayPage() {
         </div>
 
       </main>
+
+      <TvBroadcastModal isOpen={isTvModalOpen} onClose={() => setIsTvModalOpen(false)} />
     </div>
   );
 }

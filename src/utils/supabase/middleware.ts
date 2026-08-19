@@ -80,7 +80,8 @@ export async function updateSession(request: NextRequest) {
     isPatientLoginRoute ||
     isPwaAssetRoute ||
     pathname.startsWith('/auth') ||
-    pathname.startsWith('/book-appointment')
+    pathname.startsWith('/book-appointment') ||
+    pathname.startsWith('/tv')
 
   // Unauthenticated user flow
   if (!user) {
