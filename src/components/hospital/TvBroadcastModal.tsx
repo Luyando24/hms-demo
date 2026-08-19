@@ -12,7 +12,8 @@ import {
   Radio, 
   Monitor, 
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Link2
 } from 'lucide-react';
 import { 
   generateTvBroadcastCode, 
@@ -33,6 +34,7 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
   const [generating, setGenerating] = useState(false);
   const [activeCode, setActiveCode] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedTvUrl, setCopiedTvUrl] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchCodes = async () => {
@@ -53,6 +55,8 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const activeCodesList = codes.filter((c) => c.is_active);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,6 +95,17 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
     }
   };
 
+  const copyTvLinkToClipboard = async () => {
+    try {
+      const cleanTvUrl = typeof window !== 'undefined' ? `${window.location.origin}/tv` : 'https://staff.kundahealthcare.org/tv';
+      await navigator.clipboard.writeText(cleanTvUrl);
+      setCopiedTvUrl(true);
+      setTimeout(() => setCopiedTvUrl(false), 2000);
+    } catch {
+      // Fallback
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in">
       <div className="relative w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
@@ -113,12 +128,24 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={copyTvLinkToClipboard}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors border border-slate-200 shrink-0"
+              title="Copy TV display page URL without code"
+            >
+              {copiedTvUrl ? <Check size={14} className="text-emerald-600" /> : <Link2 size={14} className="text-brand-600" />}
+              <span>{copiedTvUrl ? 'TV Link Copied!' : 'Copy TV Link'}</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}
@@ -193,27 +220,25 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
             </div>
           )}
 
-          {/* Active Paired TV Devices Table */}
+          {/* Active Paired TV Devices Table (Revoked items filtered out) */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
-              <span>Active TV Activation Codes ({codes.filter(c => c.is_active).length})</span>
+              <span>Active TV Activation Codes ({activeCodesList.length})</span>
               {loading && <Loader2 size={14} className="animate-spin text-slate-400" />}
             </h3>
 
-            {codes.length === 0 ? (
+            {activeCodesList.length === 0 ? (
               <div className="p-8 text-center border border-dashed border-slate-200 rounded-2xl text-slate-400 space-y-1">
                 <Monitor size={28} className="mx-auto text-slate-300" />
-                <p className="text-xs font-semibold text-slate-600">No TV Activation Codes Generated</p>
+                <p className="text-xs font-semibold text-slate-600">No Active TV Activation Codes</p>
                 <p className="text-[11px] text-slate-400">Use the form above to generate a 6-digit code for your Smart TV.</p>
               </div>
             ) : (
               <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-white">
-                {codes.map((item) => (
+                {activeCodesList.map((item) => (
                   <div key={item.id} className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`p-2 rounded-xl border ${
-                        item.is_active ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-slate-100 border-slate-200 text-slate-400'
-                      }`}>
+                      <div className="p-2 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-600">
                         <Monitor size={18} />
                       </div>
                       <div className="min-w-0">
@@ -236,28 +261,22 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      {item.is_active ? (
-                        <>
-                          <button
-                            onClick={() => copyCodeToClipboard(item.code)}
-                            className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors text-xs font-semibold flex items-center gap-1"
-                            title="Copy Activation Code"
-                          >
-                            <Copy size={15} />
-                            <span>Copy Code</span>
-                          </button>
-                          <button
-                            onClick={() => handleRevoke(item.id)}
-                            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1"
-                            title="Revoke TV Code"
-                          >
-                            <Trash2 size={15} />
-                            <span className="hidden sm:inline">Revoke</span>
-                          </button>
-                        </>
-                      ) : (
-                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-md">Revoked</span>
-                      )}
+                      <button
+                        onClick={() => copyCodeToClipboard(item.code)}
+                        className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors text-xs font-semibold flex items-center gap-1"
+                        title="Copy Activation Code"
+                      >
+                        <Copy size={15} />
+                        <span>Copy Code</span>
+                      </button>
+                      <button
+                        onClick={() => handleRevoke(item.id)}
+                        className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1"
+                        title="Revoke TV Code"
+                      >
+                        <Trash2 size={15} />
+                        <span className="hidden sm:inline">Revoke</span>
+                      </button>
                     </div>
                   </div>
                 ))}
