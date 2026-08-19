@@ -53,6 +53,20 @@ interface RoomDisplay {
   status: 'AVAILABLE' | 'BUSY' | 'CALLING';
 }
 
+function getPatientFullName(patientData: any): string {
+  if (!patientData) return 'Patient';
+  const p = Array.isArray(patientData) ? patientData[0] : patientData;
+  if (!p) return 'Patient';
+  const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim();
+  return fullName || 'Patient';
+}
+
+function getPatientFileNumber(patientData: any): string {
+  if (!patientData) return 'N/A';
+  const p = Array.isArray(patientData) ? patientData[0] : patientData;
+  return p?.file_number || 'N/A';
+}
+
 export default function QueueDisplayView({ tvConnectionCode }: { tvConnectionCode?: string } = {}) {
   const [queueItems, setQueueItems] = useState<PatientQueueItem[]>([]);
   const [rooms, setRooms] = useState<RoomDisplay[]>([]);
@@ -214,7 +228,7 @@ export default function QueueDisplayView({ tvConnectionCode }: { tvConnectionCod
     if (!callingItems || callingItems.length === 0) return;
 
     const announcements = callingItems.map(item => {
-      const pName = item.patients ? `${item.patients.first_name} ${item.patients.last_name}` : 'Patient';
+      const pName = getPatientFullName(item.patients);
       const rName = item.rooms?.name ? item.rooms.name : 'Consultation Room';
       const tNum = item.token_number || '';
       return { pName, rName, tNum };
@@ -401,10 +415,10 @@ export default function QueueDisplayView({ tvConnectionCode }: { tvConnectionCod
                       {nowCalling.departments?.name || 'General OPD'}
                     </span>
                     <h3 className="text-4xl lg:text-5xl font-black text-white tracking-tight">
-                      {nowCalling.patients ? `${nowCalling.patients.first_name} ${nowCalling.patients.last_name}` : 'Patient'}
+                      {getPatientFullName(nowCalling.patients)}
                     </h3>
                     <p className="text-sm font-semibold text-slate-400 mt-1">
-                      File No: <span className="font-mono text-slate-200">{nowCalling.patients?.file_number || 'N/A'}</span>
+                      File No: <span className="font-mono text-slate-200">{getPatientFileNumber(nowCalling.patients)}</span>
                     </p>
                   </div>
 
@@ -484,9 +498,7 @@ export default function QueueDisplayView({ tvConnectionCode }: { tvConnectionCod
                   {room.currentPatient ? (
                     <div className="space-y-1 pt-2 border-t border-slate-800/80">
                       <p className="text-sm font-bold text-slate-100 truncate">
-                        {room.currentPatient.patients 
-                          ? `${room.currentPatient.patients.first_name} ${room.currentPatient.patients.last_name}`
-                          : 'Patient'}
+                        {getPatientFullName(room.currentPatient.patients)}
                       </p>
                       <div className="flex items-center justify-between text-xs text-slate-400">
                         <span>Token: <strong className="font-mono text-slate-200">{room.currentPatient.token_number || 'N/A'}</strong></span>
@@ -562,7 +574,7 @@ export default function QueueDisplayView({ tvConnectionCode }: { tvConnectionCod
 
                       <div className="min-w-0">
                         <p className="font-bold text-sm text-white truncate">
-                          {item.patients ? `${item.patients.first_name} ${item.patients.last_name}` : 'Patient'}
+                          {getPatientFullName(item.patients)}
                         </p>
                         <p className="text-xs text-slate-400 truncate">
                           {item.departments?.name || 'General OPD'}
