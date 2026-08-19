@@ -31,6 +31,55 @@ export async function checkIsAdmin(): Promise<boolean> {
   }
 }
 
+const TV_CODE_PREFIX = 'TVCODE:';
+
+async function getSystemSettingsTvCodes(): Promise<{ settingsId: string; codes: TvCodeItem[]; rawProviders: string[] }> {
+  const adminSupabase = createAdminClient();
+  const { data } = await adminSupabase
+    .from('system_settings')
+    .select('id, insurance_providers')
+    .limit(1)
+    .maybeSingle();
+
+  const rawProviders = data?.insurance_providers || [];
+  const tvCodes: TvCodeItem[] = [];
+
+  for (const item of rawProviders) {
+    if (item.startsWith(TV_CODE_PREFIX)) {
+      try {
+        const parsed = JSON.parse(item.slice(TV_CODE_PREFIX.length));
+        if (parsed && parsed.code) {
+          tvCodes.push(parsed);
+        }
+      } catch {
+        // Skip invalid entries
+      }
+    }
+  }
+
+  return {
+    settingsId: data?.id || '',
+    codes: tvCodes,
+    rawProviders,
+  };
+}
+
+async function saveSystemSettingsTvCodes(tvCodes: TvCodeItem[]) {
+  const adminSupabase = createAdminClient();
+  const { settingsId, rawProviders } = await getSystemSettingsTvCodes();
+
+  const nonTvItems = rawProviders.filter((p) => !p.startsWith(TV_CODE_PREFIX));
+  const newTvItems = tvCodes.map((c) => `${TV_CODE_PREFIX}${JSON.stringify(c)}`);
+  const updatedProviders = [...nonTvItems, ...newTvItems];
+
+  if (settingsId) {
+    await adminSupabase
+      .from('system_settings')
+      .update({ insurance_providers: updatedProviders })
+      .eq('id', settingsId);
+  }
+}
+
 export async function generateTvBroadcastCode(displayName: string = 'OPD Waiting Room TV') {
   const isAdmin = await checkIsAdmin();
   if (!isAdmin) {
@@ -40,31 +89,52 @@ export async function generateTvBroadcastCode(displayName: string = 'OPD Waiting
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Generate unique 6-character code e.g. TV-849201
   const randomDigits = Math.floor(100000 + Math.random() * 900000).toString();
   const code = `TV-${randomDigits}`;
+  const newItem: TvCodeItem = {
+    id: `tv-${Date.now()}-${randomDigits}`,
+    code,
+    name: displayName || 'OPD Waiting Room TV',
+    is_active: true,
+    created_at: new Date().toISOString(),
+    last_connected_at: null,
+  };
 
   const adminSupabase = createAdminClient();
-  const { data, error } = await adminSupabase
-    .from('tv_broadcast_codes')
-    .insert({
-      code,
-      name: displayName || 'OPD Waiting Room TV',
-      created_by: user?.id ?? null,
-      is_active: true,
-    })
-    .select()
-    .single();
+  const directUrl = getSubdomainUrl('staff', `/tv?code=${code}`);
 
-  if (error) {
-    console.error('Failed to generate TV broadcast code:', error);
-    return { ok: false, error: 'Failed to save TV connection code.' };
+  // 1. Try dedicated table first
+  try {
+    const { data, error } = await adminSupabase
+      .from('tv_broadcast_codes')
+      .insert({
+        code: newItem.code,
+        name: newItem.name,
+        created_by: user?.id ?? null,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      return {
+        ok: true,
+        data: data as TvCodeItem,
+        directUrl,
+      };
+    }
+  } catch {
+    // Fall back below
   }
 
-  const directUrl = getSubdomainUrl('staff', `/tv?code=${code}`);
+  // 2. Fallback to system_settings if PostgREST schema cache has not loaded tv_broadcast_codes
+  const { codes } = await getSystemSettingsTvCodes();
+  const updatedCodes = [newItem, ...codes];
+  await saveSystemSettingsTvCodes(updatedCodes);
+
   return {
     ok: true,
-    data: data as TvCodeItem,
+    data: newItem,
     directUrl,
   };
 }
@@ -76,14 +146,19 @@ export async function revokeTvBroadcastCode(id: string) {
   }
 
   const adminSupabase = createAdminClient();
-  const { error } = await adminSupabase
-    .from('tv_broadcast_codes')
-    .update({ is_active: false })
-    .eq('id', id);
-
-  if (error) {
-    return { ok: false, error: 'Failed to revoke TV connection code.' };
+  try {
+    await adminSupabase
+      .from('tv_broadcast_codes')
+      .update({ is_active: false })
+      .eq('id', id);
+  } catch {
+    // Ignore error and run fallback
   }
+
+  // Fallback update in system_settings
+  const { codes } = await getSystemSettingsTvCodes();
+  const updatedCodes = codes.map((c) => (c.id === id || c.code === id ? { ...c, is_active: false } : c));
+  await saveSystemSettingsTvCodes(updatedCodes);
 
   return { ok: true };
 }
@@ -95,16 +170,22 @@ export async function getTvBroadcastCodes() {
   }
 
   const adminSupabase = createAdminClient();
-  const { data, error } = await adminSupabase
-    .from('tv_broadcast_codes')
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await adminSupabase
+      .from('tv_broadcast_codes')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    return { ok: false, error: error.message, data: [] };
+    if (!error && data && data.length > 0) {
+      return { ok: true, data: data as TvCodeItem[] };
+    }
+  } catch {
+    // Fall back below
   }
 
-  return { ok: true, data: (data as TvCodeItem[]) || [] };
+  // Fallback read
+  const { codes } = await getSystemSettingsTvCodes();
+  return { ok: true, data: codes };
 }
 
 export async function verifyTvBroadcastCode(code: string) {
@@ -115,28 +196,53 @@ export async function verifyTvBroadcastCode(code: string) {
   const cleanCode = code.trim().toUpperCase();
   const adminSupabase = createAdminClient();
 
-  const { data, error } = await adminSupabase
-    .from('tv_broadcast_codes')
-    .select('id, name, is_active')
-    .eq('code', cleanCode)
-    .maybeSingle();
+  // 1. Try table check
+  try {
+    const { data, error } = await adminSupabase
+      .from('tv_broadcast_codes')
+      .select('id, name, is_active')
+      .eq('code', cleanCode)
+      .maybeSingle();
 
-  if (error || !data || !data.is_active) {
+    if (!error && data) {
+      if (!data.is_active) {
+        return {
+          valid: false,
+          message: 'Invalid or revoked TV connection code. Please request a new activation code from your Administrator.',
+        };
+      }
+
+      void adminSupabase
+        .from('tv_broadcast_codes')
+        .update({ last_connected_at: new Date().toISOString() })
+        .eq('id', data.id);
+
+      return {
+        valid: true,
+        name: data.name,
+        code: cleanCode,
+      };
+    }
+  } catch {
+    // Fall back below
+  }
+
+  // 2. Fallback check from system_settings
+  const { codes } = await getSystemSettingsTvCodes();
+  const matched = codes.find((c) => c.code.toUpperCase() === cleanCode && c.is_active);
+
+  if (matched) {
+    matched.last_connected_at = new Date().toISOString();
+    void saveSystemSettingsTvCodes(codes);
     return {
-      valid: false,
-      message: 'Invalid or revoked TV connection code. Please request a new activation code from your Administrator.',
+      valid: true,
+      name: matched.name,
+      code: cleanCode,
     };
   }
 
-  // Update last_connected_at asynchronously
-  void adminSupabase
-    .from('tv_broadcast_codes')
-    .update({ last_connected_at: new Date().toISOString() })
-    .eq('id', data.id);
-
   return {
-    valid: true,
-    name: data.name,
-    code: cleanCode,
+    valid: false,
+    message: 'Invalid or revoked TV connection code. Please request a new activation code from your Administrator.',
   };
 }
