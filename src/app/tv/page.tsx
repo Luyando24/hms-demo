@@ -3,17 +3,13 @@
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { 
-  Tv, 
-  Radio, 
   KeyRound, 
   Loader2, 
   AlertCircle, 
-  CheckCircle2, 
   ArrowRight,
   HeartPulse,
   Unplug,
-  Maximize2,
-  Minimize2
+  Maximize2
 } from 'lucide-react';
 import { verifyTvBroadcastCode } from './actions';
 import QueueDisplayPage from '@/app/hospital/queue-display/page';
@@ -23,7 +19,6 @@ function TvPageContent() {
   const urlCode = searchParams.get('code');
 
   const [inputCode, setInputCode] = useState('');
-  const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -42,15 +37,26 @@ function TvPageContent() {
     };
   }, []);
 
+  // Prefill input if code parameter was passed in URL, but strip query param so URL is clean
+  useEffect(() => {
+    if (urlCode) {
+      const formatted = urlCode.startsWith('TV-') ? urlCode : `TV-${urlCode}`;
+      setInputCode(formatted);
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, [urlCode]);
+
   const requestFullscreenMode = () => {
     if (typeof window !== 'undefined' && document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().catch(() => {
-        // Browser prevented auto-fullscreen due to user gesture requirement
+        // Browser user gesture policy fallback
       });
     }
   };
 
-  const performVerification = useCallback(async (codeToVerify: string, triggerFullscreen: boolean = false) => {
+  const performVerification = useCallback(async (codeToVerify: string) => {
     setVerifying(true);
     setErrorMsg(null);
 
@@ -63,12 +69,7 @@ function TvPageContent() {
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('tv_broadcast_code', res.code);
-        // Strip sensitive ?code= parameter from URL address bar so viewers cannot see the code
         window.history.replaceState({}, document.title, window.location.pathname);
-
-        if (triggerFullscreen) {
-          requestFullscreenMode();
-        }
       }
     } else {
       setIsConnected(false);
@@ -78,36 +79,13 @@ function TvPageContent() {
       }
     }
     setVerifying(false);
-    setLoading(false);
   }, []);
-
-  useEffect(() => {
-    // 1. If code passed in URL, attempt instant pairing and URL cleanup
-    if (urlCode) {
-      const formatted = urlCode.startsWith('TV-') ? urlCode : `TV-${urlCode}`;
-      setInputCode(formatted);
-      void performVerification(formatted, true);
-      return;
-    }
-
-    // 2. Check if a code was previously saved in localStorage
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('tv_broadcast_code');
-      if (saved) {
-        setInputCode(saved);
-        void performVerification(saved, false);
-        return;
-      }
-    }
-
-    setLoading(false);
-  }, [urlCode, performVerification]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputCode.trim()) return;
 
-    // Immediately trigger fullscreen on user form submit gesture
+    // Immediately trigger fullscreen on form submit gesture
     requestFullscreenMode();
 
     let codeToVerify = inputCode.trim().toUpperCase();
@@ -115,7 +93,7 @@ function TvPageContent() {
       codeToVerify = `TV-${codeToVerify}`;
     }
 
-    await performVerification(codeToVerify, true);
+    await performVerification(codeToVerify);
   };
 
   const handleDisconnect = () => {
@@ -131,19 +109,6 @@ function TvPageContent() {
     setInputCode('');
     setErrorMsg(null);
   };
-
-  if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-900 text-white font-sans">
-        <div className="flex flex-col items-center gap-4">
-          <div className="p-4 bg-slate-800 rounded-3xl border border-slate-700 shadow-xl">
-            <Loader2 className="animate-spin text-brand-400" size={40} />
-          </div>
-          <p className="text-sm font-bold tracking-widest uppercase text-slate-400">Verifying TV Connection...</p>
-        </div>
-      </main>
-    );
-  }
 
   // State A: Connected to TV Broadcast -> Render Full Queue Display
   if (isConnected && activeCode) {
@@ -166,7 +131,7 @@ function TvPageContent() {
                 className="flex items-center gap-1.5 text-xs bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-xl font-bold transition-all shadow-md shadow-brand-600/30"
               >
                 <Maximize2 size={14} />
-                <span>Enter Fullscreen (Hide Browser URL)</span>
+                <span>Enter Fullscreen</span>
               </button>
 
               <button
@@ -186,7 +151,7 @@ function TvPageContent() {
     );
   }
 
-  // State B: Enter Activation Code Form
+  // State B: Always First Screen on TV - Enter Activation Code Form
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-slate-950 p-4 font-sans text-slate-100 select-none">
       {/* Background Glow */}

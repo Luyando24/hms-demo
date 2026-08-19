@@ -5,7 +5,6 @@ import {
   Tv, 
   Copy, 
   Check, 
-  ExternalLink, 
   Plus, 
   Trash2, 
   X, 
@@ -32,9 +31,8 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
   const [codes, setCodes] = useState<TvCodeItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [activeCode, setActiveCode] = useState<{ code: string; directUrl: string } | null>(null);
+  const [activeCode, setActiveCode] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedUrl, setCopiedUrl] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchCodes = async () => {
@@ -62,11 +60,8 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
     setError(null);
 
     const res = await generateTvBroadcastCode(tvName);
-    if (res.ok && res.data && res.directUrl) {
-      setActiveCode({
-        code: res.data.code,
-        directUrl: res.directUrl,
-      });
+    if (res.ok && res.data) {
+      setActiveCode(res.data.code);
       void fetchCodes();
     } else {
       setError(res.error || 'Failed to generate TV broadcast code.');
@@ -86,16 +81,11 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
     }
   };
 
-  const copyToClipboard = async (text: string, type: 'code' | 'url') => {
+  const copyCodeToClipboard = async (codeStr: string) => {
     try {
-      await navigator.clipboard.writeText(text);
-      if (type === 'code') {
-        setCopiedCode(true);
-        setTimeout(() => setCopiedCode(false), 2000);
-      } else {
-        setCopiedUrl(true);
-        setTimeout(() => setCopiedUrl(false), 2000);
-      }
+      await navigator.clipboard.writeText(codeStr);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
     } catch {
       // Fallback
     }
@@ -103,7 +93,7 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5 bg-slate-50/50">
           <div className="flex items-center gap-3">
@@ -118,7 +108,7 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
                 </span>
               </h2>
               <p className="text-xs font-medium text-slate-500">
-                Pair Smart TVs & monitors to the live queue display without signing in.
+                Generate 6-character activation codes to pair Smart TVs & waiting room monitors.
               </p>
             </div>
           </div>
@@ -145,7 +135,7 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Plus size={16} className="text-brand-600" />
-                Generate New Connection Link & Code
+                Generate New Activation Code
               </h3>
               <span className="text-[11px] text-slate-500 font-medium">Valid until revoked</span>
             </div>
@@ -168,70 +158,37 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
                 className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs transition-all shadow-md shadow-brand-600/20 flex items-center justify-center gap-2 disabled:opacity-70 shrink-0"
               >
                 {generating ? <Loader2 size={16} className="animate-spin" /> : <Radio size={16} />}
-                <span>Generate Activation Link</span>
+                <span>Generate TV Code</span>
               </button>
             </div>
           </form>
 
           {/* Newly Generated Code Spotlight */}
           {activeCode && (
-            <div className="p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-500/50 space-y-4 animate-in fade-in">
+            <div className="p-6 rounded-2xl bg-emerald-50 border-2 border-emerald-500/50 space-y-4 animate-in fade-in text-center">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
-                  <ShieldCheck size={16} className="text-emerald-600" />
-                  TV Activation Details Generated
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5 mx-auto">
+                  <ShieldCheck size={18} className="text-emerald-600" />
+                  TV Activation Code Generated
                 </span>
-                <span className="text-[11px] font-semibold text-emerald-700">Ready to Pair</span>
               </div>
 
-              {/* Code Box */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                <div className="p-4 rounded-xl bg-white border border-emerald-200 text-center">
-                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-1">
-                    Unique Connection Code
-                  </span>
-                  <div className="text-3xl font-black font-mono text-emerald-950 tracking-wider">
-                    {activeCode.code}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(activeCode.code, 'code')}
-                    className="mt-2.5 text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center justify-center gap-1 mx-auto"
-                  >
-                    {copiedCode ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                    <span>{copiedCode ? 'Code Copied!' : 'Copy Code'}</span>
-                  </button>
+              {/* Unique Activation Code Display */}
+              <div className="p-5 rounded-2xl bg-white border border-emerald-200 shadow-sm max-w-sm mx-auto space-y-3">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">
+                  Enter This Code On Smart TV Screen
+                </span>
+                <div className="text-4xl font-black font-mono text-emerald-950 tracking-wider">
+                  {activeCode}
                 </div>
-
-                {/* Direct Link Box */}
-                <div className="p-4 rounded-xl bg-white border border-emerald-200 space-y-2">
-                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">
-                    Direct Pairing URL
-                  </span>
-                  <p className="text-xs font-mono text-slate-600 truncate bg-slate-50 p-2 rounded-lg border border-slate-200">
-                    {activeCode.directUrl}
-                  </p>
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(activeCode.directUrl, 'url')}
-                      className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1 transition-all"
-                    >
-                      {copiedUrl ? <Check size={14} /> : <Copy size={14} />}
-                      <span>{copiedUrl ? 'Link Copied!' : 'Copy Link'}</span>
-                    </button>
-
-                    <a
-                      href={activeCode.directUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center transition-all"
-                      title="Open TV view in new tab"
-                    >
-                      <ExternalLink size={16} />
-                    </a>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => copyCodeToClipboard(activeCode)}
+                  className="w-full py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-600/20"
+                >
+                  {copiedCode ? <Check size={16} /> : <Copy size={16} />}
+                  <span>{copiedCode ? 'Activation Code Copied!' : 'Copy Activation Code'}</span>
+                </button>
               </div>
             </div>
           )}
@@ -239,15 +196,15 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
           {/* Active Paired TV Devices Table */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
-              <span>Active TV Pairing Codes ({codes.filter(c => c.is_active).length})</span>
+              <span>Active TV Activation Codes ({codes.filter(c => c.is_active).length})</span>
               {loading && <Loader2 size={14} className="animate-spin text-slate-400" />}
             </h3>
 
             {codes.length === 0 ? (
               <div className="p-8 text-center border border-dashed border-slate-200 rounded-2xl text-slate-400 space-y-1">
                 <Monitor size={28} className="mx-auto text-slate-300" />
-                <p className="text-xs font-semibold text-slate-600">No TV Pairing Codes Generated</p>
-                <p className="text-[11px] text-slate-400">Use the form above to generate a code for your Smart TV.</p>
+                <p className="text-xs font-semibold text-slate-600">No TV Activation Codes Generated</p>
+                <p className="text-[11px] text-slate-400">Use the form above to generate a 6-digit code for your Smart TV.</p>
               </div>
             ) : (
               <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-white">
@@ -282,11 +239,12 @@ export function TvBroadcastModal({ isOpen, onClose }: TvBroadcastModalProps) {
                       {item.is_active ? (
                         <>
                           <button
-                            onClick={() => copyToClipboard(item.code, 'code')}
-                            className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors text-xs font-semibold"
-                            title="Copy Code"
+                            onClick={() => copyCodeToClipboard(item.code)}
+                            className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors text-xs font-semibold flex items-center gap-1"
+                            title="Copy Activation Code"
                           >
                             <Copy size={15} />
+                            <span>Copy Code</span>
                           </button>
                           <button
                             onClick={() => handleRevoke(item.id)}

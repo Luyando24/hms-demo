@@ -101,7 +101,6 @@ export async function generateTvBroadcastCode(displayName: string = 'OPD Waiting
   };
 
   const adminSupabase = createAdminClient();
-  const directUrl = getSubdomainUrl('staff', `/tv?code=${code}`);
 
   // 1. Try dedicated table first
   try {
@@ -120,7 +119,6 @@ export async function generateTvBroadcastCode(displayName: string = 'OPD Waiting
       return {
         ok: true,
         data: data as TvCodeItem,
-        directUrl,
       };
     }
   } catch {
@@ -135,7 +133,6 @@ export async function generateTvBroadcastCode(displayName: string = 'OPD Waiting
   return {
     ok: true,
     data: newItem,
-    directUrl,
   };
 }
 
