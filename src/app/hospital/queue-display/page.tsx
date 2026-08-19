@@ -21,7 +21,7 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import { playVoiceNotification, isVoiceEnabled, setVoiceEnabled } from '@/utils/voiceNotification';
 import { TvBroadcastModal } from '@/components/hospital/TvBroadcastModal';
-import { checkIsAdmin } from '@/app/tv/actions';
+import { checkIsAdmin, fetchTvQueueData } from '@/app/tv/actions';
 
 interface PatientQueueItem {
   id: string;
@@ -125,11 +125,22 @@ export default function QueueDisplayPage() {
     try {
       setLoading(true);
       // 1. Fetch walk-in queue
-      const { data: queueData } = await supabase
+      let { data: queueData } = await supabase
         .from('walkin_queue')
         .select('*, patients(first_name, last_name, file_number), rooms(id, name), departments(id, name)')
         .in('status', ['WAITING', 'TRIAGED', 'CALLING', 'CONSULTATION'])
         .order('created_at', { ascending: true });
+
+      let fallbackRooms: { id: string; name: string }[] | null = null;
+
+      // Fallback fetch via admin service role if RLS returns empty for unauthenticated Smart TV screens
+      if (!queueData || queueData.length === 0) {
+        const tvRes = await fetchTvQueueData();
+        if (tvRes.ok) {
+          queueData = tvRes.queueData as unknown as typeof queueData;
+          fallbackRooms = tvRes.roomsData;
+        }
+      }
 
       const items: PatientQueueItem[] = (queueData as unknown as PatientQueueItem[]) || [];
       setQueueItems(items);
@@ -150,13 +161,17 @@ export default function QueueDisplayPage() {
       }
 
       // 2. Fetch Rooms
-      const { data: roomsData } = await supabase
-        .from('rooms')
-        .select('id, name')
-        .order('name', { ascending: true });
+      let roomsList: { id: string; name: string }[] | null = fallbackRooms;
+      if (!roomsList) {
+        const { data: roomsData } = await supabase
+          .from('rooms')
+          .select('id, name')
+          .order('name', { ascending: true });
+        roomsList = roomsData;
+      }
 
-      if (roomsData) {
-        const roomList: RoomDisplay[] = roomsData.map(r => {
+      if (roomsList) {
+        const roomList: RoomDisplay[] = roomsList.map(r => {
           const activeItem = items.find(i => i.rooms?.id === r.id && (i.status === 'CONSULTATION' || i.status === 'CALLING'));
           return {
             id: r.id,
@@ -185,8 +200,14 @@ export default function QueueDisplayPage() {
       })
       .subscribe();
 
+    // Polling interval every 5 seconds for reliable Smart TV queue sync
+    const interval = setInterval(() => {
+      void loadQueueData();
+    }, 5000);
+
     return () => {
       void supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, []);
 

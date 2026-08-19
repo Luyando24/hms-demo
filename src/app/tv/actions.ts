@@ -246,3 +246,33 @@ export async function verifyTvBroadcastCode(code: string) {
     message: 'Invalid or revoked TV connection code. Please request a new activation code from your Administrator.',
   };
 }
+
+export async function fetchTvQueueData() {
+  try {
+    const adminSupabase = createAdminClient();
+    const { data: queueData, error } = await adminSupabase
+      .from('walkin_queue')
+      .select('*, patients(first_name, last_name, file_number), rooms(id, name), departments(id, name)')
+      .in('status', ['WAITING', 'TRIAGED', 'CALLING', 'CONSULTATION'])
+      .order('created_at', { ascending: true });
+
+    const { data: roomsData } = await adminSupabase
+      .from('rooms')
+      .select('id, name')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Failed to fetch TV queue data via admin client:', error);
+      return { ok: false, queueData: [], roomsData: [] };
+    }
+
+    return {
+      ok: true,
+      queueData: queueData || [],
+      roomsData: roomsData || [],
+    };
+  } catch (err) {
+    console.error('Error fetching TV queue data:', err);
+    return { ok: false, queueData: [], roomsData: [] };
+  }
+}
