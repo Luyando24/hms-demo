@@ -22,7 +22,7 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
     email: '',
     firstName: '',
     lastName: '',
-    role: 'NURSE',
+    role: '',
     department: 'General Outpatient (OPD)',
     staffNumber: ''
   });
@@ -43,8 +43,12 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
       }
     }
     if (step === 3) {
-      if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-        setStepError('Please enter a valid work email address.');
+      if (!formData.email.trim()) {
+        setStepError('Please enter a work email address.');
+        return false;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+        setStepError('Please enter a valid work email address (e.g. name@hospital.com).');
         return false;
       }
     }
@@ -54,6 +58,7 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
+      setStepError(null);
       setCurrentStep(prev => (prev < 3 ? (prev + 1) as 1 | 2 | 3 : prev));
     }
   };
@@ -63,10 +68,27 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
     setCurrentStep(prev => (prev > 1 ? (prev - 1) as 1 | 2 | 3 : prev));
   };
 
+  const handleStepClick = (targetStep: 1 | 2 | 3) => {
+    if (targetStep === currentStep) return;
+    if (targetStep < currentStep) {
+      setStepError(null);
+      setCurrentStep(targetStep);
+      return;
+    }
+    for (let s = 1; s < targetStep; s++) {
+      if (!validateStep(s)) {
+        setCurrentStep(s as 1 | 2 | 3);
+        return;
+      }
+    }
+    setStepError(null);
+    setCurrentStep(targetStep);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prevent submission on early steps if user presses Enter
+    // STRICT GUARD: Never submit to server unless on final step (Step 3)
     if (currentStep < 3) {
       handleNext();
       return;
@@ -89,10 +111,8 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
     setLoading(true);
 
     try {
-      const effectiveEmail = formData.email.trim() || `${formData.firstName.toLowerCase()}.${formData.lastName.toLowerCase()}.${Math.floor(1000 + Math.random() * 9000)}@hospital.com`;
-
       const result = await createStaffMember({
-        email: effectiveEmail,
+        email: formData.email.trim(),
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         role: formData.role,
@@ -147,56 +167,81 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
 
             {/* Step Pills */}
             <div className="grid grid-cols-3 gap-2 pt-1">
-              <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${
-                currentStep === 1 
-                  ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/20' 
-                  : currentStep > 1 
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold' 
-                  : 'bg-white border-slate-200 text-slate-400'
-              }`}>
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+              <button
+                type="button"
+                onClick={() => handleStepClick(1)}
+                className={`p-2 rounded-xl border flex items-center gap-2 transition-all text-left ${
+                  currentStep === 1 
+                    ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/20' 
+                    : currentStep > 1 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold hover:bg-emerald-100' 
+                    : 'bg-white border-slate-200 text-slate-400'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
                   currentStep === 1 ? 'bg-white text-brand-600' : currentStep > 1 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'
                 }`}>
                   {currentStep > 1 ? <CheckCircle2 size={12} /> : '1'}
                 </div>
                 <span className="text-[11px] font-bold truncate">Personal Details</span>
-              </div>
+              </button>
 
-              <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${
-                currentStep === 2 
-                  ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/20' 
-                  : currentStep > 2 
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold' 
-                  : 'bg-white border-slate-200 text-slate-400'
-              }`}>
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+              <button
+                type="button"
+                onClick={() => handleStepClick(2)}
+                className={`p-2 rounded-xl border flex items-center gap-2 transition-all text-left ${
+                  currentStep === 2 
+                    ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/20' 
+                    : currentStep > 2 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold hover:bg-emerald-100' 
+                    : 'bg-white border-slate-200 text-slate-400'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
                   currentStep === 2 ? 'bg-white text-brand-600' : currentStep > 2 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'
                 }`}>
                   {currentStep > 2 ? <CheckCircle2 size={12} /> : '2'}
                 </div>
                 <span className="text-[11px] font-bold truncate">Role & ID</span>
-              </div>
+              </button>
 
-              <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${
-                currentStep === 3 
-                  ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/20' 
-                  : 'bg-white border-slate-200 text-slate-400'
-              }`}>
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+              <button
+                type="button"
+                onClick={() => handleStepClick(3)}
+                className={`p-2 rounded-xl border flex items-center gap-2 transition-all text-left ${
+                  currentStep === 3 
+                    ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/20' 
+                    : 'bg-white border-slate-200 text-slate-400'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
                   currentStep === 3 ? 'bg-white text-brand-600' : 'bg-slate-100 text-slate-400'
                 }`}>
                   3
                 </div>
                 <span className="text-[11px] font-bold truncate">Email & Invite</span>
-              </div>
+              </button>
             </div>
           </div>
 
           {/* Form Body */}
-          <form id="add-staff-form" onSubmit={handleSubmit} className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6">
+          <form 
+            id="add-staff-form" 
+            onSubmit={handleSubmit} 
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                if (currentStep < 3) {
+                  handleNext();
+                }
+              }
+            }}
+            className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6"
+          >
             {stepError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold animate-in fade-in">
-                ⚠️ {stepError}
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold animate-in fade-in flex items-center gap-2">
+                <span>⚠️</span>
+                <span>{stepError}</span>
               </div>
             )}
 
@@ -215,7 +260,10 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
                       <input 
                         required
                         value={formData.firstName}
-                        onChange={e => setFormData({...formData, firstName: e.target.value})}
+                        onChange={e => {
+                          setStepError(null);
+                          setFormData({...formData, firstName: e.target.value});
+                        }}
                         placeholder="e.g. Luyando"
                         className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white transition-all"
                       />
@@ -229,7 +277,10 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
                       <input 
                         required
                         value={formData.lastName}
-                        onChange={e => setFormData({...formData, lastName: e.target.value})}
+                        onChange={e => {
+                          setStepError(null);
+                          setFormData({...formData, lastName: e.target.value});
+                        }}
                         placeholder="e.g. Chansa"
                         className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white transition-all"
                       />
@@ -252,10 +303,15 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
                     <div className="relative group">
                       <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={16} />
                       <select 
+                        required
                         value={formData.role}
-                        onChange={e => setFormData({...formData, role: e.target.value})}
+                        onChange={e => {
+                          setStepError(null);
+                          setFormData({...formData, role: e.target.value});
+                        }}
                         className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white transition-all"
                       >
+                        <option value="" disabled>-- Select Staff Role --</option>
                         <option value="DOCTOR">Medical Doctor</option>
                         <option value="NURSE">Nurse / Clinical Staff</option>
                         <option value="RECEPTIONIST">Receptionist / Front Desk</option>
@@ -315,17 +371,20 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 ml-1 uppercase tracking-wider flex items-center justify-between">
-                    Work Email Address
-                    <span className="text-[10px] text-slate-400 normal-case font-normal">(Auto-generated if left blank)</span>
+                  <label className="text-xs font-bold text-slate-700 ml-1 uppercase tracking-wider">
+                    Work Email Address *
                   </label>
                   <div className="relative group">
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={16} />
                     <input 
                       type="email"
+                      required
                       value={formData.email}
-                      onChange={e => setFormData({...formData, email: e.target.value})}
-                      placeholder={`${formData.firstName.toLowerCase()}.${formData.lastName.toLowerCase()}@hospital.com`}
+                      onChange={e => {
+                        setStepError(null);
+                        setFormData({...formData, email: e.target.value});
+                      }}
+                      placeholder={`${formData.firstName.toLowerCase() || 'staff'}.${formData.lastName.toLowerCase() || 'member'}@hospital.com`}
                       className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white transition-all"
                     />
                   </div>
@@ -339,11 +398,19 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
                   </div>
                   <div className="flex justify-between text-xs font-bold">
                     <span className="text-slate-500">Assigned Role:</span>
-                    <span className="text-brand-600">{formData.role}</span>
+                    <span className="text-brand-600">{formData.role || 'Not selected'}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-slate-500">Department:</span>
+                    <span className="text-slate-900">{formData.department}</span>
                   </div>
                   <div className="flex justify-between text-xs font-bold">
                     <span className="text-slate-500">Staff ID:</span>
                     <span className="text-slate-900">{formData.staffNumber || 'Auto-generated'}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-slate-500">Work Email:</span>
+                    <span className="text-slate-900">{formData.email || 'Required'}</span>
                   </div>
                 </div>
               </div>
