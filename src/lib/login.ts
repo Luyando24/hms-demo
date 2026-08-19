@@ -7,7 +7,7 @@ import { ROLE_PERMISSIONS, type UserRole } from '@/utils/rbac';
 
 import { isLocationWithinGeofence } from '@/utils/geofence';
 
-export type LoginAudience = 'patient' | 'workforce';
+export type LoginAudience = 'patient' | 'staff' | 'admin';
 
 export type LoginResult =
   | { ok: true; role: UserRole }
@@ -42,7 +42,11 @@ function isRoleAllowedForAudience(
     return role === 'PATIENT';
   }
 
-  return role !== 'PATIENT' && Boolean(ROLE_PERMISSIONS[role]);
+  if (audience === 'admin') {
+    return role === 'ADMIN';
+  }
+
+  return role !== 'PATIENT' && role !== 'ADMIN' && Boolean(ROLE_PERMISSIONS[role]);
 }
 
 export async function authenticateLogin(
@@ -115,8 +119,8 @@ export async function authenticateLogin(
     return { ok: false, reason: 'invalid-credentials' };
   }
 
-  // Geofence check for workforce sign-in
-  if (audience === 'workforce') {
+  // Geofence check for staff and administrator sign-in.
+  if (audience !== 'patient') {
     const adminSupabase = createAdminClient();
     const { data: settings } = await adminSupabase
       .from('system_settings')

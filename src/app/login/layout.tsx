@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Staff Sign In",
-  description: "Secure sign in for HMS hospital staff and administrators.",
+  title: "Workforce Sign In",
+  description: "Choose secure staff or administrator access.",
   robots: {
     index: false,
     follow: false,

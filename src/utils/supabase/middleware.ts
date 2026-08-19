@@ -59,7 +59,11 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isWorkforceLoginRoute = pathname === '/login'
+  const isLoginChooserRoute = pathname === '/login'
+  const isStaffLoginRoute = pathname === '/login/staff'
+  const isAdminLoginRoute = pathname === '/login/admin'
+  const isWorkforceLoginRoute =
+    isLoginChooserRoute || isStaffLoginRoute || isAdminLoginRoute
   const isPatientLoginRoute = pathname === '/patient/login'
   const isPwaAssetRoute =
     pathname === '/manifest.webmanifest' ||

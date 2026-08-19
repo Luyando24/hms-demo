@@ -16,13 +16,14 @@ import {
   CheckCircle2,
   Compass,
   ShieldCheck,
+  Shield,
   Info,
 } from "lucide-react";
 
 type LoginAction = (formData: FormData) => void | Promise<void>;
 
 interface LoginFormProps {
-  audience: "patient" | "workforce";
+  audience: "patient" | "staff" | "admin";
   action: LoginAction;
 }
 
@@ -38,16 +39,27 @@ const content = {
     switchHref: "/login",
     Icon: User,
   },
-  workforce: {
-    eyebrow: "Hospital workforce",
-    title: "Staff & Administrator Sign In",
-    description: "Use your hospital account to access clinical and administrative tools.",
+  staff: {
+    eyebrow: "Hospital staff",
+    title: "Staff Sign In",
+    description: "Access the clinical and operational workspace assigned to your role.",
     identifierLabel: "Email or Staff ID",
     identifierPlaceholder: "Email or HMS-S-...",
-    switchPrompt: "Looking for your health records?",
-    switchLabel: "Patient portal sign in",
-    switchHref: "/patient/login",
+    switchPrompt: "Need a different workforce sign-in?",
+    switchLabel: "Return to sign-in options",
+    switchHref: "/login",
     Icon: Stethoscope,
+  },
+  admin: {
+    eyebrow: "Administration",
+    title: "Administrator Sign In",
+    description: "Access hospital configuration, oversight, reporting, and administration.",
+    identifierLabel: "Administrator Email or Staff ID",
+    identifierPlaceholder: "Email or HMS-S-...",
+    switchPrompt: "Need a different workforce sign-in?",
+    switchLabel: "Return to sign-in options",
+    switchHref: "/login",
+    Icon: Shield,
   },
 } as const;
 
@@ -82,7 +94,8 @@ function LoginContent({ audience, action }: LoginFormProps) {
   const IdentifierIcon = pageContent.Icon;
 
   // Screen step: 1 = Initial Location Check (workforce only), 2 = Credentials Screen
-  const [step, setStep] = useState<1 | 2>(audience === 'workforce' ? 1 : 2);
+  const isWorkforce = audience !== 'patient';
+  const [step, setStep] = useState<1 | 2>(isWorkforce ? 1 : 2);
 
   const [coords, setCoords] = useState<{ lat: number | null; lng: number | null }>({
     lat: null,
@@ -162,10 +175,10 @@ function LoginContent({ audience, action }: LoginFormProps) {
 
   // Automatic GPS acquisition on mount for Screen 1
   useEffect(() => {
-    if (audience === 'workforce') {
-      requestLocation();
-    }
-  }, [audience, requestLocation]);
+    if (!isWorkforce) return;
+    const timeoutId = window.setTimeout(requestLocation, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [isWorkforce, requestLocation]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#f8f9fa] p-4 font-sans">
@@ -201,7 +214,7 @@ function LoginContent({ audience, action }: LoginFormProps) {
           )}
 
           {/* SCREEN 1: FIRST SCREEN LOCATION VERIFICATION ANIMATION */}
-          {audience === 'workforce' && step === 1 && (
+          {isWorkforce && step === 1 && (
             <div className="py-4 space-y-6 text-center animate-in fade-in duration-300">
               {locating ? (
                 <div className="space-y-5">
@@ -284,9 +297,9 @@ function LoginContent({ audience, action }: LoginFormProps) {
           )}
 
           {/* SCREEN 2: LOGIN CREDENTIALS FORM */}
-          {(audience === 'patient' || step === 2) && (
+          {(!isWorkforce || step === 2) && (
             <form action={action} className="space-y-5 animate-in fade-in duration-300">
-              {audience === 'workforce' && (
+              {isWorkforce && (
                 <>
                   <input
                     type="hidden"

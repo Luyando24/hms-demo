@@ -6,12 +6,16 @@ import { getSubdomainUrl } from '@/utils/subdomain';
 import { getRoleLandingDestination } from '@/utils/rbac';
 import { createClient } from '@/utils/supabase/server';
 
-function loginError(message: string): never {
-  redirect('/login?error=' + encodeURIComponent(message));
+function loginError(path: '/login/staff' | '/login/admin', message: string): never {
+  redirect(path + '?error=' + encodeURIComponent(message));
 }
 
-export async function signInWorkforce(formData: FormData) {
-  const result = await authenticateLogin(formData, 'workforce');
+async function signInWorkforce(
+  formData: FormData,
+  audience: 'staff' | 'admin',
+  loginPath: '/login/staff' | '/login/admin',
+) {
+  const result = await authenticateLogin(formData, audience);
 
   if (!result.ok) {
     let message = 'Invalid sign-in credentials.';
@@ -22,15 +26,23 @@ export async function signInWorkforce(formData: FormData) {
     } else if (result.reason === 'geofence-denied') {
       message = `Access Denied: You are outside the authorized hospital geo-fence zone (Current distance: ${result.distance ?? 'Unknown'}, Permitted radius: ${result.limit ?? 'Unknown'}).`;
     }
-    loginError(message);
+    loginError(loginPath, message);
   }
 
   const destination = getRoleLandingDestination(result.role);
   if (!destination) {
-    loginError('Your account does not have a valid access profile.');
+    loginError(loginPath, 'Your account does not have a valid access profile.');
   }
 
   redirect(getSubdomainUrl(destination.subdomain, destination.path));
+}
+
+export async function signInStaff(formData: FormData) {
+  return signInWorkforce(formData, 'staff', '/login/staff');
+}
+
+export async function signInAdmin(formData: FormData) {
+  return signInWorkforce(formData, 'admin', '/login/admin');
 }
 
 export async function signOut() {
