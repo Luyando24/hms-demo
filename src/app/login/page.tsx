@@ -8,7 +8,7 @@ import {
 
 const signInOptions = [
   {
-    href: "/login/staff",
+    href: "/staff/login",
     eyebrow: "Clinical & operations",
     title: "Staff Login",
     description:
@@ -17,7 +17,7 @@ const signInOptions = [
     accent: "bg-brand-50 text-brand-700 group-hover:bg-brand-600 group-hover:text-white",
   },
   {
-    href: "/login/admin",
+    href: "/admin/login",
     eyebrow: "Hospital administration",
     title: "Admin Login",
     description:

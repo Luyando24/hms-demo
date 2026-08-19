@@ -6,14 +6,14 @@ import { getSubdomainUrl } from '@/utils/subdomain';
 import { getRoleLandingDestination } from '@/utils/rbac';
 import { createClient } from '@/utils/supabase/server';
 
-function loginError(path: '/login/staff' | '/login/admin', message: string): never {
+function loginError(path: '/staff/login' | '/admin/login' | '/login/staff' | '/login/admin', message: string): never {
   redirect(path + '?error=' + encodeURIComponent(message));
 }
 
 async function signInWorkforce(
   formData: FormData,
   audience: 'staff' | 'admin',
-  loginPath: '/login/staff' | '/login/admin',
+  loginPath: '/staff/login' | '/admin/login' | '/login/staff' | '/login/admin',
 ) {
   const result = await authenticateLogin(formData, audience);
 
@@ -38,11 +38,11 @@ async function signInWorkforce(
 }
 
 export async function signInStaff(formData: FormData) {
-  return signInWorkforce(formData, 'staff', '/login/staff');
+  return signInWorkforce(formData, 'staff', '/staff/login');
 }
 
 export async function signInAdmin(formData: FormData) {
-  return signInWorkforce(formData, 'admin', '/login/admin');
+  return signInWorkforce(formData, 'admin', '/admin/login');
 }
 
 export async function signOut() {
