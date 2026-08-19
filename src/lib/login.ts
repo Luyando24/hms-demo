@@ -46,7 +46,7 @@ function isRoleAllowedForAudience(
     return role === 'ADMIN';
   }
 
-  return role !== 'PATIENT' && role !== 'ADMIN' && Boolean(ROLE_PERMISSIONS[role]);
+  return role !== 'PATIENT' && Boolean(ROLE_PERMISSIONS[role]);
 }
 
 export async function authenticateLogin(

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getSubdomainUrl } from "@/utils/subdomain";
 import { HeartPulse, MapPin, Phone, Mail } from "lucide-react";
 
 interface FooterProps {
@@ -49,7 +50,7 @@ export function Footer({ settings }: FooterProps = {}) {
           <h4 className="text-white font-bold mb-6 tracking-wide uppercase text-sm">Patient Services</h4>
           <ul className="space-y-4 text-sm">
             <li><Link href="/book-appointment" className="hover:text-brand-400 transition-colors">Book an Appointment</Link></li>
-            <li><Link href="/patient/login" className="hover:text-brand-400 transition-colors">Patient Portal</Link></li>
+            <li><Link href={getSubdomainUrl('patient', '/login')} className="hover:text-brand-400 transition-colors">Patient Portal</Link></li>
             <li><Link href="#services" className="hover:text-brand-400 transition-colors">Our Departments</Link></li>
             <li><Link href="#" className="hover:text-brand-400 transition-colors">Billing & Insurance</Link></li>
           </ul>
@@ -62,7 +63,7 @@ export function Footer({ settings }: FooterProps = {}) {
             <li><Link href="#doctors" className="hover:text-brand-400 transition-colors">Find a Doctor</Link></li>
             <li><Link href="#" className="hover:text-brand-400 transition-colors">Careers</Link></li>
             <li><Link href="#" className="hover:text-brand-400 transition-colors">News & Updates</Link></li>
-            <li><Link href="/login" className="hover:text-brand-400 transition-colors">Staff & Admin Sign In</Link></li>
+            <li><Link href={getSubdomainUrl(null, '/login')} className="hover:text-brand-400 transition-colors">Staff & Admin Sign In</Link></li>
           </ul>
         </div>
         

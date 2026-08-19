@@ -25,6 +25,8 @@ export async function updateSession(request: NextRequest) {
             const cookieOptions = { ...options }
             if (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1')) {
               cookieOptions.domain = `.${rootDomainHost}`
+            } else if (rootDomainHost === 'localhost') {
+              cookieOptions.domain = '.localhost'
             }
             request.cookies.set(name, value)
           })
@@ -35,6 +37,8 @@ export async function updateSession(request: NextRequest) {
             const cookieOptions = { ...options }
             if (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1')) {
               cookieOptions.domain = `.${rootDomainHost}`
+            } else if (rootDomainHost === 'localhost') {
+              cookieOptions.domain = '.localhost'
             }
             supabaseResponse.cookies.set(name, value, cookieOptions)
           })
@@ -118,8 +122,7 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
-  // 2. Authorization always comes from the protected profile, never editable
-  // user metadata.
+  // 2. Authorization always comes from the protected profile, never editable user metadata.
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role')

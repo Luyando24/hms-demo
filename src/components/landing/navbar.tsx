@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { getSubdomainUrl } from "@/utils/subdomain";
 import { HeartPulse } from "lucide-react";
 
 interface NavbarProps {
@@ -56,7 +57,7 @@ export function Navbar({ settings }: NavbarProps = {}) {
         </div>
 
         <div className="flex items-center gap-4">
-          <Link href="/patient/login" className="text-sm font-bold uppercase tracking-widest text-slate-700 hover:text-brand-600 transition-colors">
+          <Link href={getSubdomainUrl('patient', '/login')} className="text-sm font-bold uppercase tracking-widest text-slate-700 hover:text-brand-600 transition-colors">
             Patient Portal
           </Link>
           <Link href="/book-appointment" className="bg-brand-600 text-white text-sm font-bold uppercase tracking-widest px-6 py-3 rounded-full hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 hover:-translate-y-0.5">

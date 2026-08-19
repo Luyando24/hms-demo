@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -5,29 +6,49 @@ import {
   ShieldCheck,
   Stethoscope,
 } from "lucide-react";
+import { getSubdomain, getSubdomainUrl } from "@/utils/subdomain";
+import { LoginForm } from "@/components/auth/login-form";
+import { signInStaff, signInAdmin } from "@/app/login/actions";
+import { signInPatient } from "@/app/patient/login/actions";
 
-const signInOptions = [
-  {
-    href: "/staff/login",
-    eyebrow: "Clinical & operations",
-    title: "Staff Login",
-    description:
-      "For doctors, nurses, reception, laboratory, pharmacy, finance, and other hospital staff.",
-    Icon: Stethoscope,
-    accent: "bg-brand-50 text-brand-700 group-hover:bg-brand-600 group-hover:text-white",
-  },
-  {
-    href: "/admin/login",
-    eyebrow: "Hospital administration",
-    title: "Admin Login",
-    description:
-      "For authorized administrators managing configuration, staff, reporting, and oversight.",
-    Icon: ShieldCheck,
-    accent: "bg-slate-100 text-slate-700 group-hover:bg-slate-900 group-hover:text-white",
-  },
-] as const;
+export default async function LoginPage() {
+  const headerList = await headers();
+  const host = headerList.get("host");
+  const subdomain = getSubdomain(host);
 
-export default function LoginPage() {
+  if (subdomain === "admin") {
+    return <LoginForm audience="admin" action={signInAdmin} />;
+  }
+
+  if (subdomain === "staff") {
+    return <LoginForm audience="staff" action={signInStaff} />;
+  }
+
+  if (subdomain === "patient") {
+    return <LoginForm audience="patient" action={signInPatient} />;
+  }
+
+  const signInOptions = [
+    {
+      href: getSubdomainUrl("staff", "/login"),
+      eyebrow: "Clinical & operations",
+      title: "Staff Login",
+      description:
+        "For doctors, nurses, reception, laboratory, pharmacy, finance, and other hospital staff.",
+      Icon: Stethoscope,
+      accent: "bg-brand-50 text-brand-700 group-hover:bg-brand-600 group-hover:text-white",
+    },
+    {
+      href: getSubdomainUrl("admin", "/login"),
+      eyebrow: "Hospital administration",
+      title: "Admin Login",
+      description:
+        "For authorized administrators managing configuration, staff, reporting, and oversight.",
+      Icon: ShieldCheck,
+      accent: "bg-slate-100 text-slate-700 group-hover:bg-slate-900 group-hover:text-white",
+    },
+  ];
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f8f9fa] p-4 font-sans">
       <div className="w-full max-w-4xl py-10">

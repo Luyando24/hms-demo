@@ -1,6 +1,6 @@
-import { LoginForm } from "@/components/auth/login-form";
-import { signInAdmin } from "@/app/login/actions";
+import { redirect } from "next/navigation";
+import { getSubdomainUrl } from "@/utils/subdomain";
 
 export default function AdminLoginPage() {
-  return <LoginForm audience="admin" action={signInAdmin} />;
+  redirect(getSubdomainUrl("admin", "/login"));
 }
