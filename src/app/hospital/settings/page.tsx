@@ -91,13 +91,19 @@ export default function SystemSettingsPage() {
         phone: data.phone || '',
         email: data.email || '',
         address: data.address || '',
-        payment_methods: data.payment_methods || ['CASH', 'CARD', 'MOBILE_MONEY', 'INSURANCE', 'BANK_TRANSFER', 'CHEQUE'],
-        insurance_providers: data.insurance_providers || ['NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct'],
+        payment_methods: (data.payment_methods || ['CASH', 'CARD', 'MOBILE_MONEY', 'INSURANCE', 'BANK_TRANSFER', 'CHEQUE'])
+          .map((m: string) => (typeof m === 'string' ? m.trim() : ''))
+          .filter((m: string) => m.length > 0),
+        insurance_providers: (data.insurance_providers || ['NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct'])
+          .map((p: string) => (typeof p === 'string' ? p.trim() : ''))
+          .filter((p: string) => p.length > 0),
         geofence_enabled: data.geofence_enabled ?? false,
         geofence_latitude: (data.geofence_latitude && data.geofence_latitude !== 0) ? data.geofence_latitude : -15.3875,
         geofence_longitude: (data.geofence_longitude && data.geofence_longitude !== 0) ? data.geofence_longitude : 28.3228,
         geofence_radius_meters: data.geofence_radius_meters ?? 500,
-        geofence_enforce_roles: data.geofence_enforce_roles || ['DOCTOR', 'NURSE', 'RECEPTIONIST', 'PHARMACIST', 'LAB_TECH', 'RADIOLOGIST', 'ACCOUNTANT', 'STAFF'],
+        geofence_enforce_roles: (data.geofence_enforce_roles || ['DOCTOR', 'NURSE', 'RECEPTIONIST', 'PHARMACIST', 'LAB_TECH', 'RADIOLOGIST', 'ACCOUNTANT', 'STAFF'])
+          .map((r: string) => (typeof r === 'string' ? r.trim() : ''))
+          .filter((r: string) => r.length > 0),
         geofence_allow_admin_bypass: data.geofence_allow_admin_bypass ?? true,
       });
     }
@@ -158,6 +164,9 @@ export default function SystemSettingsPage() {
     const cleanedForm = {
       ...form,
       hospital_name: form.hospital_name.trim() || 'HMS Medical Center',
+      payment_methods: form.payment_methods.map(m => m.trim()).filter(Boolean),
+      insurance_providers: form.insurance_providers.map(p => p.trim()).filter(Boolean),
+      geofence_enforce_roles: form.geofence_enforce_roles.map(r => r.trim()).filter(Boolean),
       geofence_latitude: Number.isNaN(form.geofence_latitude) ? -15.3875 : form.geofence_latitude,
       geofence_longitude: Number.isNaN(form.geofence_longitude) ? 28.3228 : form.geofence_longitude,
       geofence_radius_meters: (Number.isNaN(form.geofence_radius_meters) || form.geofence_radius_meters < 10) ? 500 : form.geofence_radius_meters,
