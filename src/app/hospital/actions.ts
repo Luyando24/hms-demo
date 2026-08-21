@@ -81,7 +81,12 @@ const systemSettingsSchema = z
 
 function actionError(error: unknown): string {
   if (error instanceof z.ZodError) {
-    return error.issues[0]?.message || 'The submitted data is invalid.';
+    const issue = error.issues[0];
+    if (issue) {
+      const field = issue.path.length > 0 ? issue.path.join('.') : 'field';
+      return `Invalid ${field}: ${issue.message}`;
+    }
+    return 'The submitted data is invalid.';
   }
   if (error instanceof AuthorizationError) {
     return error.message;

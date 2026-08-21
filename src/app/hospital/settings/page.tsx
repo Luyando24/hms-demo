@@ -32,7 +32,7 @@ export default function SystemSettingsPage() {
   const [isTvModalOpen, setIsTvModalOpen] = useState(false);
 
   const [form, setForm] = useState({
-    hospital_name: '',
+    hospital_name: 'HMS Medical Center',
     brand_title: '',
     tagline: 'Integrated Healthcare & Clinical Operations System',
     logo_url: '',
@@ -80,7 +80,7 @@ export default function SystemSettingsPage() {
 
     if (data) {
       setForm({
-        hospital_name: data.hospital_name || '',
+        hospital_name: data.hospital_name || 'HMS Medical Center',
         brand_title: data.brand_title || '',
         tagline: data.tagline || 'Integrated Healthcare & Clinical Operations System',
         logo_url: data.logo_url || '',
@@ -155,7 +155,15 @@ export default function SystemSettingsPage() {
     }
 
     setSaving(true);
-    const res = await updateSystemSettingsAction(form);
+    const cleanedForm = {
+      ...form,
+      hospital_name: form.hospital_name.trim() || 'HMS Medical Center',
+      geofence_latitude: Number.isNaN(form.geofence_latitude) ? -15.3875 : form.geofence_latitude,
+      geofence_longitude: Number.isNaN(form.geofence_longitude) ? 28.3228 : form.geofence_longitude,
+      geofence_radius_meters: (Number.isNaN(form.geofence_radius_meters) || form.geofence_radius_meters < 10) ? 500 : form.geofence_radius_meters,
+    };
+
+    const res = await updateSystemSettingsAction(cleanedForm);
 
     if (res.error) {
       setStatus({ type: 'error', title: 'Save Failed', message: res.error });
