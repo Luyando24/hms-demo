@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 import UpdateStockModal from "@/components/hospital/UpdateStockModal";
 import AddItemModal from "@/components/hospital/AddItemModal";
+import DispenseMedicationModal from "@/components/hospital/DispenseMedicationModal";
 import StatusModal from "@/components/hospital/StatusModal";
 
 interface InventoryItem {
@@ -26,6 +27,8 @@ export default function InventoryDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [selectedPrescription, setSelectedPrescription] = useState<any | null>(null);
+  const [isDispenseModalOpen, setIsDispenseModalOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
@@ -325,11 +328,15 @@ export default function InventoryDashboard() {
                     </p>
                   </div>
                   <button 
-                    onClick={() => handleDispense(row)}
-                    className="bg-brand-600 hover:bg-brand-500 text-white p-2.5 rounded-xl transition-all shadow-md shadow-brand-500/20"
+                    onClick={() => {
+                      setSelectedPrescription(row);
+                      setIsDispenseModalOpen(true);
+                    }}
+                    className="bg-brand-600 hover:bg-brand-500 text-white px-3.5 py-2 rounded-xl transition-all shadow-md shadow-brand-500/20 text-xs font-bold flex items-center gap-1.5 shrink-0"
                     title="Dispense Medication"
                   >
-                    <ClipboardCheck size={18} />
+                    <ClipboardCheck size={16} />
+                    Dispense
                   </button>
                 </div>
               ))}
@@ -337,6 +344,21 @@ export default function InventoryDashboard() {
           </div>
         </div>
       </div>
+
+      {selectedPrescription && (
+        <DispenseMedicationModal
+          isOpen={isDispenseModalOpen}
+          onClose={() => {
+            setIsDispenseModalOpen(false);
+            setSelectedPrescription(null);
+          }}
+          prescription={selectedPrescription}
+          onSuccess={() => {
+            fetchPrescriptions();
+            fetchItems();
+          }}
+        />
+      )}
 
       {selectedItem && (
         <UpdateStockModal 

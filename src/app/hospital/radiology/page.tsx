@@ -38,6 +38,8 @@ export default function RadiologyDashboard() {
 
   const [findings, setFindings] = useState("");
   const [conclusion, setConclusion] = useState("");
+  const [nextStep, setNextStep] = useState<'DOCTOR_REVIEW' | 'IPD' | 'BILLING' | 'DISCHARGE'>('DOCTOR_REVIEW');
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
@@ -46,6 +48,7 @@ export default function RadiologyDashboard() {
 
   useEffect(() => {
     fetchOrders();
+    fetchDepartments();
 
     // Subscribe to realtime radiology changes
     const channel = supabase
@@ -58,6 +61,23 @@ export default function RadiologyDashboard() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const fetchDepartments = async () => {
+    const { data } = await supabase.from('departments').select('id, name').order('name');
+    if (data) setDepartments(data);
+  };
+
+  const getDepartmentId = (deptKey: string): string | null => {
+    const normalized = deptKey.toLowerCase();
+    const found = departments.find((d) => {
+      const name = d.name.toLowerCase();
+      if (normalized === 'opd') return name.includes('opd') || name.includes('outpatient');
+      if (normalized === 'ipd') return name.includes('ipd') || name.includes('inpatient') || name.includes('ward');
+      if (normalized === 'billing') return name.includes('billing') || name.includes('finance');
+      return name.includes(normalized);
+    });
+    return found?.id || null;
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -125,11 +145,86 @@ export default function RadiologyDashboard() {
         .update({ status: 'COMPLETED' })
         .eq('id', selectedOrder.id);
 
-      setStatusModal({
-        type: 'success',
-        title: 'Report Finalized',
-        message: 'Radiology report signed and saved to electronic health record.'
-      });
+      // Perform Patient Queue Routing
+      const pId = selectedOrder.patient_id;
+      const pName = selectedOrder.patients ? `${selectedOrder.patients.first_name} ${selectedOrder.patients.last_name}` : 'Patient';
+
+      if (pId) {
+        const { data: queueRow } = await supabase
+          .from('walkin_queue')
+          .select('token_number')
+          .eq('patient_id', pId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const token = queueRow?.token_number || null;
+
+        if (nextStep === 'DOCTOR_REVIEW') {
+          const opdDeptId = getDepartmentId('opd');
+          if (opdDeptId) {
+            await supabase.from('walkin_queue').insert({
+              patient_id: pId,
+              department_id: opdDeptId,
+              status: 'WAITING',
+              priority: 'HIGH',
+              reason: `Imaging Report Finalized: ${selectedOrder.modality} (${selectedOrder.body_part})`,
+              token_number: token,
+            });
+          }
+          setStatusModal({
+            type: 'success',
+            title: 'Report Finalized & Forwarded',
+            message: `Radiology report signed. ${pName} has been routed back to Doctor Consultation for review.`
+          });
+        } else if (nextStep === 'IPD') {
+          const ipdDeptId = getDepartmentId('ipd');
+          if (ipdDeptId) {
+            await supabase.from('walkin_queue').insert({
+              patient_id: pId,
+              department_id: ipdDeptId,
+              status: 'WAITING',
+              priority: 'NORMAL',
+              reason: `Inpatient Imaging Completed: ${selectedOrder.modality}`,
+              token_number: token,
+            });
+          }
+          setStatusModal({
+            type: 'success',
+            title: 'Report Finalized & Forwarded to Ward',
+            message: `Radiology report signed. ${pName} has been forwarded to Inpatient Wards (IPD).`
+          });
+        } else if (nextStep === 'BILLING') {
+          const billingDeptId = getDepartmentId('billing');
+          if (billingDeptId) {
+            await supabase.from('walkin_queue').insert({
+              patient_id: pId,
+              department_id: billingDeptId,
+              status: 'WAITING',
+              priority: 'NORMAL',
+              reason: 'Radiology Scan Fee Settlement',
+              token_number: token,
+            });
+          }
+          setStatusModal({
+            type: 'success',
+            title: 'Report Finalized & Forwarded to Billing',
+            message: `Radiology report signed. ${pName} has been forwarded to Finance & Billing.`
+          });
+        } else {
+          setStatusModal({
+            type: 'success',
+            title: 'Report Finalized',
+            message: `Radiology report signed and saved to electronic health record for ${pName}.`
+          });
+        }
+      } else {
+        setStatusModal({
+          type: 'success',
+          title: 'Report Finalized',
+          message: 'Radiology report signed and saved to electronic health record.'
+        });
+      }
 
       fetchOrders();
     } catch (err: any) {
@@ -339,27 +434,51 @@ export default function RadiologyDashboard() {
             </div>
 
             {/* Diagnostic Report Editor */}
-            <div className="bg-slate-800/90 backdrop-blur-md p-6 border-t border-slate-700 relative z-10">
-              <div className="flex justify-between items-end gap-4">
-                <div className="space-y-2 flex-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Radiologist Diagnostic Findings & Impression</label>
-                  <textarea 
-                    value={findings}
-                    onChange={e => setFindings(e.target.value)}
-                    className="w-full bg-slate-900/60 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500 placeholder:text-slate-600 h-20"
-                    placeholder="Enter diagnostic findings and impression..."
-                  />
+            <div className="bg-slate-800/95 backdrop-blur-md p-6 border-t border-slate-700 relative z-10 space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Radiologist Diagnostic Findings & Impression</label>
+                <textarea 
+                  value={findings}
+                  onChange={e => setFindings(e.target.value)}
+                  className="w-full bg-slate-900/80 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500 placeholder:text-slate-600 h-20 outline-none"
+                  placeholder="Enter diagnostic findings, impression, and conclusion..."
+                />
+              </div>
+
+              {/* Next Step Selector & Finalize Action */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-700/60">
+                <div className="flex items-center gap-1.5 overflow-x-auto">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 shrink-0">Forward to:</span>
+                  {[
+                    { id: 'DOCTOR_REVIEW' as const, label: 'Doctor OPD', tag: 'Review' },
+                    { id: 'IPD' as const, label: 'Ward (IPD)', tag: 'Inpatient' },
+                    { id: 'BILLING' as const, label: 'Billing', tag: 'Cashier' },
+                    { id: 'DISCHARGE' as const, label: 'Discharge', tag: 'Exit' },
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setNextStep(opt.id)}
+                      className={clsx(
+                        'px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0',
+                        nextStep === opt.id
+                          ? 'bg-brand-600 text-white shadow-sm ring-1 ring-brand-400'
+                          : 'bg-slate-900 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
-                <div className="w-48 space-y-3">
-                  <button 
-                    disabled={!selectedOrder || isSubmittingReport}
-                    onClick={handleSaveReport}
-                    className="w-full bg-brand-600 hover:bg-brand-500 text-white py-3 rounded-xl text-xs font-bold shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {isSubmittingReport ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
-                    Finalize Report
-                  </button>
-                </div>
+
+                <button 
+                  disabled={!selectedOrder || isSubmittingReport}
+                  onClick={handleSaveReport}
+                  className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
+                >
+                  {isSubmittingReport ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                  Sign & Forward Report
+                </button>
               </div>
             </div>
           </div>
