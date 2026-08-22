@@ -79,8 +79,19 @@ export default function OutpatientDashboard() {
         .select('role')
         .eq('id', authData.user.id)
         .maybeSingle();
-      if (profile?.role) {
-        setCurrentUserRole(profile.role);
+
+      const role = (
+        profile?.role ||
+        authData.user.user_metadata?.role ||
+        (authData.user.app_metadata as any)?.role ||
+        ''
+      )
+        .toString()
+        .trim()
+        .toUpperCase();
+
+      if (role) {
+        setCurrentUserRole(role);
       }
     }
   };

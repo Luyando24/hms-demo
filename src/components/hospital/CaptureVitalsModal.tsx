@@ -102,11 +102,21 @@ export default function CaptureVitalsModal({
       .eq('id', authData.user.id)
       .maybeSingle();
 
-    if (profile?.role !== 'NURSE') {
+    const userRole = (
+      profile?.role ||
+      authData.user.user_metadata?.role ||
+      (authData.user.app_metadata as any)?.role ||
+      ''
+    )
+      .toString()
+      .trim()
+      .toUpperCase();
+
+    if (userRole !== 'NURSE') {
       setStatus({
         type: 'error',
         title: 'Access Restricted to Nursing Staff',
-        message: 'Only registered Nurses are authorized to capture vitals and conduct triage. Doctors and Administrators cannot record vitals.',
+        message: `You are currently signed in as ${authData.user.email} with role '${userRole || 'UNKNOWN'}'. Only registered Nurses (NURSE) are authorized to capture vitals and conduct triage.`,
       });
       setLoading(false);
       return;
