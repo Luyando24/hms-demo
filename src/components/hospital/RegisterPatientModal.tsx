@@ -176,10 +176,18 @@ export default function RegisterPatientModal({
           token_number: tokenNumber,
         });
 
-        // Create consultation invoice
+        // Create consultation invoice using system configured fee
+        const { data: settingsData } = await supabase
+          .from('system_settings')
+          .select('consultation_fee')
+          .limit(1)
+          .maybeSingle();
+
+        const consultationFee = Number(settingsData?.consultation_fee) || 150.0;
+
         await supabase.from('invoices').insert({
           patient_id: createdPatientId,
-          total_amount: 150.0,
+          total_amount: consultationFee,
           status: 'UNPAID',
         });
       }

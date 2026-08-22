@@ -40,6 +40,7 @@ export default function SystemSettingsPage() {
     currency_symbol: '$',
     currency_position: 'prefix' as 'prefix' | 'suffix',
     tax_rate: 0,
+    consultation_fee: 150.0,
     phone: '',
     email: '',
     address: '',
@@ -88,6 +89,7 @@ export default function SystemSettingsPage() {
         currency_symbol: data.currency_symbol || '$',
         currency_position: data.currency_position === 'suffix' ? 'suffix' : 'prefix',
         tax_rate: data.tax_rate || 0,
+        consultation_fee: Number(data.consultation_fee) || 150.0,
         phone: data.phone || '',
         email: data.email || '',
         address: data.address || '',
@@ -452,6 +454,32 @@ export default function SystemSettingsPage() {
                   <option value="prefix">Prefix (e.g. {form.currency_symbol}150.00)</option>
                   <option value="suffix">Suffix (e.g. 150.00 {form.currency_symbol})</option>
                 </select>
+              </div>
+
+              <div className="space-y-2 md:col-span-3">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-1">
+                  Standard OPD Consultation Fee ({form.currency_symbol})
+                </label>
+                <div className="relative max-w-md">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">
+                    {form.currency_symbol}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.consultation_fee}
+                    onChange={(e) =>
+                      setForm({ ...form, consultation_fee: parseFloat(e.target.value) || 0 })
+                    }
+                    disabled={userRole !== 'ADMIN'}
+                    placeholder="e.g. 150.00"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 font-medium ml-1">
+                  Base fee applied to outpatient consultation tickets and front desk intake billing.
+                </p>
               </div>
             </div>
 

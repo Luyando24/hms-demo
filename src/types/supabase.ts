@@ -2259,6 +2259,7 @@ export type Database = {
           phone: string | null
           tagline: string | null
           tax_rate: number | null
+          consultation_fee: number | null
           updated_at: string | null
         }
         Insert: {
@@ -2282,6 +2283,7 @@ export type Database = {
           phone?: string | null
           tagline?: string | null
           tax_rate?: number | null
+          consultation_fee?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -2305,6 +2307,7 @@ export type Database = {
           phone?: string | null
           tagline?: string | null
           tax_rate?: number | null
+          consultation_fee?: number | null
           updated_at?: string | null
         }
         Relationships: []

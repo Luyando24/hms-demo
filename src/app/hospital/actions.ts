@@ -65,6 +65,7 @@ const systemSettingsSchema = z
     currency_symbol: z.string().trim().min(1).max(8),
     currency_position: z.enum(['prefix', 'suffix']),
     tax_rate: z.coerce.number().min(0).max(100),
+    consultation_fee: z.coerce.number().min(0).optional().default(150.0),
     address: optionalText(500),
     phone: optionalText(40),
     email: optionalEmail,

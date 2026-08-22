@@ -47,7 +47,7 @@ export default function GenerateInvoiceModal({
 
       void supabase
         .from('system_settings')
-        .select('currency_symbol, currency_position')
+        .select('currency_symbol, currency_position, consultation_fee')
         .limit(1)
         .maybeSingle()
         .then(({ data }) => {
@@ -56,6 +56,8 @@ export default function GenerateInvoiceModal({
               symbol: data.currency_symbol || '$',
               position: (data.currency_position as 'prefix' | 'suffix') || 'prefix',
             });
+            const fee = Number(data.consultation_fee) || 150;
+            setItems([{ description: 'General OPD Consultation', quantity: 1, unit_price: fee }]);
           }
         });
     }
