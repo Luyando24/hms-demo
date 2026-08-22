@@ -22,8 +22,6 @@ export async function createClient() {
               const cookieOptions = { ...options }
               if (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1')) {
                 cookieOptions.domain = `.${rootDomainHost}`
-              } else if (rootDomainHost === 'localhost') {
-                cookieOptions.domain = '.localhost'
               }
               cookieStore.set(name, value, cookieOptions)
             })

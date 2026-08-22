@@ -25,8 +25,6 @@ export async function updateSession(request: NextRequest) {
             const cookieOptions = { ...options }
             if (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1')) {
               cookieOptions.domain = `.${rootDomainHost}`
-            } else if (rootDomainHost === 'localhost') {
-              cookieOptions.domain = '.localhost'
             }
             request.cookies.set(name, value)
           })
@@ -37,8 +35,6 @@ export async function updateSession(request: NextRequest) {
             const cookieOptions = { ...options }
             if (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1')) {
               cookieOptions.domain = `.${rootDomainHost}`
-            } else if (rootDomainHost === 'localhost') {
-              cookieOptions.domain = '.localhost'
             }
             supabaseResponse.cookies.set(name, value, cookieOptions)
           })

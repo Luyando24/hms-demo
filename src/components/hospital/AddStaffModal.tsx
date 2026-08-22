@@ -1,7 +1,23 @@
 'use client'
 
 import React, { useState } from 'react';
-import { X, User, Mail, Shield, Loader2, Save, Hash, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { 
+  X, 
+  User, 
+  Mail, 
+  Shield, 
+  Loader2, 
+  Save, 
+  Hash, 
+  ArrowRight, 
+  ArrowLeft, 
+  CheckCircle2, 
+  Copy, 
+  Check, 
+  KeyRound,
+  Building,
+  Sparkles
+} from 'lucide-react';
 import { createStaffMember } from '@/app/hospital/staff/actions';
 import StatusModal from './StatusModal';
 import { SearchableCombobox } from '../ui/SearchableCombobox';
@@ -12,11 +28,22 @@ interface AddStaffModalProps {
   onSuccess: () => void;
 }
 
+interface CreatedStaffCredentials {
+  name: string;
+  role: string;
+  department: string;
+  staffNumber: string;
+  email: string;
+  tempPassword?: string;
+}
+
 export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffModalProps) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
   const [stepError, setStepError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<CreatedStaffCredentials | null>(null);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -116,37 +143,146 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         role: formData.role,
-        staffNumber: formData.staffNumber.trim()
+        department: formData.department.trim(),
+        staffNumber: formData.staffNumber.trim() || undefined
       });
 
       if (!result.success) {
-        throw new Error(result.error);
+        throw new Error(result.error || 'Failed to create staff member account.');
       }
 
-      if (result.tempPassword) {
-        setStatus({
-          type: 'success',
-          title: 'Staff Account Created',
-          message: `${formData.firstName} ${formData.lastName} (${result.staffNumber}) has been registered. Initial Password: ${result.tempPassword}`
-        });
-      } else {
-        setStatus({
-          type: 'success',
-          title: 'Staff Member Added',
-          message: `${formData.firstName} ${formData.lastName} (${result.staffNumber}) has been registered and sent an invitation email.`
-        });
-      }
+      setCreatedCredentials({
+        name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+        role: formData.role,
+        department: formData.department,
+        staffNumber: result.staffNumber || formData.staffNumber,
+        email: formData.email.trim(),
+        tempPassword: result.tempPassword,
+      });
 
     } catch (err: unknown) {
       setStatus({
         type: 'error',
-        title: 'Creation Failed',
+        title: 'Registration Failed',
         message: err instanceof Error ? err.message : 'Failed to add staff member'
       });
     } finally {
       setLoading(false);
     }
   };
+
+  const handleCopyCredentials = () => {
+    if (!createdCredentials) return;
+    const textToCopy = `HMS Staff Account Credentials:
+Name: ${createdCredentials.name}
+Role: ${createdCredentials.role}
+Staff ID: ${createdCredentials.staffNumber}
+Department: ${createdCredentials.department}
+Email / Login: ${createdCredentials.email}
+Initial Password: ${createdCredentials.tempPassword || 'Set via invite link'}`;
+
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+
+  const handleCloseSuccess = () => {
+    setCreatedCredentials(null);
+    onSuccess();
+    onClose();
+  };
+
+  // SUCCESS CREDENTIAL CARD MODAL VIEW
+  if (createdCredentials) {
+    return (
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200 border border-slate-100">
+          <div className="p-6 bg-gradient-to-br from-brand-600 to-brand-700 text-white text-center relative">
+            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-3 border border-white/30 shadow-inner">
+              <Sparkles size={28} className="text-amber-300" />
+            </div>
+            <h2 className="text-xl font-black">Staff Account Provisioned!</h2>
+            <p className="text-xs text-brand-100 font-medium mt-1">
+              New medical staff record has been registered successfully.
+            </p>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Employee Name</span>
+                <span className="text-sm font-black text-slate-900">{createdCredentials.name}</span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Staff ID</span>
+                <span className="font-mono text-xs font-black bg-brand-50 text-brand-700 px-2 py-0.5 rounded-lg border border-brand-100">
+                  {createdCredentials.staffNumber}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role</span>
+                <span className="text-xs font-black px-2.5 py-0.5 rounded-md bg-purple-100 text-purple-700">
+                  {createdCredentials.role}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Department</span>
+                <span className="text-xs font-bold text-slate-700">{createdCredentials.department}</span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Work Email</span>
+                <span className="text-xs font-bold text-slate-900">{createdCredentials.email}</span>
+              </div>
+              {createdCredentials.tempPassword && (
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1">
+                    <KeyRound size={13} /> Initial Password
+                  </span>
+                  <span className="font-mono text-xs font-black bg-rose-50 text-rose-700 px-2.5 py-1 rounded-lg border border-rose-200 select-all">
+                    {createdCredentials.tempPassword}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] font-semibold text-amber-800 flex items-start gap-2">
+              <span className="shrink-0 mt-0.5">ℹ️</span>
+              <span>Please securely copy and provide these credentials to the staff member. They will be prompted to change their password upon initial sign in.</span>
+            </div>
+          </div>
+
+          <div className="p-4 px-6 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={handleCopyCredentials}
+              className="px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2"
+            >
+              {copied ? (
+                <>
+                  <Check size={16} className="text-emerald-600" />
+                  <span className="text-emerald-700">Copied to Clipboard!</span>
+                </>
+              ) : (
+                <>
+                  <Copy size={16} className="text-slate-500" />
+                  <span>Copy Credentials</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCloseSuccess}
+              className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-brand-500/20 transition-all flex items-center gap-1.5"
+            >
+              Done & View Staff <ArrowRight size={15} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -316,6 +452,8 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
                         <option value="NURSE">Nurse / Clinical Staff</option>
                         <option value="RECEPTIONIST">Receptionist / Front Desk</option>
                         <option value="PHARMACIST">Pharmacist</option>
+                        <option value="LAB_TECH">Laboratory Technician</option>
+                        <option value="RADIOLOGIST">Radiologist / Imaging</option>
                         <option value="ACCOUNTANT">Accountant / Billing</option>
                         <option value="WAITING_ROOM">Waiting Room Display Kiosk</option>
                         <option value="ADMIN">Administrator</option>

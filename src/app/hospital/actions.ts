@@ -322,3 +322,6 @@ export async function updateSystemSettingsAction(input: unknown) {
     return { success: false, error: actionError(error) };
   }
 }
+
+export { createStaffMember } from './staff/actions';
+
