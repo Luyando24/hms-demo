@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useState } from 'react';
-import { X, User, Mail, Shield, Loader2, Save, Hash, Phone } from 'lucide-react';
+import { X, User, Mail, Shield, Loader2, Save, Hash, Phone, KeyRound } from 'lucide-react';
 import { updateStaffAction } from '@/app/hospital/actions';
+import ChangeStaffPasswordModal from './ChangeStaffPasswordModal';
 import StatusModal from './StatusModal';
 
 interface EditStaffModalProps {
@@ -14,6 +15,7 @@ interface EditStaffModalProps {
 
 export default function EditStaffModal({ isOpen, onClose, onSuccess, staffMember }: EditStaffModalProps) {
   const [loading, setLoading] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
   
   const [formData, setFormData] = useState({
@@ -166,6 +168,25 @@ export default function EditStaffModal({ isOpen, onClose, onSuccess, staffMember
                   </div>
                 </div>
               </div>
+
+              {/* Password Management Section */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <KeyRound size={14} className="text-amber-500 shrink-0" /> Staff Login Password
+                  </h4>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    Reset or auto-generate a new temporary password for this account.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(true)}
+                  className="px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-black transition-colors shadow-xs flex items-center gap-1.5 shrink-0"
+                >
+                  <KeyRound size={14} /> Change Password
+                </button>
+              </div>
             </form>
           </div>
 
@@ -195,6 +216,13 @@ export default function EditStaffModal({ isOpen, onClose, onSuccess, staffMember
           </div>
         </div>
       </div>
+
+      <ChangeStaffPasswordModal
+        isOpen={isPasswordModalOpen}
+        staffMember={staffMember}
+        onClose={() => setIsPasswordModalOpen(false)}
+        onSuccess={onSuccess}
+      />
 
       <StatusModal
         isOpen={!!status}

@@ -14,13 +14,15 @@ import {
   ChevronLeft, 
   ChevronRight,
   Filter,
-  RefreshCw
+  RefreshCw,
+  KeyRound,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 
 import AddStaffModal from "@/components/hospital/AddStaffModal";
 import EditStaffModal from "@/components/hospital/EditStaffModal";
+import ChangeStaffPasswordModal from "@/components/hospital/ChangeStaffPasswordModal";
 import StatusModal from "@/components/hospital/StatusModal";
 import { deleteStaffAction } from "@/app/hospital/actions";
 
@@ -33,6 +35,7 @@ export default function StaffDirectory() {
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<any>(null);
+  const [passwordTargetStaff, setPasswordTargetStaff] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
@@ -242,6 +245,13 @@ export default function StaffDirectory() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
+                          onClick={() => setPasswordTargetStaff(member)}
+                          className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Change Staff Password"
+                        >
+                          <KeyRound size={16} />
+                        </button>
+                        <button 
                           onClick={() => setEditingStaff(member)}
                           className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
                           title="Edit Staff Member"
@@ -319,6 +329,15 @@ export default function StaffDirectory() {
           isOpen={!!editingStaff}
           staffMember={editingStaff}
           onClose={() => setEditingStaff(null)}
+          onSuccess={fetchStaff}
+        />
+      )}
+
+      {passwordTargetStaff && (
+        <ChangeStaffPasswordModal
+          isOpen={!!passwordTargetStaff}
+          staffMember={passwordTargetStaff}
+          onClose={() => setPasswordTargetStaff(null)}
           onSuccess={fetchStaff}
         />
       )}

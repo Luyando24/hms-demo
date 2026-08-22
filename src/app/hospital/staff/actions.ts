@@ -222,3 +222,62 @@ export async function createStaffMember(input: unknown) {
     return { success: false, error: actionError(error) };
   }
 }
+
+export async function changeStaffPasswordAction(input: {
+  staffId: string;
+  newPassword?: string;
+  autoGenerate?: boolean;
+}) {
+  try {
+    await requireRole(['ADMIN']);
+    const adminSupabase = createAdminClient();
+
+    if (!input.staffId) {
+      throw new Error('Staff user ID is required.');
+    }
+
+    const { data: profile, error: profileErr } = await adminSupabase
+      .from('profiles')
+      .select('id, email, first_name, last_name, staff_number, role')
+      .eq('id', input.staffId)
+      .single();
+
+    if (profileErr || !profile) {
+      throw new Error('Staff member profile record not found.');
+    }
+
+    let passwordToSet = input.newPassword?.trim();
+    if (input.autoGenerate || !passwordToSet) {
+      passwordToSet = generateSecurePassword();
+    } else if (passwordToSet.length < 8) {
+      throw new Error('Password must be at least 8 characters in length.');
+    }
+
+    // Update password in Supabase Auth via Admin API
+    const { error: updateError } = await adminSupabase.auth.admin.updateUserById(
+      input.staffId,
+      { password: passwordToSet }
+    );
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    revalidatePath('/hospital/staff');
+    revalidatePath('/hospital/hr');
+
+    return {
+      success: true,
+      staffId: profile.id,
+      email: profile.email,
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+      staffNumber: profile.staff_number,
+      role: profile.role,
+      newPassword: passwordToSet,
+    };
+  } catch (error) {
+    return { success: false, error: actionError(error) };
+  }
+}
+
