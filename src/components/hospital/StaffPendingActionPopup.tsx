@@ -52,16 +52,87 @@ export default function StaffPendingActionPopup() {
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [snoozedUntil, setSnoozedUntil] = useState<number | null>(null);
   const [isVoiceOn, setIsVoiceOn] = useState<boolean>(true);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
   const lastActionIdRef = useRef<string | null>(null);
 
-  // Sync sound preference
+  // Sync sound preference and load active user role
   useEffect(() => {
     setIsVoiceOn(isVoiceEnabled());
+    void fetchUserRole();
   }, []);
+
+  const fetchUserRole = async () => {
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+      if (profile?.role) {
+        setCurrentUserRole(profile.role);
+      }
+    }
+  };
+
+  // Determines if an action item is relevant to the logged-in staff role
+  const isActionForRole = (
+    actionType: PendingActionItem['type'],
+    role: string | null,
+    path: string | null,
+  ): boolean => {
+    if (!role) return false;
+
+    // ADMIN: contextual alerts based on current dashboard page or critical emergency
+    if (role === 'ADMIN') {
+      if (actionType === 'EMERGENCY') return true;
+      if (actionType === 'LAB' && path?.includes('/laboratory')) return true;
+      if (actionType === 'PRESCRIPTION' && path?.includes('/inventory')) return true;
+      if (actionType === 'RADIOLOGY' && path?.includes('/radiology')) return true;
+      if (actionType === 'TRIAGE' && path?.includes('/opd')) return true;
+      if (actionType === 'DOCTOR' && path?.includes('/opd')) return true;
+      if (actionType === 'BILLING' && (path?.includes('/billing') || path?.includes('/finance')))
+        return true;
+      return false;
+    }
+
+    // Role-specific routing:
+    // DOCTORS only receive Doctor consultation / follow-up review alerts
+    if (role === 'DOCTOR') {
+      return actionType === 'DOCTOR' || actionType === 'EMERGENCY';
+    }
+
+    // LAB TECHS only receive Laboratory investigation referrals
+    if (role === 'LAB_TECH') {
+      return actionType === 'LAB';
+    }
+
+    // PHARMACISTS only receive Pharmacy dispensing referrals
+    if (role === 'PHARMACIST') {
+      return actionType === 'PRESCRIPTION';
+    }
+
+    // RADIOLOGISTS only receive Radiology & Imaging scan referrals
+    if (role === 'RADIOLOGIST') {
+      return actionType === 'RADIOLOGY';
+    }
+
+    // NURSES only receive Triage & Vitals capture referrals
+    if (role === 'NURSE') {
+      return actionType === 'TRIAGE' || actionType === 'EMERGENCY';
+    }
+
+    // ACCOUNTANTS & RECEPTIONISTS receive Billing referrals
+    if (role === 'ACCOUNTANT' || role === 'RECEPTIONIST') {
+      return actionType === 'BILLING';
+    }
+
+    return false;
+  };
 
   // Fetch pending action items across hospital tables
   const checkForPendingActions = async () => {
@@ -74,14 +145,12 @@ export default function StaffPendingActionPopup() {
       const actions: PendingActionItem[] = [];
 
       // 1. Check Walk-in Queue for Triage, ER, or Doctor
-      const { data: queueData, count: queueCount } = await supabase
+      const { data: queueData } = await supabase
         .from('walkin_queue')
-        .select('*, patients(first_name, last_name, file_number), departments(name), rooms(name)', {
-          count: 'exact',
-        })
+        .select('*, patients(first_name, last_name, file_number), departments(name), rooms(name)')
         .in('status', ['WAITING', 'TRIAGED'])
         .order('created_at', { ascending: false })
-        .limit(4);
+        .limit(6);
 
       if (queueData && queueData.length > 0) {
         queueData.forEach((q: any) => {
@@ -143,13 +212,13 @@ export default function StaffPendingActionPopup() {
         });
       }
 
-      // 2. Check Pending Lab Orders
-      const { data: labData, count: labCount } = await supabase
+      // 2. Check Pending Lab Orders (intended for LAB_TECH)
+      const { data: labData } = await supabase
         .from('lab_orders')
-        .select('*, patients(first_name, last_name, file_number)', { count: 'exact' })
+        .select('*, patients(first_name, last_name, file_number)')
         .in('status', ['ORDERED', 'PENDING', 'REQUESTED'])
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(4);
 
       if (labData && labData.length > 0) {
         labData.forEach((l: any) => {
@@ -171,13 +240,13 @@ export default function StaffPendingActionPopup() {
         });
       }
 
-      // 3. Check Pending Prescriptions
-      const { data: rxData, count: rxCount } = await supabase
+      // 3. Check Pending Prescriptions (intended for PHARMACIST)
+      const { data: rxData } = await supabase
         .from('prescriptions')
-        .select('*, patients(first_name, last_name, file_number)', { count: 'exact' })
+        .select('*, patients(first_name, last_name, file_number)')
         .eq('status', 'PENDING')
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(4);
 
       if (rxData && rxData.length > 0) {
         rxData.forEach((rx: any) => {
@@ -199,13 +268,13 @@ export default function StaffPendingActionPopup() {
         });
       }
 
-      // 4. Check Pending Radiology Orders
-      const { data: radData, count: radCount } = await supabase
+      // 4. Check Pending Radiology Orders (intended for RADIOLOGIST)
+      const { data: radData } = await supabase
         .from('radiology_orders')
-        .select('*, patients(first_name, last_name, file_number)', { count: 'exact' })
+        .select('*, patients(first_name, last_name, file_number)')
         .eq('status', 'ORDERED')
         .order('created_at', { ascending: false })
-        .limit(2);
+        .limit(3);
 
       if (radData && radData.length > 0) {
         radData.forEach((rad: any) => {
@@ -227,12 +296,15 @@ export default function StaffPendingActionPopup() {
         });
       }
 
-      const totalCount =
-        (queueCount || 0) + (labCount || 0) + (rxCount || 0) + (radCount || 0);
-      setTotalPendingCount(totalCount);
+      // 5. Filter strictly by the current user's role & permissions
+      const roleTargetedActions = actions.filter((a) =>
+        isActionForRole(a.type, currentUserRole, pathname),
+      );
+
+      setTotalPendingCount(roleTargetedActions.length);
 
       // Filter out dismissed items
-      const undismissed = actions.filter((a) => !dismissedIds.has(a.id));
+      const undismissed = roleTargetedActions.filter((a) => !dismissedIds.has(a.id));
 
       if (undismissed.length > 0) {
         const topAction = undismissed[0];
@@ -259,7 +331,9 @@ export default function StaffPendingActionPopup() {
   };
 
   useEffect(() => {
-    void checkForPendingActions();
+    if (currentUserRole) {
+      void checkForPendingActions();
+    }
 
     // Subscribe to realtime database changes across relevant tables
     const channel = supabase
@@ -289,7 +363,7 @@ export default function StaffPendingActionPopup() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [dismissedIds, snoozedUntil]);
+  }, [dismissedIds, snoozedUntil, currentUserRole, pathname]);
 
   const handleDismiss = () => {
     if (activeAction) {
@@ -483,7 +557,7 @@ export default function StaffPendingActionPopup() {
             <div className="flex items-center justify-between text-xs font-bold text-slate-500 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200/80">
               <span className="flex items-center gap-1.5 text-slate-700">
                 <Sparkles size={14} className="text-amber-500" />
-                Active Hospital Pipeline
+                Your Pending Department Queue
               </span>
               <span className="text-brand-600 font-extrabold">{totalPendingCount} pending items</span>
             </div>

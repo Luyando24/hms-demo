@@ -221,16 +221,16 @@ export default function BillingDashboard() {
                 <p className="text-sm font-bold text-slate-100">Pending Approvals</p>
                 <span className="text-[9px] font-black bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase">In Review</span>
               </div>
-              <p className="text-2xl font-black">$4,200</p>
-              <p className="text-[10px] text-slate-500 mt-1 font-bold">12 CLAIMS ACROSS 3 PROVIDERS</p>
+              <p className="text-2xl font-black">{formatCurrencyAmount(stats.pendingAmount * 0.4, currencyConfig.symbol, currencyConfig.position)}</p>
+              <p className="text-[10px] text-slate-500 mt-1 font-bold">INSURANCE CLAIMS IN REVIEW</p>
             </div>
 
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 p-5 rounded-2xl">
               <div className="flex justify-between items-start mb-4">
-                <p className="text-sm font-bold text-slate-100">Settled This Week</p>
+                <p className="text-sm font-bold text-slate-100">Settled This Period</p>
                 <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded uppercase">Paid</span>
               </div>
-              <p className="text-2xl font-black">$18,450</p>
+              <p className="text-2xl font-black">{formatCurrencyAmount(stats.totalRevenue, currencyConfig.symbol, currencyConfig.position)}</p>
               <p className="text-[10px] text-slate-500 mt-1 font-bold">ALL PAYMENTS VERIFIED</p>
             </div>
           </div>

@@ -17,6 +17,7 @@ import {
   CornerDownRight,
   Loader2,
 } from 'lucide-react';
+import { formatCurrencyAmount } from '@/utils/currency';
 import StatusModal from './StatusModal';
 import clsx from 'clsx';
 
@@ -42,6 +43,10 @@ export default function RecordPaymentModal({
   const [nextStep, setNextStep] = useState<PaymentNextStep>('DISCHARGE');
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(false);
+  const [currencyConfig, setCurrencyConfig] = useState<{
+    symbol: string;
+    position: 'prefix' | 'suffix';
+  }>({ symbol: '$', position: 'prefix' });
 
   const [availableMethods, setAvailableMethods] = useState<string[]>([
     'CASH',
@@ -110,11 +115,17 @@ export default function RecordPaymentModal({
   const fetchPaymentSettings = async () => {
     const { data } = await supabase
       .from('system_settings')
-      .select('payment_methods, insurance_providers')
+      .select('payment_methods, insurance_providers, currency_symbol, currency_position')
       .limit(1)
       .maybeSingle();
 
     if (data) {
+      if (data.currency_symbol) {
+        setCurrencyConfig({
+          symbol: data.currency_symbol,
+          position: (data.currency_position as 'prefix' | 'suffix') || 'prefix',
+        });
+      }
       if (
         data.payment_methods &&
         Array.isArray(data.payment_methods) &&
@@ -211,10 +222,11 @@ export default function RecordPaymentModal({
             token_number: token,
           });
         }
+        const formattedAmt = formatCurrencyAmount(amount, currencyConfig.symbol, currencyConfig.position);
         setStatus({
           type: 'success',
           title: 'Payment Recorded & Patient Routed',
-          message: `Payment of $${amount.toFixed(2)} recorded. ${patientName} was forwarded to Central Pharmacy for medication collection.`,
+          message: `Payment of ${formattedAmt} recorded. ${patientName} was forwarded to Central Pharmacy for medication collection.`,
         });
       } else if (nextStep === 'LAB') {
         const labDeptId = getDeptId('laboratory');
@@ -228,10 +240,11 @@ export default function RecordPaymentModal({
             token_number: token,
           });
         }
+        const formattedAmt = formatCurrencyAmount(amount, currencyConfig.symbol, currencyConfig.position);
         setStatus({
           type: 'success',
           title: 'Payment Recorded & Patient Routed',
-          message: `Payment of $${amount.toFixed(2)} recorded. ${patientName} was forwarded to Diagnostic Laboratory.`,
+          message: `Payment of ${formattedAmt} recorded. ${patientName} was forwarded to Diagnostic Laboratory.`,
         });
       } else if (nextStep === 'DOCTOR') {
         const opdDeptId = getDeptId('opd');
@@ -245,24 +258,27 @@ export default function RecordPaymentModal({
             token_number: token,
           });
         }
+        const formattedAmt = formatCurrencyAmount(amount, currencyConfig.symbol, currencyConfig.position);
         setStatus({
           type: 'success',
           title: 'Payment Recorded & Patient Routed',
-          message: `Payment of $${amount.toFixed(2)} recorded. ${patientName} was queued for Doctor OPD Consultation.`,
+          message: `Payment of ${formattedAmt} recorded. ${patientName} was queued for Doctor OPD Consultation.`,
         });
       } else {
         // DISCHARGE
+        const formattedAmt = formatCurrencyAmount(amount, currencyConfig.symbol, currencyConfig.position);
         setStatus({
           type: 'success',
           title: 'Payment Settled',
-          message: `Payment of $${amount.toFixed(2)} (${method.replace('_', ' ')}) applied. Receipt issued and patient visit complete.`,
+          message: `Payment of ${formattedAmt} (${method.replace('_', ' ')}) applied. Receipt issued and patient visit complete.`,
         });
       }
     } else {
+      const formattedAmt = formatCurrencyAmount(amount, currencyConfig.symbol, currencyConfig.position);
       setStatus({
         type: 'success',
         title: 'Payment Recorded',
-        message: `Payment of $${amount.toFixed(2)} (${method.replace('_', ' ')}) applied to Invoice #${invoice.id.slice(0, 8)}.`,
+        message: `Payment of ${formattedAmt} (${method.replace('_', ' ')}) applied to Invoice #${invoice.id.slice(0, 8)}.`,
       });
     }
 
@@ -323,10 +339,12 @@ export default function RecordPaymentModal({
           <div className="p-6 sm:p-7 space-y-5 overflow-y-auto flex-1">
             <div>
               <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">
-                Payment Amount ($) *
+                Payment Amount ({currencyConfig.symbol}) *
               </label>
               <div className="relative">
-                <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">
+                  {currencyConfig.symbol}
+                </span>
                 <input
                   type="number"
                   step="0.01"

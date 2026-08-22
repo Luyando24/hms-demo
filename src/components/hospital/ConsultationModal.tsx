@@ -27,6 +27,7 @@ import {
 import clsx from 'clsx';
 import StatusModal from './StatusModal';
 import { createClient } from '@/utils/supabase/client';
+import { formatCurrencyAmount } from '@/utils/currency';
 import type { Database, Json } from '@/types/supabase';
 import { SearchableCombobox } from '../ui/SearchableCombobox';
 
@@ -110,6 +111,10 @@ export default function ConsultationModal({
   const [labTests, setLabTests] = useState<LabDraft[]>([]);
   const [radiologyStudies, setRadiologyStudies] = useState<RadiologyDraft[]>([]);
   const [charges, setCharges] = useState<ChargeDraft[]>([]);
+  const [currencyConfig, setCurrencyConfig] = useState<{
+    symbol: string;
+    position: 'prefix' | 'suffix';
+  }>({ symbol: '$', position: 'prefix' });
 
   // Disposition & Patient Forwarding State
   const [disposition, setDisposition] = useState<DispositionType>('DISCHARGE');
@@ -131,7 +136,7 @@ export default function ConsultationModal({
     let cancelled = false;
 
     async function loadConsultationReferences() {
-      const [vitalsResult, inventoryResult, deptsResult, queueResult] = await Promise.all([
+      const [vitalsResult, inventoryResult, deptsResult, queueResult, settingsResult] = await Promise.all([
         supabase
           .from('vitals')
           .select('*')
@@ -153,6 +158,11 @@ export default function ConsultationModal({
           .select('token_number')
           .eq('id', queueId)
           .maybeSingle(),
+        supabase
+          .from('system_settings')
+          .select('currency_symbol, currency_position')
+          .limit(1)
+          .maybeSingle(),
       ]);
 
       if (!cancelled) {
@@ -160,6 +170,12 @@ export default function ConsultationModal({
         setInventory(inventoryResult.data || []);
         setDepartments(deptsResult.data || []);
         setCurrentQueueToken(queueResult.data?.token_number || null);
+        if (settingsResult.data) {
+          setCurrencyConfig({
+            symbol: settingsResult.data.currency_symbol || '$',
+            position: (settingsResult.data.currency_position as 'prefix' | 'suffix') || 'prefix',
+          });
+        }
       }
     }
 
@@ -1051,7 +1067,7 @@ export default function ConsultationModal({
                       <div>
                         <p className='text-xs font-bold text-slate-500 uppercase'>Consultation & Service Invoicing</p>
                         <p className='text-xl font-black text-slate-900 mt-0.5'>
-                          Total: ${chargeTotal.toFixed(2)}
+                          Total: {formatCurrencyAmount(chargeTotal, currencyConfig.symbol, currencyConfig.position)}
                         </p>
                       </div>
                       <button
@@ -1097,7 +1113,7 @@ export default function ConsultationModal({
                           <div className='flex items-end gap-2'>
                             <div className='flex-1'>
                               <NumberDraftInput
-                                label='Unit Price ($) *'
+                                label={`Unit Price (${currencyConfig.symbol}) *`}
                                 min={0}
                                 step='0.01'
                                 value={charge.unitPrice}

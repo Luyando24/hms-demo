@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Mail, Smartphone, Monitor, Sparkles } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { formatCurrencyAmount } from '@/utils/currency';
 
 export interface ClientHospitalInfo {
   hospitalName: string;
@@ -176,6 +177,10 @@ export default function EmailTemplatePreviewModal({
     email: 'info@medicloud.health',
     appUrl: 'https://kundahealthcare.org'
   });
+  const [currencyConfig, setCurrencyConfig] = useState<{ symbol: string; position: 'prefix' | 'suffix' }>({
+    symbol: '$',
+    position: 'prefix'
+  });
 
   const supabase = createClient();
 
@@ -184,7 +189,7 @@ export default function EmailTemplatePreviewModal({
       const loadInfo = async () => {
         const { data } = await supabase
           .from('system_settings')
-          .select('hospital_name, address, phone, email')
+          .select('hospital_name, address, phone, email, currency_symbol, currency_position')
           .limit(1)
           .maybeSingle();
 
@@ -196,6 +201,12 @@ export default function EmailTemplatePreviewModal({
             email: data.email || 'info@medicloud.health',
             appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://kundahealthcare.org'
           });
+          if (data.currency_symbol) {
+            setCurrencyConfig({
+              symbol: data.currency_symbol,
+              position: (data.currency_position as 'prefix' | 'suffix') || 'prefix'
+            });
+          }
         }
       };
       void loadInfo();
@@ -241,8 +252,8 @@ export default function EmailTemplatePreviewModal({
       ['New Patient Registrations', 18],
       ['Admissions / Discharges', '12 / 9'],
       ['Ward Bed Occupancy', '78%'],
-      ['Gross Billing Invoiced', '$14,250.00'],
-      ['Realized Collections', '$11,800.00'],
+      ['Gross Billing Invoiced', formatCurrencyAmount(14250, currencyConfig.symbol, currencyConfig.position)],
+      ['Realized Collections', formatCurrencyAmount(11800, currencyConfig.symbol, currencyConfig.position)],
       ['Operational Status', '100% COMPLIANT']
     ];
     cta = { label: 'Open Executive Dashboard', href: 'https://medicloud.health/hospital/reports' };
