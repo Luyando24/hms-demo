@@ -85,6 +85,33 @@ export default function CaptureVitalsModal({
     e.preventDefault();
     setLoading(true);
 
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) {
+      setStatus({
+        type: 'error',
+        title: 'Authentication Required',
+        message: 'Sign in before capturing vitals.',
+      });
+      setLoading(false);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+
+    if (profile?.role !== 'NURSE') {
+      setStatus({
+        type: 'error',
+        title: 'Access Restricted to Nursing Staff',
+        message: 'Only registered Nurses are authorized to capture vitals and conduct triage. Doctors and Administrators cannot record vitals.',
+      });
+      setLoading(false);
+      return;
+    }
+
     const formData = new FormData(e.currentTarget);
     const roomId = formData.get('room_id') as string;
     const bpSystolic = parseInt(formData.get('bp_systolic') as string);
@@ -98,6 +125,7 @@ export default function CaptureVitalsModal({
     // 1. Insert vitals
     const vitalsData = {
       patient_id: patientId,
+      recorded_by: authData.user.id,
       bp_systolic: bpSystolic || null,
       bp_diastolic: bpDiastolic || null,
       heart_rate: heartRate || null,

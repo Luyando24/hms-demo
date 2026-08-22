@@ -1,36 +1,48 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  BellRing, 
-  X, 
-  ArrowRight, 
-  Clock, 
-  Users, 
-  FlaskConical, 
-  Pill, 
-  FileText, 
-  AlertCircle, 
+import {
+  BellRing,
+  X,
+  ArrowRight,
+  Clock,
+  Users,
+  FlaskConical,
+  Pill,
+  Camera,
+  Activity,
+  AlertTriangle,
   CheckCircle2,
   Volume2,
   VolumeX,
-  Sparkles
+  Sparkles,
+  Stethoscope,
+  CreditCard,
+  Send,
+  CornerDownRight,
+  User,
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
-import { playChime, isVoiceEnabled, setVoiceEnabled } from '@/utils/voiceNotification';
+import {
+  playChime,
+  playVoiceNotification,
+  isVoiceEnabled,
+  setVoiceEnabled,
+} from '@/utils/voiceNotification';
 import clsx from 'clsx';
 
 export interface PendingActionItem {
   id: string;
-  type: 'QUEUE' | 'LAB' | 'PRESCRIPTION' | 'RADIOLOGY' | 'EMERGENCY';
+  type: 'TRIAGE' | 'DOCTOR' | 'LAB' | 'PRESCRIPTION' | 'RADIOLOGY' | 'EMERGENCY' | 'BILLING';
   title: string;
   patientName: string;
   patientFileNo?: string;
+  tokenNumber?: string;
   detail: string;
-  priority: 'NORMAL' | 'HIGH' | 'URGENT';
+  priority: 'NORMAL' | 'HIGH' | 'URGENT' | 'EMERGENCY';
   targetPath: string;
+  actionLabel: string;
   timestamp: string;
 }
 
@@ -46,12 +58,12 @@ export default function StaffPendingActionPopup() {
   const supabase = createClient();
   const lastActionIdRef = useRef<string | null>(null);
 
-  // Sync voice preference
+  // Sync sound preference
   useEffect(() => {
     setIsVoiceOn(isVoiceEnabled());
   }, []);
 
-  // Fetch pending action items across system tables
+  // Fetch pending action items across hospital tables
   const checkForPendingActions = async () => {
     try {
       // Check if snoozed
@@ -59,30 +71,75 @@ export default function StaffPendingActionPopup() {
         return;
       }
 
-      let actions: PendingActionItem[] = [];
+      const actions: PendingActionItem[] = [];
 
-      // 1. Check Walk-in OPD Queue (WAITING status)
+      // 1. Check Walk-in Queue for Triage, ER, or Doctor
       const { data: queueData, count: queueCount } = await supabase
         .from('walkin_queue')
-        .select('*, patients(first_name, last_name, file_number), departments(name), rooms(name)', { count: 'exact' })
-        .eq('status', 'WAITING')
+        .select('*, patients(first_name, last_name, file_number), departments(name), rooms(name)', {
+          count: 'exact',
+        })
+        .in('status', ['WAITING', 'TRIAGED'])
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(4);
 
       if (queueData && queueData.length > 0) {
         queueData.forEach((q: any) => {
-          const pName = q.patients ? `${q.patients.first_name} ${q.patients.last_name}` : 'Walk-in Patient';
-          actions.push({
-            id: `queue-${q.id}`,
-            type: 'QUEUE',
-            title: 'New Patient Waiting',
-            patientName: pName,
-            patientFileNo: q.patients?.file_number || q.token_number || undefined,
-            detail: `Checked in for ${q.departments?.name || 'OPD'} ${q.rooms?.name ? `(${q.rooms.name})` : ''}`,
-            priority: q.priority === 'URGENT' ? 'URGENT' : q.priority === 'HIGH' ? 'HIGH' : 'NORMAL',
-            targetPath: '/hospital/reception',
-            timestamp: q.created_at || new Date().toISOString(),
-          });
+          const pName = q.patients
+            ? `${q.patients.first_name} ${q.patients.last_name}`
+            : 'Walk-in Patient';
+          const token = q.token_number || undefined;
+          const fileNo = q.patients?.file_number || undefined;
+          const isEmergency = q.priority === 'EMERGENCY';
+          const isTriage =
+            q.status === 'WAITING' &&
+            (!q.room_id || (q.reason && q.reason.toLowerCase().includes('triage')));
+
+          if (isEmergency) {
+            actions.push({
+              id: `queue-${q.id}`,
+              type: 'EMERGENCY',
+              title: 'Emergency Trauma Referral',
+              patientName: pName,
+              patientFileNo: fileNo,
+              tokenNumber: token,
+              detail: q.reason || 'Critical patient escalated to Emergency Room (ER) queue.',
+              priority: 'EMERGENCY',
+              targetPath: '/hospital/er',
+              actionLabel: 'Open Emergency Bay',
+              timestamp: q.created_at || new Date().toISOString(),
+            });
+          } else if (isTriage) {
+            actions.push({
+              id: `queue-${q.id}`,
+              type: 'TRIAGE',
+              title: 'Pending Referral: Nurse Triage & Vitals',
+              patientName: pName,
+              patientFileNo: fileNo,
+              tokenNumber: token,
+              detail: `Patient referred from Reception to OPD. Waiting for vitals capture & triage.`,
+              priority: q.priority === 'URGENT' ? 'URGENT' : 'NORMAL',
+              targetPath: '/hospital/opd',
+              actionLabel: 'Capture Vitals Now',
+              timestamp: q.created_at || new Date().toISOString(),
+            });
+          } else if (q.status === 'TRIAGED' || q.status === 'CONSULTATION') {
+            actions.push({
+              id: `queue-${q.id}`,
+              type: 'DOCTOR',
+              title: 'Patient Ready: Doctor OPD Consultation',
+              patientName: pName,
+              patientFileNo: fileNo,
+              tokenNumber: token,
+              detail: `Vitals recorded. Patient waiting in queue for Doctor consultation ${
+                q.rooms?.name ? `(${q.rooms.name})` : ''
+              }.`,
+              priority: q.priority === 'URGENT' ? 'URGENT' : 'NORMAL',
+              targetPath: '/hospital/opd',
+              actionLabel: 'Start Consultation',
+              timestamp: q.created_at || new Date().toISOString(),
+            });
+          }
         });
       }
 
@@ -90,22 +147,25 @@ export default function StaffPendingActionPopup() {
       const { data: labData, count: labCount } = await supabase
         .from('lab_orders')
         .select('*, patients(first_name, last_name, file_number)', { count: 'exact' })
-        .in('status', ['PENDING', 'REQUESTED'])
+        .in('status', ['ORDERED', 'PENDING', 'REQUESTED'])
         .order('created_at', { ascending: false })
         .limit(3);
 
       if (labData && labData.length > 0) {
         labData.forEach((l: any) => {
-          const pName = l.patients ? `${l.patients.first_name} ${l.patients.last_name}` : 'Patient';
+          const pName = l.patients
+            ? `${l.patients.first_name} ${l.patients.last_name}`
+            : 'Patient';
           actions.push({
             id: `lab-${l.id}`,
             type: 'LAB',
-            title: 'Pending Lab Order',
+            title: 'Pending Referral: Diagnostic Lab Test',
             patientName: pName,
             patientFileNo: l.patients?.file_number || undefined,
-            detail: 'New laboratory test requested by doctor',
-            priority: l.priority === 'URGENT' ? 'URGENT' : 'NORMAL',
+            detail: `New laboratory investigation ordered by doctor awaiting sample collection.`,
+            priority: l.priority === 'URGENT' || l.priority === 'CRITICAL' ? 'URGENT' : 'NORMAL',
             targetPath: '/hospital/laboratory',
+            actionLabel: 'Open Lab Worklist',
             timestamp: l.created_at || new Date().toISOString(),
           });
         });
@@ -121,60 +181,109 @@ export default function StaffPendingActionPopup() {
 
       if (rxData && rxData.length > 0) {
         rxData.forEach((rx: any) => {
-          const pName = rx.patients ? `${rx.patients.first_name} ${rx.patients.last_name}` : 'Patient';
+          const pName = rx.patients
+            ? `${rx.patients.first_name} ${rx.patients.last_name}`
+            : 'Patient';
           actions.push({
             id: `rx-${rx.id}`,
             type: 'PRESCRIPTION',
-            title: 'Prescription To Dispense',
+            title: 'Pending Referral: Pharmacy Dispensing',
             patientName: pName,
             patientFileNo: rx.patients?.file_number || undefined,
-            detail: 'Medication order awaiting pharmacy dispensing',
+            detail: `Doctor prescription awaiting pharmacist verification & medication dispensing.`,
             priority: 'NORMAL',
             targetPath: '/hospital/inventory',
+            actionLabel: 'Dispense Prescription',
             timestamp: rx.created_at || new Date().toISOString(),
           });
         });
       }
 
-      const totalCount = (queueCount || 0) + (labCount || 0) + (rxCount || 0);
+      // 4. Check Pending Radiology Orders
+      const { data: radData, count: radCount } = await supabase
+        .from('radiology_orders')
+        .select('*, patients(first_name, last_name, file_number)', { count: 'exact' })
+        .eq('status', 'ORDERED')
+        .order('created_at', { ascending: false })
+        .limit(2);
+
+      if (radData && radData.length > 0) {
+        radData.forEach((rad: any) => {
+          const pName = rad.patients
+            ? `${rad.patients.first_name} ${rad.patients.last_name}`
+            : 'Patient';
+          actions.push({
+            id: `rad-${rad.id}`,
+            type: 'RADIOLOGY',
+            title: `Pending Referral: Radiology (${rad.modality})`,
+            patientName: pName,
+            patientFileNo: rad.patients?.file_number || undefined,
+            detail: `Imaging scan for ${rad.body_part || 'Study'} requested by clinician.`,
+            priority: 'NORMAL',
+            targetPath: '/hospital/radiology',
+            actionLabel: 'Open Imaging Station',
+            timestamp: rad.created_at || new Date().toISOString(),
+          });
+        });
+      }
+
+      const totalCount =
+        (queueCount || 0) + (labCount || 0) + (rxCount || 0) + (radCount || 0);
       setTotalPendingCount(totalCount);
 
       // Filter out dismissed items
-      const undismissed = actions.filter(a => !dismissedIds.has(a.id));
+      const undismissed = actions.filter((a) => !dismissedIds.has(a.id));
 
       if (undismissed.length > 0) {
         const topAction = undismissed[0];
-        
-        // If this is a newly arrived action item, trigger alert voice & popup
+
+        // Trigger sound notification on new arrival
         if (topAction.id !== lastActionIdRef.current) {
           lastActionIdRef.current = topAction.id;
           setActiveAction(topAction);
 
-          playChime(topAction.priority === 'URGENT' ? 'warning' : 'info');
+          if (topAction.priority === 'EMERGENCY' || topAction.priority === 'URGENT') {
+            playChime('warning');
+            playVoiceNotification(topAction.title, topAction.detail, 'warning');
+          } else {
+            playChime('info');
+            playVoiceNotification(topAction.title, undefined, 'info');
+          }
         }
       } else {
         setActiveAction(null);
       }
     } catch (err) {
-      console.error('Error checking pending staff actions:', err);
+      console.error('Error checking pending staff referral actions:', err);
     }
   };
 
   useEffect(() => {
     void checkForPendingActions();
 
-    // Subscribe to real-time events on walkin_queue, lab_orders, prescriptions
+    // Subscribe to realtime database changes across relevant tables
     const channel = supabase
-      .channel('staff-pending-actions-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'walkin_queue' }, () => {
-        void checkForPendingActions();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lab_orders' }, () => {
-        void checkForPendingActions();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'prescriptions' }, () => {
-        void checkForPendingActions();
-      })
+      .channel('staff-pending-referrals-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'walkin_queue' },
+        () => void checkForPendingActions(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'lab_orders' },
+        () => void checkForPendingActions(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'prescriptions' },
+        () => void checkForPendingActions(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'radiology_orders' },
+        () => void checkForPendingActions(),
+      )
       .subscribe();
 
     return () => {
@@ -184,7 +293,7 @@ export default function StaffPendingActionPopup() {
 
   const handleDismiss = () => {
     if (activeAction) {
-      setDismissedIds(prev => new Set(prev).add(activeAction.id));
+      setDismissedIds((prev) => new Set(prev).add(activeAction.id));
       setActiveAction(null);
     }
   };
@@ -192,12 +301,15 @@ export default function StaffPendingActionPopup() {
   const handleSnooze = (minutes: number = 5) => {
     const snoozeEnd = Date.now() + minutes * 60 * 1000;
     setSnoozedUntil(snoozeEnd);
+    if (activeAction) {
+      setDismissedIds((prev) => new Set(prev).add(activeAction.id));
+    }
     setActiveAction(null);
   };
 
   const handleTakeAction = () => {
     if (activeAction) {
-      setDismissedIds(prev => new Set(prev).add(activeAction.id));
+      setDismissedIds((prev) => new Set(prev).add(activeAction.id));
       const target = activeAction.targetPath;
       setActiveAction(null);
       router.push(target);
@@ -210,138 +322,204 @@ export default function StaffPendingActionPopup() {
     setIsVoiceOn(nextState);
   };
 
-  // Do not show popup if no active action or currently on queue-display screen
+  // Do not show modal on public queue-display screen or when no action is active
   if (!activeAction || pathname?.startsWith('/hospital/queue-display')) {
     return null;
   }
 
-  const getTypeIcon = (type: PendingActionItem['type']) => {
+  const getThemeConfig = (type: PendingActionItem['type']) => {
     switch (type) {
+      case 'TRIAGE':
+        return {
+          icon: Activity,
+          badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+          bannerBg: 'bg-emerald-600',
+          bannerLight: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+          buttonColor: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20 text-white',
+          accentBorder: 'border-emerald-500',
+        };
+      case 'DOCTOR':
+        return {
+          icon: Stethoscope,
+          badgeBg: 'bg-brand-100 text-brand-800 border-brand-200',
+          bannerBg: 'bg-brand-600',
+          bannerLight: 'bg-brand-50 border-brand-200 text-brand-900',
+          buttonColor: 'bg-brand-600 hover:bg-brand-700 shadow-brand-500/20 text-white',
+          accentBorder: 'border-brand-500',
+        };
       case 'LAB':
-        return <FlaskConical className="text-purple-600" size={20} />;
+        return {
+          icon: FlaskConical,
+          badgeBg: 'bg-purple-100 text-purple-800 border-purple-200',
+          bannerBg: 'bg-purple-600',
+          bannerLight: 'bg-purple-50 border-purple-200 text-purple-900',
+          buttonColor: 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20 text-white',
+          accentBorder: 'border-purple-500',
+        };
       case 'PRESCRIPTION':
-        return <Pill className="text-amber-600" size={20} />;
-      case 'QUEUE':
-        return <Users className="text-emerald-600" size={20} />;
+        return {
+          icon: Pill,
+          badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+          bannerBg: 'bg-emerald-600',
+          bannerLight: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+          buttonColor: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20 text-white',
+          accentBorder: 'border-emerald-500',
+        };
+      case 'RADIOLOGY':
+        return {
+          icon: Camera,
+          badgeBg: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+          bannerBg: 'bg-indigo-600',
+          bannerLight: 'bg-indigo-50 border-indigo-200 text-indigo-900',
+          buttonColor: 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20 text-white',
+          accentBorder: 'border-indigo-500',
+        };
+      case 'EMERGENCY':
+        return {
+          icon: AlertTriangle,
+          badgeBg: 'bg-rose-100 text-rose-800 border-rose-200',
+          bannerBg: 'bg-rose-600',
+          bannerLight: 'bg-rose-50 border-rose-200 text-rose-900',
+          buttonColor: 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20 text-white',
+          accentBorder: 'border-rose-500',
+        };
+      case 'BILLING':
       default:
-        return <BellRing className="text-brand-600" size={20} />;
+        return {
+          icon: CreditCard,
+          badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
+          bannerBg: 'bg-amber-600',
+          bannerLight: 'bg-amber-50 border-amber-200 text-amber-900',
+          buttonColor: 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20 text-white',
+          accentBorder: 'border-amber-500',
+        };
     }
   };
 
-  const getTypeBadgeClass = (type: PendingActionItem['type']) => {
-    switch (type) {
-      case 'LAB':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'PRESCRIPTION':
-        return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'QUEUE':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      default:
-        return 'bg-brand-100 text-brand-800 border-brand-200';
-    }
-  };
+  const theme = getThemeConfig(activeAction.type);
+  const IconComp = theme.icon;
 
   return (
-    <div className="fixed top-20 right-4 lg:right-8 z-[110] max-w-md w-full px-2 sm:px-0 pointer-events-none">
-      <div className="bg-white/95 backdrop-blur-md rounded-3xl p-5 lg:p-6 shadow-2xl border-2 border-slate-200/90 animate-in slide-in-from-top-4 fade-in duration-300 pointer-events-auto relative overflow-hidden select-none">
-        
-        {/* Decorative background glow */}
-        <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br from-brand-100/60 to-emerald-100/40 rounded-full -mr-16 -mt-16 -z-10 blur-xl" />
-
-        {/* Top Header Row */}
-        <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100 mb-3.5">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="p-2.5 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
-              {getTypeIcon(activeAction.type)}
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-200">
+        {/* Header Banner */}
+        <div className={clsx('p-6 text-white flex items-center justify-between relative', theme.bannerBg)}>
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner text-white">
+              <IconComp size={24} />
             </div>
-            <div className="min-w-0">
+            <div>
               <div className="flex items-center gap-2">
-                <span className={clsx("text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border", getTypeBadgeClass(activeAction.type))}>
-                  {activeAction.type} ACTION
+                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/20 text-white">
+                  {activeAction.type} Referral
                 </span>
-                {activeAction.priority === 'URGENT' && (
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 animate-pulse">
-                    URGENT
+                {activeAction.priority === 'EMERGENCY' || activeAction.priority === 'URGENT' ? (
+                  <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-rose-500 text-white animate-pulse">
+                    {activeAction.priority}
                   </span>
-                )}
+                ) : null}
               </div>
-              <h3 className="text-sm font-extrabold text-slate-900 truncate mt-0.5">
+              <h2 className="text-lg font-black text-white mt-1 leading-tight">
                 {activeAction.title}
-              </h3>
+              </h2>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Audio Toggle */}
+          <div className="flex items-center gap-1">
             <button
               onClick={toggleVoice}
-              className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-              title={isVoiceOn ? "Mute Voice Alerts" : "Enable Voice Alerts"}
+              className="p-2 rounded-xl hover:bg-white/20 text-white/80 hover:text-white transition-colors"
+              title={isVoiceOn ? 'Mute Sound Alerts' : 'Enable Sound Alerts'}
             >
-              {isVoiceOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              {isVoiceOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </button>
-            {/* Close / Dismiss Button */}
             <button
               onClick={handleDismiss}
-              className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-              title="Dismiss Popup"
+              className="p-2 rounded-xl hover:bg-white/20 text-white/80 hover:text-white transition-colors"
+              title="Dismiss Alert"
             >
-              <X size={18} />
+              <X size={20} />
             </button>
           </div>
         </div>
 
-        {/* Action Item Body Card */}
-        <div className="bg-slate-50 border border-slate-200/80 p-3.5 rounded-2xl space-y-1.5">
-          <div className="flex items-baseline justify-between gap-2">
-            <h4 className="text-base font-extrabold text-slate-900 truncate uppercase">
-              {activeAction.patientName}
-            </h4>
-            {activeAction.patientFileNo && (
-              <span className="text-xs font-mono font-bold text-slate-500 shrink-0">
-                {activeAction.patientFileNo}
-              </span>
-            )}
+        {/* Modal Body Card */}
+        <div className="p-6 sm:p-7 space-y-4">
+          {/* Patient Details Card */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center font-bold">
+                  <User size={16} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 uppercase">
+                    {activeAction.patientName}
+                  </h3>
+                  {activeAction.patientFileNo && (
+                    <p className="text-[11px] font-mono font-bold text-slate-500">
+                      MRN: {activeAction.patientFileNo}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {activeAction.tokenNumber && (
+                <div className="text-right">
+                  <span className="px-2.5 py-1 rounded-xl bg-brand-50 border border-brand-200 text-brand-700 text-xs font-black font-mono">
+                    Token #{activeAction.tokenNumber}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-600 font-medium leading-relaxed pt-1">
+              {activeAction.detail}
+            </p>
           </div>
-          <p className="text-xs text-slate-600 font-medium leading-relaxed">
-            {activeAction.detail}
-          </p>
+
+          {/* Pending Queue Count Banner */}
+          {totalPendingCount > 1 && (
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200/80">
+              <span className="flex items-center gap-1.5 text-slate-700">
+                <Sparkles size={14} className="text-amber-500" />
+                Active Hospital Pipeline
+              </span>
+              <span className="text-brand-600 font-extrabold">{totalPendingCount} pending items</span>
+            </div>
+          )}
         </div>
 
-        {/* Footer Buttons: Take Action, Snooze, Dismiss */}
-        <div className="mt-4 flex items-center justify-between gap-2">
+        {/* Modal Footer Controls: Snooze 5 min, Dismiss, Take Action */}
+        <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           <button
             onClick={() => handleSnooze(5)}
-            className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-all flex items-center gap-1.5"
-            title="Snooze action alerts for 5 minutes"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white transition-all flex items-center justify-center gap-1.5 shadow-xs"
+            title="Snooze popup alerts for 5 minutes"
           >
-            <Clock size={14} />
-            <span>Snooze 5m</span>
+            <Clock size={15} className="text-slate-400" />
+            <span>Snooze for 5 Mins</span>
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
             <button
               onClick={handleDismiss}
-              className="px-3 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all"
+              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white transition-colors text-center"
             >
               Dismiss
             </button>
             <button
               onClick={handleTakeAction}
-              className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-md shadow-brand-600/20 transition-all flex items-center gap-1.5"
+              className={clsx(
+                'flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs font-black shadow-lg transition-all flex items-center justify-center gap-2',
+                theme.buttonColor,
+              )}
             >
-              <span>Take Action</span>
-              <ArrowRight size={14} />
+              <span>{activeAction.actionLabel}</span>
+              <ArrowRight size={15} />
             </button>
           </div>
         </div>
-
-        {totalPendingCount > 1 && (
-          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            <span>Real-time System Action</span>
-            <span className="text-brand-600 font-extrabold">{totalPendingCount} pending items</span>
-          </div>
-        )}
       </div>
     </div>
   );

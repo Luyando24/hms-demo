@@ -40,6 +40,7 @@ export default function OutpatientDashboard() {
 
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [selectedQueueItem, setSelectedQueueItem] = useState<any>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
   const [isConsultationModalOpen, setIsConsultationModalOpen] = useState(false);
@@ -57,6 +58,7 @@ export default function OutpatientDashboard() {
 
   useEffect(() => {
     fetchOpdData();
+    fetchCurrentUser();
     
     // Subscribe to realtime OPD queue updates
     const channel = supabase
@@ -68,6 +70,20 @@ export default function OutpatientDashboard() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const fetchCurrentUser = async () => {
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+      if (profile?.role) {
+        setCurrentUserRole(profile.role);
+      }
+    }
+  };
 
   const fetchOpdData = async () => {
     setLoading(true);
@@ -291,7 +307,8 @@ export default function OutpatientDashboard() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {item.status === 'WAITING' && item.patients && (
+                      {/* Vitals Capture is restricted EXCLUSIVELY to Nurses */}
+                      {item.status === 'WAITING' && item.patients && currentUserRole === 'NURSE' && (
                         <button 
                           onClick={() => { setSelectedPatient(item.patients); setIsVitalsModalOpen(true); }}
                           className="bg-brand-600 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-brand-700 transition-all shadow-md flex items-center gap-1.5 active:scale-95"
@@ -300,7 +317,9 @@ export default function OutpatientDashboard() {
                           Capture Vitals
                         </button>
                       )}
-                      {(item.status === 'TRIAGED' || item.status === 'CONSULTATION' || item.status === 'WAITING') && item.patients && (
+
+                      {/* Doctor Consultation is available for Doctors and Admins */}
+                      {(item.status === 'TRIAGED' || item.status === 'CONSULTATION' || (item.status === 'WAITING' && currentUserRole !== 'NURSE')) && item.patients && (
                         <button 
                           onClick={() => { setSelectedPatient(item.patients); setSelectedQueueItem(item); setIsConsultationModalOpen(true); }}
                           className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-slate-800 transition-all shadow-md flex items-center gap-1.5 active:scale-95"
