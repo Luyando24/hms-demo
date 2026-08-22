@@ -323,5 +323,3 @@ export async function updateSystemSettingsAction(input: unknown) {
   }
 }
 
-export { createStaffMember } from './staff/actions';
-
