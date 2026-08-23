@@ -280,64 +280,48 @@ export default function OPDCheckInModal({
       label: 'Doctor Consultation (OPD)',
       tag: 'Nurse Triage & Vitals First',
       icon: Stethoscope,
-      accent: 'border-brand-500 bg-brand-50/70',
-      iconBg: 'bg-brand-600 text-white',
     },
     {
       id: 'LAB' as CheckInDestination,
       label: 'Diagnostic Laboratory',
       tag: 'Blood / Specimen Collection',
       icon: FlaskConical,
-      accent: 'border-purple-500 bg-purple-50/70',
-      iconBg: 'bg-purple-600 text-white',
     },
     {
       id: 'PHARMACY' as CheckInDestination,
       label: 'Central Pharmacy',
       tag: 'Medication Refill & Collection',
       icon: Pill,
-      accent: 'border-emerald-500 bg-emerald-50/70',
-      iconBg: 'bg-emerald-600 text-white',
     },
     {
       id: 'RADIOLOGY' as CheckInDestination,
       label: 'Radiology & Imaging',
       tag: 'X-Ray, Ultrasound, CT, MRI',
       icon: Camera,
-      accent: 'border-indigo-500 bg-indigo-50/70',
-      iconBg: 'bg-indigo-600 text-white',
     },
     {
       id: 'ER' as CheckInDestination,
       label: 'Emergency (ER)',
       tag: 'Acute Trauma & Resuscitation',
       icon: AlertTriangle,
-      accent: 'border-rose-500 bg-rose-50/70',
-      iconBg: 'bg-rose-600 text-white',
     },
     {
       id: 'BILLING' as CheckInDestination,
       label: 'Billing & Cashier',
       tag: 'Invoice Payment & Settlement',
       icon: CreditCard,
-      accent: 'border-amber-500 bg-amber-50/70',
-      iconBg: 'bg-amber-600 text-white',
     },
     {
       id: 'ADMISSION' as CheckInDestination,
       label: 'Inpatient Ward Admission',
       tag: 'IPD Bed & Room Placement',
       icon: Building,
-      accent: 'border-cyan-500 bg-cyan-50/70',
-      iconBg: 'bg-cyan-600 text-white',
     },
     {
       id: 'DOCTOR' as CheckInDestination,
       label: 'Direct Doctor Consultation',
       tag: 'Skip Triage (Follow-up / Specialist)',
       icon: Activity,
-      accent: 'border-blue-500 bg-blue-50/70',
-      iconBg: 'bg-blue-600 text-white',
     },
   ];
 
@@ -345,61 +329,61 @@ export default function OPDCheckInModal({
 
   return (
     <>
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[92vh] border border-slate-100">
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh] border border-slate-200/80">
           {/* Header */}
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20 text-white">
-                <LogIn size={22} />
+              <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-xs">
+                <LogIn size={16} />
               </div>
               <div>
-                <h2 className="text-xl font-black text-slate-900 leading-tight">
-                  Front Desk Patient Check-in & Intake
+                <h2 className="text-base font-bold text-slate-900 leading-tight">
+                  Patient Intake & Routing
                 </h2>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                  Multi-Service Hospital Queue Routing
+                <p className="text-xs text-slate-500 font-normal mt-0.5">
+                  Route patient to the appropriate clinic workstation
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white rounded-xl text-slate-400 hover:text-slate-600 transition-colors border border-transparent hover:border-slate-200"
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
 
-          <div className="p-6 sm:p-7 space-y-5 overflow-y-auto flex-1">
+          <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
             {/* Patient Search (if not preselected) */}
             {!selectedPatient ? (
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                  Search Patient (Name / MRN File Number / Phone) *
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Search Patient (Name / MRN / Phone) *
                 </label>
                 <div className="relative">
                   <Search
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                    size={18}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    size={15}
                   />
                   <input
                     type="text"
                     placeholder="Type name, phone or file number..."
                     value={searchQuery}
                     onChange={(e) => searchPatients(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                   />
                   {loading && (
                     <Loader2
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-brand-600"
-                      size={18}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-500"
+                      size={15}
                     />
                   )}
                 </div>
 
                 {/* Patient Search Dropdown Results */}
                 {patients.length > 0 && (
-                  <div className="border border-slate-200 rounded-2xl divide-y divide-slate-100 max-h-48 overflow-y-auto mt-2 shadow-lg">
+                  <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-44 overflow-y-auto mt-1.5 shadow-sm bg-white">
                     {patients.map((p) => (
                       <button
                         key={p.id}
@@ -409,20 +393,20 @@ export default function OPDCheckInModal({
                           setSearchQuery('');
                           setPatients([]);
                         }}
-                        className="w-full p-3.5 text-left hover:bg-slate-50 flex items-center justify-between transition-colors group"
+                        className="w-full p-3 text-left hover:bg-slate-50 flex items-center justify-between transition-colors group"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-xs">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs">
                             {p.first_name?.[0]}{p.last_name?.[0]}
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-slate-900 group-hover:text-brand-600">
+                            <p className="text-xs font-bold text-slate-900">
                               {p.first_name} {p.last_name}
                             </p>
-                            <p className="text-xs text-slate-500">{p.phone || 'No phone'}</p>
+                            <p className="text-[10px] text-slate-400">{p.phone || 'No phone'}</p>
                           </div>
                         </div>
-                        <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                        <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">
                           {p.file_number}
                         </span>
                       </button>
@@ -432,20 +416,20 @@ export default function OPDCheckInModal({
               </div>
             ) : (
               /* Selected Patient Banner */
-              <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl flex items-center justify-between animate-in fade-in">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-sm">
-                    <User size={22} />
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-xs">
+                    <User size={16} />
                   </div>
                   <div>
-                    <p className="text-sm font-black text-emerald-950">
+                    <p className="text-xs font-bold text-slate-900">
                       {selectedPatient.first_name} {selectedPatient.last_name}
                     </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] font-mono font-medium text-slate-500 bg-white border border-slate-200 px-1.5 py-0.2 rounded">
                         MRN: {selectedPatient.file_number}
                       </span>
-                      <span className="text-xs text-emerald-700 font-medium">
+                      <span className="text-[10px] text-slate-400 font-normal">
                         • {selectedPatient.gender || 'N/A'} • {selectedPatient.phone || 'No phone'}
                       </span>
                     </div>
@@ -455,7 +439,7 @@ export default function OPDCheckInModal({
                   <button
                     type="button"
                     onClick={() => setSelectedPatient(null)}
-                    className="text-xs font-bold text-rose-600 hover:text-rose-700 px-3 py-1.5 rounded-lg hover:bg-rose-50 transition-colors"
+                    className="text-xs font-medium text-slate-500 hover:text-slate-900 px-2 py-1 rounded-md hover:bg-slate-200/60 transition-colors"
                   >
                     Change
                   </button>
@@ -464,18 +448,14 @@ export default function OPDCheckInModal({
             )}
 
             {/* Visit Purpose & Destination Department Selector */}
-            <div className="space-y-3 pt-2">
+            <div className="space-y-2 pt-1">
               <div>
-                <label className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Send size={14} className="text-brand-600" />
-                  Select Visit Purpose & Service Department *
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  Select Department & Intake Destination *
                 </label>
-                <p className="text-[11px] text-slate-500 font-medium">
-                  Select why the patient visited the hospital today to route to the correct workstation.
-                </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {destinationOptions.map((opt) => {
                   const isSelected = destination === opt.id;
                   const Icon = opt.icon;
@@ -485,36 +465,34 @@ export default function OPDCheckInModal({
                       type="button"
                       onClick={() => handleSelectDestination(opt.id)}
                       className={clsx(
-                        'p-3.5 rounded-2xl border text-left transition-all flex items-start justify-between gap-2 relative shadow-xs group',
+                        'p-3 rounded-xl border text-left transition-all flex items-center justify-between gap-2 shadow-xs',
                         isSelected
-                          ? `${opt.accent} ring-2 ring-brand-500/20`
-                          : 'border-slate-200 bg-white hover:bg-slate-50',
+                          ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                          : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50 text-slate-900',
                       )}
                     >
-                      <div className="flex items-start gap-3 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <div
                           className={clsx(
-                            'w-9 h-9 rounded-xl flex items-center justify-center transition-colors shrink-0',
-                            isSelected ? opt.iconBg : 'bg-slate-100 text-slate-600',
+                            'w-7 h-7 rounded-lg flex items-center justify-center shrink-0',
+                            isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700',
                           )}
                         >
-                          <Icon size={18} />
+                          <Icon size={14} />
                         </div>
                         <div className="min-w-0">
-                          <div className="text-xs font-black text-slate-900 leading-tight">
+                          <div className={clsx('text-xs font-bold leading-tight truncate', isSelected ? 'text-white' : 'text-slate-900')}>
                             {opt.label}
                           </div>
-                          <div className="text-[10px] font-semibold text-slate-500 mt-0.5 truncate">
+                          <div className={clsx('text-[10px] mt-0.5 truncate', isSelected ? 'text-slate-300' : 'text-slate-400')}>
                             {opt.tag}
                           </div>
                         </div>
                       </div>
 
-                      {isSelected ? (
-                        <div className="w-5 h-5 rounded-full bg-brand-600 text-white flex items-center justify-center shrink-0">
-                          <Check size={12} strokeWidth={3} />
-                        </div>
-                      ) : null}
+                      {isSelected && (
+                        <Check size={14} className="text-white shrink-0" />
+                      )}
                     </button>
                   );
                 })}
@@ -522,29 +500,29 @@ export default function OPDCheckInModal({
             </div>
 
             {/* Specific Reason & Notes */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-                Specific Visit Details / Investigation Notes
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700">
+                Investigation / Clinical Notes
               </label>
               <input
                 type="text"
                 value={customReason}
                 onChange={(e) => setCustomReason(e.target.value)}
-                placeholder="e.g. Routine hypertension check, Full Blood Count test, Amoxicillin refill..."
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                placeholder="e.g. Routine checkup, Full Blood Count test, Prescription refill..."
+                className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
               />
             </div>
 
             {/* Priority & Consultation Fee Toggle */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                <label className="text-xs font-semibold text-slate-700">
                   Priority Level
                 </label>
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                 >
                   <option value="NORMAL">Normal Priority</option>
                   <option value="HIGH">High Priority</option>
@@ -554,16 +532,16 @@ export default function OPDCheckInModal({
               </div>
 
               {(destination === 'TRIAGE' || destination === 'DOCTOR') && (
-                <div className="flex items-center gap-2.5 pt-4">
+                <div className="flex items-center gap-2 pt-5">
                   <input
                     type="checkbox"
                     id="gen-invoice"
                     checked={generateInvoice}
                     onChange={(e) => setGenerateInvoice(e.target.checked)}
-                    className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500/20"
+                    className="w-4 h-4 rounded text-slate-900 focus:ring-slate-900/10"
                   />
-                  <label htmlFor="gen-invoice" className="text-xs font-bold text-slate-700 cursor-pointer">
-                    Generate Consultation Fee Invoice (
+                  <label htmlFor="gen-invoice" className="text-xs font-medium text-slate-700 cursor-pointer">
+                    Add Consultation Fee Invoice (
                     {formatCurrencyAmount(
                       consultationFee,
                       currencyConfig.symbol,
@@ -577,24 +555,24 @@ export default function OPDCheckInModal({
           </div>
 
           {/* Footer */}
-          <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3 shrink-0">
+          <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex gap-2.5 shrink-0 justify-end">
             <button
               onClick={onClose}
               type="button"
-              className="flex-1 px-5 py-3 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-white transition-colors"
+              className="px-4 py-2 border border-slate-200 bg-white text-slate-700 rounded-xl text-xs font-medium hover:bg-slate-50 transition-colors shadow-xs"
             >
               Cancel
             </button>
             <button
               disabled={!selectedPatient || loading}
               onClick={handleCheckIn}
-              className="flex-[2] bg-brand-600 text-white px-5 py-3 rounded-xl text-xs font-black hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+              className="bg-slate-900 text-white px-5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-98"
             >
               {loading ? (
-                <Loader2 className="animate-spin" size={16} />
+                <Loader2 className="animate-spin" size={14} />
               ) : (
                 <>
-                  <CheckCircle2 size={16} /> Check In & Queue Patient <CornerDownRight size={14} />
+                  <CheckCircle2 size={14} /> Route Patient
                 </>
               )}
             </button>

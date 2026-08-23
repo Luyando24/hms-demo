@@ -15,7 +15,8 @@ import {
   DoorOpen,
   RefreshCw,
   UserCheck,
-  Tv
+  Tv,
+  ArrowRight
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
@@ -149,77 +150,93 @@ export default function OutpatientDashboard() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Outpatient Department (OPD)</h1>
-          <p className="text-slate-500 mt-1 font-medium">Daily Consultation Queue, Patient Triage & Clinical Workflows.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Outpatient Department (OPD)</h1>
+          <p className="text-xs text-slate-500 font-normal mt-0.5">Daily consultation queue, patient triage, and physician workflows.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button 
             onClick={fetchOpdData}
-            className="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
+            className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
           >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
             Refresh
           </button>
           <Link
             href="/hospital/queue-display"
             target="_blank"
-            className="bg-slate-900 text-white border border-slate-800 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-md"
+            className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-xs flex items-center gap-2"
           >
-            <Tv size={16} className="text-emerald-400 animate-pulse" />
-            TV Queue Screen
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            TV Screen
           </Link>
           <Link
             href="/hospital/reception"
-            className="bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
+            className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
           >
-            <UserCheck size={16} />
-            Reception Desk
+            <UserCheck size={13} />
+            Reception
           </Link>
           <button 
             onClick={() => setIsRegisterModalOpen(true)}
-            className="bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20 flex items-center gap-2"
+            className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5"
           >
-            <Plus size={16} />
+            <Plus size={14} />
             Register Patient
           </button>
         </div>
       </div>
 
       {/* OPD Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Total Queue Today</p>
-          <p className="text-3xl font-black text-slate-900">{opdStats.totalToday}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Queue Total</p>
+            <span className="w-2 h-2 rounded-full bg-slate-400" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{opdStats.totalToday}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Checked in today</p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-xs font-black text-blue-500 uppercase tracking-wider mb-2">In Consultation</p>
-          <p className="text-3xl font-black text-slate-900">{opdStats.inConsultation}</p>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">In Consult</p>
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{opdStats.inConsultation}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">With physician</p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-xs font-black text-amber-500 uppercase tracking-wider mb-2">Waiting Triage</p>
-          <p className="text-3xl font-black text-slate-900">{opdStats.waitingTriage}</p>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Waiting Triage</p>
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{opdStats.waitingTriage}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Awaiting vitals</p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-xs font-black text-emerald-500 uppercase tracking-wider mb-2">Completed</p>
-          <p className="text-3xl font-black text-slate-900">{opdStats.completedToday}</p>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed</p>
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{opdStats.completedToday}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Discharged / routed</p>
         </div>
       </div>
 
       {/* Main Queue Table */}
-      <section className="space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h2 className="text-xl font-black text-slate-900">OPD Consultation Queue</h2>
+      <section className="space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <h2 className="text-base font-bold text-slate-900">OPD Consultation Queue</h2>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Status Filter */}
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-white border border-slate-200 text-xs font-bold rounded-xl px-3 py-2 text-slate-700 focus:outline-none"
+              className="bg-white border border-slate-200 text-xs font-semibold rounded-xl px-3 py-2 text-slate-700 focus:outline-none shadow-xs"
             >
               <option value="ALL">All Statuses</option>
               <option value="WAITING">Waiting Triage</option>
@@ -229,102 +246,109 @@ export default function OutpatientDashboard() {
             </select>
 
             <div className="relative group">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
               <input 
                 type="text" 
-                placeholder="Search queue..." 
+                placeholder="Filter queue..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 shadow-xs"
               />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Token / ID</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Patient</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Check-in Time</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Department</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+              <tr className="bg-slate-50/70 border-b border-slate-200/60">
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Token / ID</th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Patient</th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Check-in</th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Department</th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">
-                    <Loader2 className="animate-spin text-brand-600 mx-auto mb-2" size={24} />
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400 font-medium text-xs">
+                    <Loader2 className="animate-spin text-slate-600 mx-auto mb-1.5" size={20} />
                     Loading live queue...
                   </td>
                 </tr>
               ) : filteredQueue.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center">
-                    <div className="w-16 h-16 bg-slate-50 text-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <Clock size={32} />
+                  <td colSpan={6} className="px-4 py-12 text-center">
+                    <div className="w-10 h-10 bg-slate-50 text-slate-300 rounded-xl flex items-center justify-center mx-auto mb-2">
+                      <Clock size={20} />
                     </div>
-                    <p className="text-slate-400 font-bold text-sm">No OPD queue records found.</p>
+                    <p className="text-slate-500 font-medium text-xs">No OPD queue records found.</p>
                   </td>
                 </tr>
               ) : filteredQueue.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <span className="font-black text-slate-400 text-xs tracking-tighter">#{item.id.slice(0, 8)}</span>
+                <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="px-4 py-3.5">
+                    <span className="font-mono text-xs font-bold text-slate-700">#{item.id.slice(0, 8)}</span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2">
-                      <p className="font-black text-slate-900 capitalize group-hover:text-brand-600 transition-colors">
+                      <p className="font-bold text-sm text-slate-900 capitalize">
                         {item.patients ? `${item.patients.first_name} ${item.patients.last_name}` : 'Walk-in Patient'}
                       </p>
                       {item.priority !== 'NORMAL' && (
                         <span className={clsx(
-                          "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter",
-                          item.priority === 'EMERGENCY' ? "bg-rose-500 text-white animate-pulse" : "bg-amber-500 text-white"
+                          "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide",
+                          item.priority === 'EMERGENCY' ? "bg-rose-50 text-rose-700 border border-rose-200" : "bg-amber-50 text-amber-700 border border-amber-200"
                         )}>
                           {item.priority}
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-0.5">
+                    <p className="text-[11px] text-slate-400 font-normal">
                       MRN: {item.patients?.file_number || 'N/A'}
                     </p>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="flex items-center gap-1.5 text-slate-600 font-bold text-xs">
+                  <td className="px-4 py-3.5">
+                    <span className="flex items-center gap-1.5 text-slate-500 text-xs font-normal">
                       <Clock size={12} className="text-slate-400" />
                       {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-brand-600">
-                      <DoorOpen size={14} />
-                      <span className="text-xs font-black uppercase tracking-widest">{item.department || 'General OPD'}</span>
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-1.5 text-slate-700">
+                      <DoorOpen size={13} className="text-slate-400" />
+                      <span className="text-xs font-semibold">{item.department || 'General OPD'}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-3.5">
                     <span className={clsx(
-                      "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border",
-                      item.status === 'COMPLETED' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                      item.status === 'CONSULTATION' ? "bg-brand-50 text-brand-600 border-brand-100 animate-pulse" :
-                      item.status === 'TRIAGED' ? "bg-blue-50 text-blue-600 border-blue-100" :
-                      "bg-amber-50 text-amber-600 border-amber-100"
+                      "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide border",
+                      item.status === 'COMPLETED' ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" :
+                      item.status === 'CONSULTATION' ? "bg-blue-50 text-blue-700 border-blue-200/60" :
+                      item.status === 'TRIAGED' ? "bg-indigo-50 text-indigo-700 border-indigo-200/60" :
+                      "bg-amber-50 text-amber-700 border-amber-200/60"
                     )}>
+                      <span className={clsx(
+                        "w-1.5 h-1.5 rounded-full",
+                        item.status === 'COMPLETED' ? "bg-emerald-500" :
+                        item.status === 'CONSULTATION' ? "bg-blue-500 animate-pulse" :
+                        item.status === 'TRIAGED' ? "bg-indigo-500" :
+                        "bg-amber-500"
+                      )} />
                       {item.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="px-4 py-3.5 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
                       {/* Vitals Capture is restricted EXCLUSIVELY to Nurses */}
                       {item.status === 'WAITING' && item.patients && currentUserRole === 'NURSE' && (
                         <button 
                           onClick={() => { setSelectedPatient(item.patients); setIsVitalsModalOpen(true); }}
-                          className="bg-brand-600 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-brand-700 transition-all shadow-md flex items-center gap-1.5 active:scale-95"
+                          className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
                         >
-                          <Activity size={14} />
+                          <Activity size={13} />
                           Capture Vitals
                         </button>
                       )}
@@ -333,9 +357,9 @@ export default function OutpatientDashboard() {
                       {(item.status === 'TRIAGED' || item.status === 'CONSULTATION' || (item.status === 'WAITING' && currentUserRole !== 'NURSE')) && item.patients && (
                         <button 
                           onClick={() => { setSelectedPatient(item.patients); setSelectedQueueItem(item); setIsConsultationModalOpen(true); }}
-                          className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-slate-800 transition-all shadow-md flex items-center gap-1.5 active:scale-95"
+                          className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
                         >
-                          <Stethoscope size={14} />
+                          <Stethoscope size={13} />
                           Start Consult
                         </button>
                       )}
@@ -349,24 +373,24 @@ export default function OutpatientDashboard() {
       </section>
 
       {/* Attending Physicians & Quick Nav */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-          <h2 className="text-lg font-black text-slate-900">Attending Physicians</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Attending Physicians</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {doctors.length === 0 ? (
-              <p className="text-xs text-slate-400 font-bold col-span-full">No attending physicians registered.</p>
+              <p className="text-xs text-slate-400 font-normal col-span-full">No attending physicians registered.</p>
             ) : doctors.map((doc) => (
-              <div key={doc.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center">
-                    <Stethoscope size={20} />
+              <div key={doc.id} className="flex items-center justify-between p-3 bg-slate-50/70 rounded-xl border border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs">
+                    <Stethoscope size={15} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-900">Dr. {doc.first_name} {doc.last_name}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">{doc.role}</p>
+                    <p className="text-xs font-bold text-slate-900">Dr. {doc.first_name} {doc.last_name}</p>
+                    <p className="text-[10px] text-slate-400 font-medium uppercase">{doc.role}</p>
                   </div>
                 </div>
-                <span className="text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                   Available
                 </span>
               </div>
@@ -374,32 +398,30 @@ export default function OutpatientDashboard() {
           </div>
         </div>
 
-        <div className="bg-brand-600 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-between border border-brand-500">
-          <div>
-            <h2 className="text-lg font-black mb-6">OPD Quick Navigation</h2>
-            <div className="space-y-3">
-              <Link 
-                href="/hospital/reception"
-                className="w-full bg-white/10 hover:bg-white/20 text-white p-4 rounded-2xl text-xs font-bold flex items-center justify-between transition-all"
-              >
-                Front Office & Reception Desk
-                <CheckCircle2 size={18} />
-              </Link>
-              <Link 
-                href="/hospital/patients"
-                className="w-full bg-white/10 hover:bg-white/20 text-white p-4 rounded-2xl text-xs font-bold flex items-center justify-between transition-all"
-              >
-                Patient Registry (EHR)
-                <CheckCircle2 size={18} />
-              </Link>
-              <Link 
-                href="/hospital/laboratory"
-                className="w-full bg-white/10 hover:bg-white/20 text-white p-4 rounded-2xl text-xs font-bold flex items-center justify-between transition-all"
-              >
-                Laboratory Information System
-                <CheckCircle2 size={18} />
-              </Link>
-            </div>
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">OPD Quick Links</h2>
+          <div className="space-y-2">
+            <Link 
+              href="/hospital/reception"
+              className="w-full bg-slate-50 hover:bg-slate-100/80 text-slate-700 p-3 rounded-xl text-xs font-medium flex items-center justify-between border border-slate-100 transition-all"
+            >
+              Front Office & Reception
+              <ArrowRight size={14} className="text-slate-400" />
+            </Link>
+            <Link 
+              href="/hospital/patients"
+              className="w-full bg-slate-50 hover:bg-slate-100/80 text-slate-700 p-3 rounded-xl text-xs font-medium flex items-center justify-between border border-slate-100 transition-all"
+            >
+              Patient Registry (EHR)
+              <ArrowRight size={14} className="text-slate-400" />
+            </Link>
+            <Link 
+              href="/hospital/laboratory"
+              className="w-full bg-slate-50 hover:bg-slate-100/80 text-slate-700 p-3 rounded-xl text-xs font-medium flex items-center justify-between border border-slate-100 transition-all"
+            >
+              Laboratory LIS
+              <ArrowRight size={14} className="text-slate-400" />
+            </Link>
           </div>
         </div>
       </div>

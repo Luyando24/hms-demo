@@ -23,15 +23,15 @@ export function HospitalLayoutClient({
 
   return (
     <MobileNavProvider>
-      <div className="min-h-screen bg-slate-100 pb-20 lg:pb-0">
+      <div className="min-h-screen bg-[#F8FAFC] pb-20 lg:pb-0">
         <HospitalHeader />
         <HospitalSidebar />
         <HospitalBottomNav />
         <QueueFloatingIndicator />
         <StaffPendingActionPopup />
         <GeofenceGuard />
-        <div className="lg:ml-72 pt-20 flex flex-col min-h-screen">
-          <main className="flex-1 p-4 lg:p-8">{children}</main>
+        <div className="lg:ml-72 pt-16 flex flex-col min-h-screen">
+          <main className="flex-1 p-6 lg:p-8">{children}</main>
         </div>
       </div>
     </MobileNavProvider>

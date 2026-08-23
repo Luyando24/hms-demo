@@ -20,6 +20,7 @@ import {
   Check,
   Send,
   CornerDownRight,
+  ShieldCheck,
 } from 'lucide-react';
 import StatusModal from './StatusModal';
 import { registerPatientAction } from '@/app/hospital/actions';
@@ -249,85 +250,85 @@ export default function RegisterPatientModal({
       <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
           {/* Header & Step Wizard Bar */}
-          <div className="p-6 border-b border-slate-100 bg-slate-50/50 shrink-0">
-            <div className="flex items-center justify-between mb-4">
+          <div className="p-5 border-b border-slate-100 bg-white shrink-0">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <h2 className="text-xl font-black text-slate-900">Register New Patient</h2>
-                <p className="text-xs text-slate-500 font-medium">
-                  Multi-step patient intake & census registration.
+                <h2 className="text-base font-bold text-slate-900">Register New Patient</h2>
+                <p className="text-xs text-slate-500 font-normal mt-0.5">
+                  Patient intake, demographic details, and initial routing.
                 </p>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400 hover:text-slate-600 border border-transparent hover:border-slate-200"
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
             {/* Step Indicators */}
-            <div className="grid grid-cols-3 gap-2 pt-2">
+            <div className="grid grid-cols-3 gap-2 pt-1">
               <div
-                className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
+                className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${
                   currentStep === 1
-                    ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/20'
+                    ? 'bg-slate-900 border-slate-900 text-white shadow-xs font-semibold'
                     : currentStep > 1
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold'
-                    : 'bg-white border-slate-200 text-slate-400'
+                    ? 'bg-slate-100 border-slate-200 text-slate-800 font-medium'
+                    : 'bg-white border-slate-200/80 text-slate-400 font-normal'
                 }`}
               >
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
                     currentStep === 1
-                      ? 'bg-white text-brand-600'
+                      ? 'bg-white/20 text-white'
                       : currentStep > 1
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-slate-800 text-white'
                       : 'bg-slate-100 text-slate-400'
                   }`}
                 >
-                  {currentStep > 1 ? <CheckCircle2 size={14} /> : '1'}
+                  {currentStep > 1 ? <CheckCircle2 size={12} /> : '1'}
                 </div>
-                <span className="text-xs font-bold truncate">Personal Identity</span>
+                <span className="text-xs truncate">1. Identity</span>
               </div>
 
               <div
-                className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
+                className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${
                   currentStep === 2
-                    ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/20'
+                    ? 'bg-slate-900 border-slate-900 text-white shadow-xs font-semibold'
                     : currentStep > 2
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold'
-                    : 'bg-white border-slate-200 text-slate-400'
+                    ? 'bg-slate-100 border-slate-200 text-slate-800 font-medium'
+                    : 'bg-white border-slate-200/80 text-slate-400 font-normal'
                 }`}
               >
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
                     currentStep === 2
-                      ? 'bg-white text-brand-600'
+                      ? 'bg-white/20 text-white'
                       : currentStep > 2
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-slate-800 text-white'
                       : 'bg-slate-100 text-slate-400'
                   }`}
                 >
-                  {currentStep > 2 ? <CheckCircle2 size={14} /> : '2'}
+                  {currentStep > 2 ? <CheckCircle2 size={12} /> : '2'}
                 </div>
-                <span className="text-xs font-bold truncate">Contact & Address</span>
+                <span className="text-xs truncate">2. Contact</span>
               </div>
 
               <div
-                className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
+                className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${
                   currentStep === 3
-                    ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/20'
-                    : 'bg-white border-slate-200 text-slate-400'
+                    ? 'bg-slate-900 border-slate-900 text-white shadow-xs font-semibold'
+                    : 'bg-white border-slate-200/80 text-slate-400 font-normal'
                 }`}
               >
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
-                    currentStep === 3 ? 'bg-white text-brand-600' : 'bg-slate-100 text-slate-400'
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    currentStep === 3 ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400'
                   }`}
                 >
                   3
                 </div>
-                <span className="text-xs font-bold truncate">Insurance & Route</span>
+                <span className="text-xs truncate">3. Route</span>
               </div>
             </div>
           </div>
@@ -336,23 +337,23 @@ export default function RegisterPatientModal({
           <form
             id="registration-form"
             onSubmit={handleSubmit}
-            className="p-6 sm:p-7 overflow-y-auto flex-1 space-y-6"
+            className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4"
           >
             {stepError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold animate-in fade-in">
+              <div className="p-3 bg-rose-50 border border-rose-200/60 rounded-xl text-rose-700 text-xs font-medium animate-in fade-in">
                 ⚠️ {stepError}
               </div>
             )}
 
             {/* STEP 1 */}
             {currentStep === 1 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
-                <div className="flex items-center gap-2 text-xs font-black text-brand-600 uppercase tracking-wider">
-                  <User size={15} /> Step 1: Personal Demographic Details
+              <div className="space-y-3.5 animate-in fade-in slide-in-from-right-4 duration-150">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  <User size={14} /> Step 1: Personal Demographic Details
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <label className="text-xs font-bold text-slate-700">
+                    <label className="text-xs font-semibold text-slate-700">
                       Patient File # (Optional - Auto-generated if blank)
                     </label>
                     <input
@@ -361,53 +362,51 @@ export default function RegisterPatientModal({
                       value={formData.file_number}
                       onChange={handleChange}
                       placeholder="e.g. HMS-P-12345"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 uppercase"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-700">First Name *</label>
+                    <label className="text-xs font-semibold text-slate-700">First Name *</label>
                     <input
                       name="first_name"
                       type="text"
                       required
                       value={formData.first_name}
                       onChange={handleChange}
-                      placeholder="e.g. Mwansa"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      placeholder="First name"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-700">Last Name *</label>
+                    <label className="text-xs font-semibold text-slate-700">Last Name *</label>
                     <input
                       name="last_name"
                       type="text"
                       required
                       value={formData.last_name}
                       onChange={handleChange}
-                      placeholder="e.g. Banda"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      placeholder="Last name"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-700">Date of Birth *</label>
+                    <label className="text-xs font-semibold text-slate-700">Date of Birth *</label>
                     <input
                       name="dob"
                       type="date"
                       required
                       value={formData.dob}
-                      max={new Date().toISOString().slice(0, 10)}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-700">Gender *</label>
+                    <label className="text-xs font-semibold text-slate-700">Gender *</label>
                     <select
                       name="gender"
-                      required
                       value={formData.gender}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     >
                       <option value="">Select Gender</option>
                       <option value="Male">Male</option>
@@ -421,68 +420,64 @@ export default function RegisterPatientModal({
 
             {/* STEP 2 */}
             {currentStep === 2 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
-                <div className="flex items-center gap-2 text-xs font-black text-brand-600 uppercase tracking-wider">
-                  <Phone size={15} /> Step 2: Contact Details & Emergency Reach
+              <div className="space-y-3.5 animate-in fade-in slide-in-from-right-4 duration-150">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  <Phone size={14} /> Step 2: Contact & Residential Details
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-slate-700">Phone Number</label>
+                    <label className="text-xs font-semibold text-slate-700">Phone Number</label>
                     <input
                       name="phone"
                       type="tel"
                       value={formData.phone}
                       onChange={handleChange}
-                      placeholder="+260 97 1234567"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      placeholder="+260 970 000 000"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-700">Email Address</label>
+                    <label className="text-xs font-semibold text-slate-700">Email Address</label>
                     <input
                       name="email"
                       type="email"
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="patient@example.com"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-xs font-bold text-slate-700">Residential Address</label>
-                    <textarea
+                    <label className="text-xs font-semibold text-slate-700">Residential Address</label>
+                    <input
                       name="address"
-                      rows={2}
+                      type="text"
                       value={formData.address}
                       onChange={handleChange}
-                      placeholder="Plot / House No, Street, City / Area"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"
+                      placeholder="Plot / Street / City"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-700">
-                      Emergency Contact Name
-                    </label>
+                    <label className="text-xs font-semibold text-slate-700">Emergency Contact Name</label>
                     <input
                       name="emergency_contact_name"
                       type="text"
                       value={formData.emergency_contact_name}
                       onChange={handleChange}
-                      placeholder="Next of Kin / Spouse"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      placeholder="Next of Kin / Relative"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-700">
-                      Emergency Contact Phone
-                    </label>
+                    <label className="text-xs font-semibold text-slate-700">Emergency Contact Phone</label>
                     <input
                       name="emergency_contact_phone"
                       type="tel"
                       value={formData.emergency_contact_phone}
                       onChange={handleChange}
-                      placeholder="+260 96 7654321"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      placeholder="Phone number"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     />
                   </div>
                 </div>
@@ -491,92 +486,40 @@ export default function RegisterPatientModal({
 
             {/* STEP 3 */}
             {currentStep === 3 && (
-              <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-200">
-                {/* Insurance Box */}
-                <div className="p-4 bg-purple-50/70 border border-purple-200/80 rounded-2xl space-y-3">
-                  <h3 className="text-xs font-black text-purple-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <Shield size={16} className="text-purple-600" /> Insurance & Payment Scheme
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-purple-700 uppercase mb-1 block">
-                        Insurance Provider
-                      </label>
-                      <SearchableCombobox
-                        name="insurance_provider"
-                        value={formData.insurance_provider}
-                        onChange={(val) =>
-                          setFormData((prev) => ({ ...prev, insurance_provider: val }))
-                        }
-                        placeholder="Search or type provider..."
-                        options={[
-                          {
-                            value: 'NHIMA',
-                            label: 'NHIMA (National Health Insurance)',
-                            badge: 'Public',
-                          },
-                          {
-                            value: 'Madison Health',
-                            label: 'Madison Health Insurance',
-                            badge: 'Private',
-                          },
-                          {
-                            value: 'Professional Life',
-                            label: 'Professional Life Assurance',
-                            badge: 'Private',
-                          },
-                          {
-                            value: 'Sanlam Medical',
-                            label: 'Sanlam Medical Insurance',
-                            badge: 'Private',
-                          },
-                          {
-                            value: 'Prudential Health',
-                            label: 'Prudential Health',
-                            badge: 'Private',
-                          },
-                          {
-                            value: 'Liberty Health',
-                            label: 'Liberty Health Cover',
-                            badge: 'Regional',
-                          },
-                          {
-                            value: 'Self-Pay',
-                            label: 'Self-Pay / Cash Patient',
-                            badge: 'Direct',
-                          },
-                        ]}
-                        inputClassName="bg-white border-purple-200 focus:ring-purple-500/20"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-purple-700 uppercase block mb-1">
-                        Policy Number
-                      </label>
-                      <input
-                        name="insurance_policy_number"
-                        type="text"
-                        value={formData.insurance_policy_number}
-                        onChange={handleChange}
-                        placeholder="Policy / Card ID Number"
-                        className="w-full px-4 py-2 bg-white border border-purple-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                      />
-                    </div>
+              <div className="space-y-3.5 animate-in fade-in slide-in-from-right-4 duration-150">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  <ShieldCheck size={14} /> Step 3: Insurance & Rapid Queue Routing
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700">Insurance Provider</label>
+                    <input
+                      name="insurance_provider"
+                      type="text"
+                      value={formData.insurance_provider}
+                      onChange={handleChange}
+                      placeholder="e.g. NHIMA, Madison, Self-Pay"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700">Insurance Policy Number</label>
+                    <input
+                      name="insurance_policy_number"
+                      type="text"
+                      value={formData.insurance_policy_number}
+                      onChange={handleChange}
+                      placeholder="Policy / Card ID"
+                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
+                    />
                   </div>
                 </div>
 
-                {/* Immediate Patient Disposition & Routing */}
-                <div className="pt-2 space-y-3">
-                  <div>
-                    <label className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <Send size={14} className="text-brand-600" />
-                      Post-Registration Queue & Routing *
-                    </label>
-                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                      Where should the patient proceed immediately after registration?
-                    </p>
-                  </div>
-
+                <div className="pt-2 border-t border-slate-100">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-2">
+                    <Send size={13} className="text-slate-600" />
+                    Intake Routing Destination
+                  </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {nextActionOptions.map((opt) => {
                       const isSelected = nextAction === opt.id;
@@ -587,34 +530,32 @@ export default function RegisterPatientModal({
                           type="button"
                           onClick={() => setNextAction(opt.id)}
                           className={clsx(
-                            'p-2.5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-1 shadow-xs',
+                            'p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-1 shadow-xs',
                             isSelected
-                              ? 'border-brand-600 bg-brand-50/70 ring-2 ring-brand-500/20'
-                              : 'border-slate-200 bg-white hover:bg-slate-50',
+                              ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                              : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50 text-slate-900',
                           )}
                         >
                           <div className="flex items-center justify-between w-full">
                             <div
                               className={clsx(
-                                'w-7 h-7 rounded-xl flex items-center justify-center transition-colors',
+                                'w-6 h-6 rounded-lg flex items-center justify-center transition-colors',
                                 isSelected
-                                  ? 'bg-brand-600 text-white'
-                                  : 'bg-slate-100 text-slate-500',
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-slate-100 text-slate-600',
                               )}
                             >
-                              <Icon size={14} />
+                              <Icon size={13} />
                             </div>
                             {isSelected && (
-                              <div className="w-3.5 h-3.5 rounded-full bg-brand-600 text-white flex items-center justify-center">
-                                <Check size={8} strokeWidth={3} />
-                              </div>
+                              <Check size={12} className="text-white" />
                             )}
                           </div>
                           <div>
-                            <div className="text-[11px] font-black text-slate-900 leading-tight">
+                            <div className={clsx('text-[11px] font-bold leading-tight truncate', isSelected ? 'text-white' : 'text-slate-900')}>
                               {opt.label}
                             </div>
-                            <div className="text-[9px] font-semibold text-slate-400 mt-0.5">
+                            <div className={clsx('text-[9px] mt-0.5 truncate', isSelected ? 'text-slate-300' : 'text-slate-400')}>
                               {opt.tag}
                             </div>
                           </div>
@@ -628,20 +569,20 @@ export default function RegisterPatientModal({
           </form>
 
           {/* Footer Controls */}
-          <div className="p-4 px-6 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-4 shrink-0">
+          <div className="p-4 px-5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3 shrink-0">
             {currentStep > 1 ? (
               <button
                 type="button"
                 onClick={handleBack}
-                className="px-5 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-white transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 border border-slate-200 bg-white text-slate-700 rounded-xl text-xs font-medium hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-xs"
               >
-                <ArrowLeft size={16} /> Back
+                <ArrowLeft size={14} /> Back
               </button>
             ) : (
               <button
                 type="button"
                 onClick={onClose}
-                className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-white transition-colors"
+                className="px-4 py-2 border border-slate-200 bg-white text-slate-700 rounded-xl text-xs font-medium hover:bg-slate-50 transition-colors shadow-xs"
               >
                 Cancel
               </button>
@@ -651,22 +592,22 @@ export default function RegisterPatientModal({
               <button
                 type="button"
                 onClick={handleNext}
-                className="bg-brand-600 text-white px-6 py-2.5 rounded-xl text-xs font-bold hover:bg-brand-700 transition-colors shadow-md shadow-brand-500/20 flex items-center gap-1.5"
+                className="bg-slate-900 text-white px-5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
               >
-                Next Step <ArrowRight size={16} />
+                Next <ArrowRight size={14} />
               </button>
             ) : (
               <button
                 disabled={loading}
                 type="submit"
                 form="registration-form"
-                className="bg-brand-600 text-white px-6 py-2.5 rounded-xl text-xs font-black hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                className="bg-slate-900 text-white px-5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-98"
               >
                 {loading ? (
                   'Registering...'
                 ) : (
                   <>
-                    <Save size={16} /> Register & Route Patient <CornerDownRight size={14} />
+                    <Save size={14} /> Register & Route
                   </>
                 )}
               </button>

@@ -141,63 +141,76 @@ export default function InventoryDashboard() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Pharmacy & Inventory Management</h1>
-          <p className="text-slate-500 mt-1 font-medium">Medical stock control, reorder alerts, and pharmacy dispensing.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Pharmacy & Inventory Management</h1>
+          <p className="text-xs text-slate-500 font-normal mt-0.5">Medical stock control, reorder alerts, and pharmacy dispensing desk.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button 
             onClick={fetchData}
-            className="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
+            className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
           >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
             Refresh
           </button>
           <button 
             onClick={() => setIsAddModalOpen(true)}
-            className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-md flex items-center gap-2"
+            className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
           >
-            <Plus size={16} />
+            <Plus size={14} />
             Add New Item
           </button>
         </div>
       </div>
 
       {/* Inventory Real Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Inventory Items</p>
-          <p className="text-3xl font-black text-slate-900">{stats.totalItems}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Total Items</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.totalItems}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Configured pharmaceuticals</p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-xs font-bold text-rose-600 uppercase tracking-wider mb-2">Out of Stock Items</p>
-          <p className="text-3xl font-black text-rose-600">{stats.outOfStock}</p>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Out of Stock</p>
+            <span className="w-2 h-2 rounded-full bg-rose-500" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.outOfStock}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Requires emergency purchase</p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">Low Stock Reorder Alerts</p>
-          <p className="text-3xl font-black text-amber-600">{stats.lowStock}</p>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Low Stock Alerts</p>
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.lowStock}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Under reorder threshold</p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Dispensed Today</p>
-          <p className="text-3xl font-black text-slate-900">{stats.dispensingToday}</p>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dispensed Today</p>
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.dispensingToday}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Filled prescriptions</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left: Inventory List */}
-        <div className="lg:col-span-8 space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <h2 className="text-lg font-black text-slate-900">Inventory Stock Catalog</h2>
+        <div className="lg:col-span-8 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <h2 className="text-base font-bold text-slate-900">Inventory Stock Catalog</h2>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="bg-white border border-slate-200 text-xs font-bold rounded-xl px-3 py-2 text-slate-700 focus:outline-none"
+                className="bg-white border border-slate-200 text-xs font-semibold rounded-xl px-3 py-1.5 text-slate-700 focus:outline-none shadow-xs"
               >
                 <option value="ALL">All Categories</option>
                 <option value="Pharmacy">Pharmacy / Meds</option>
@@ -206,84 +219,88 @@ export default function InventoryDashboard() {
               </select>
 
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
                 <input 
                   type="text" 
                   placeholder="Search stock catalog..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 shadow-xs"
                 />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">
                 <tr>
-                  <th className="px-6 py-4">Item Name</th>
-                  <th className="px-6 py-4">Category</th>
-                  <th className="px-6 py-4">Stock Level</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <th className="px-4 py-2.5">Item Name</th>
+                  <th className="px-4 py-2.5">Category</th>
+                  <th className="px-4 py-2.5">Stock Level</th>
+                  <th className="px-4 py-2.5">Status</th>
+                  <th className="px-4 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold text-xs uppercase">
-                      <Loader2 className="animate-spin text-brand-600 mx-auto mb-2" size={24} />
+                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400 font-normal">
+                      <Loader2 className="animate-spin text-slate-500 mx-auto mb-1.5" size={20} />
                       Loading inventory stock...
                     </td>
                   </tr>
                 ) : filteredItems.length === 0 ? (
-                  <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 font-bold text-xs">No items found matching filter.</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 font-normal">No items found matching filter.</td></tr>
                 ) : filteredItems.map((item) => {
                   const reorderVal = item.reorder_level || item.min_reorder_level || 50;
                   const isOut = item.stock_level === 0;
                   const isLow = !isOut && item.stock_level <= reorderVal;
 
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-6 py-4">
+                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3">
                         <p className="font-bold text-slate-900">{item.name}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">{item.unit || 'units'}</p>
+                        <p className="text-[10px] text-slate-400">{item.unit || 'units'}</p>
                       </td>
-                      <td className="px-6 py-4 text-slate-600 font-medium">{item.category || 'General'}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3 text-slate-600 font-normal">{item.category || 'General'}</td>
+                      <td className="px-4 py-3">
                         <span className={clsx(
-                          "font-black text-base",
+                          "font-bold text-xs",
                           isOut ? "text-rose-600" : isLow ? "text-amber-600" : "text-slate-900"
                         )}>
                           {item.stock_level.toLocaleString()}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3">
                         <span className={clsx(
-                          "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                          isOut ? "bg-rose-100 text-rose-700" :
-                          isLow ? "bg-amber-100 text-amber-700" :
-                          "bg-emerald-100 text-emerald-700"
+                          "px-2 py-0.5 rounded-md text-[10px] font-semibold inline-flex items-center gap-1",
+                          isOut ? "bg-rose-50 text-rose-700 border border-rose-200/60" :
+                          isLow ? "bg-amber-50 text-amber-700 border border-amber-200/60" :
+                          "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
                         )}>
+                          <span className={clsx(
+                            "w-1.5 h-1.5 rounded-full",
+                            isOut ? "bg-rose-500" : isLow ? "bg-amber-500" : "bg-emerald-500"
+                          )} />
                           {isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
                           <button 
                             onClick={() => { setSelectedItem(item); setIsUpdateModalOpen(true); }}
-                            className="p-1.5 text-slate-400 hover:text-brand-600 rounded-lg hover:bg-brand-50 transition-colors"
+                            className="p-1 text-slate-400 hover:text-slate-900 rounded-lg transition-colors"
                             title="Update Stock"
                           >
-                            <Edit2 size={16} />
+                            <Edit2 size={13} />
                           </button>
                           <button 
                             onClick={() => handleDeleteItem(item.id, item.name)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
                             title="Delete Item"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </td>
@@ -296,32 +313,31 @@ export default function InventoryDashboard() {
         </div>
 
         {/* Right: Pharmacy Dispensing Queue */}
-        <div className="lg:col-span-4 space-y-8">
-          <div className="bg-slate-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col h-full min-h-[500px] border border-slate-800">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/10 blur-2xl rounded-full pointer-events-none" />
-            <h2 className="text-lg font-black mb-6 flex items-center justify-between relative z-10">
-              Pharmacy Dispensing Queue
-              <span className="bg-rose-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase">
+        <div className="lg:col-span-4 space-y-4">
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col h-full min-h-[480px]">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center justify-between">
+              Dispensing Queue
+              <span className="bg-slate-100 text-slate-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">
                 {prescriptions.length} Pending
               </span>
             </h2>
             
-            <div className="space-y-4 flex-1 overflow-y-auto relative z-10">
+            <div className="space-y-2.5 flex-1 overflow-y-auto">
               {prescriptions.length === 0 ? (
-                <div className="text-center py-16 text-slate-400">
-                  <Package className="mx-auto mb-4 opacity-20" size={48} />
-                  <p className="text-xs font-bold uppercase tracking-widest">No pending prescriptions in queue.</p>
+                <div className="text-center py-12 text-slate-400">
+                  <Package className="mx-auto mb-2 text-slate-300" size={32} />
+                  <p className="text-xs font-normal">No pending prescriptions in queue.</p>
                 </div>
               ) : prescriptions.map((row) => (
-                <div key={row.id} className="bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 p-4 rounded-2xl flex items-center justify-between group hover:bg-slate-800 transition-all">
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-bold text-slate-100">
+                <div key={row.id} className="bg-slate-50/70 border border-slate-100 p-3 rounded-xl flex items-center justify-between hover:bg-slate-100/60 transition-all">
+                  <div className="space-y-0.5 min-w-0 pr-2">
+                    <p className="text-xs font-bold text-slate-900 truncate">
                       {row.patients ? `${row.patients.first_name} ${row.patients.last_name}` : 'Patient'}
                     </p>
-                    <p className="text-xs text-brand-400 font-bold">
+                    <p className="text-[11px] text-slate-700 font-medium truncate">
                       {(row.prescription_items || []).map((item: any) => item.inventory_items?.name || 'Medication').join(', ')}
                     </p>
-                    <p className="text-[10px] text-slate-400 font-medium">
+                    <p className="text-[10px] text-slate-400 truncate">
                       {(row.prescription_items || []).map((item: any) =>
                         `${item.dosage} · ${item.frequency} · Qty ${item.quantity_prescribed - (item.quantity_dispensed || 0)}`
                       ).join(' | ')}
@@ -332,10 +348,10 @@ export default function InventoryDashboard() {
                       setSelectedPrescription(row);
                       setIsDispenseModalOpen(true);
                     }}
-                    className="bg-brand-600 hover:bg-brand-500 text-white px-3.5 py-2 rounded-xl transition-all shadow-md shadow-brand-500/20 text-xs font-bold flex items-center gap-1.5 shrink-0"
+                    className="bg-slate-900 hover:bg-slate-800 text-white px-2.5 py-1.5 rounded-lg transition-all shadow-xs text-xs font-medium flex items-center gap-1 shrink-0 active:scale-98"
                     title="Dispense Medication"
                   >
-                    <ClipboardCheck size={16} />
+                    <ClipboardCheck size={13} />
                     Dispense
                   </button>
                 </div>

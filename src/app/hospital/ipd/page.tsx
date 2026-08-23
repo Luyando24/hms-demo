@@ -176,74 +176,78 @@ export default function InpatientDashboard() {
     .sort((a, b) => new Date(b.admission_date).getTime() - new Date(a.admission_date).getTime());
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Inpatient Department (IPD)</h1>
-          <p className="text-slate-500 mt-1 font-medium">Real-time ward bed tracking, patient admissions, and discharge desk.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Inpatient Department (IPD)</h1>
+          <p className="text-xs text-slate-500 font-normal mt-0.5">Ward bed tracking, patient admissions, and census coordination.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button 
             onClick={fetchBedsAndWards}
-            className="bg-white border border-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
+            className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
           >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
             Refresh
           </button>
           <button 
             onClick={() => setIsAdmissionModalOpen(true)}
-            className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-md flex items-center gap-2 active:scale-95 transition-all"
+            className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
           >
-            <Plus size={16} />
+            <Plus size={14} />
             New Admission
           </button>
         </div>
       </div>
 
       {/* Ward Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Ward Capacity</p>
-            <BedDouble size={18} className="text-slate-400" />
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ward Capacity</p>
+            <BedDouble size={15} className="text-slate-400" />
           </div>
-          <p className="text-3xl font-black text-slate-900">{stats.total}</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.total}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Total configured beds</p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">Occupied Beds</p>
-            <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Occupied</p>
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
           </div>
-          <p className="text-3xl font-black text-slate-900">{stats.occupied}</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.occupied}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Patients admitted</p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Vacant & Ready</p>
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Vacant & Ready</p>
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
           </div>
-          <p className="text-3xl font-black text-slate-900">{stats.vacant}</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.vacant}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Available for intake</p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Cleaning / Sanitization</p>
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Maintenance</p>
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
           </div>
-          <p className="text-3xl font-black text-slate-900">{stats.maintenance}</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.maintenance}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Cleaning / turnover</p>
         </div>
       </div>
 
       {/* Bed Tracking Grid */}
-      <section className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h2 className="text-lg font-black text-slate-900">Ward Bed Occupancy Grid</h2>
+      <section className="space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <h2 className="text-base font-bold text-slate-900">Ward Bed Occupancy Grid</h2>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Ward Filter */}
             <select
               value={selectedWard}
               onChange={(e) => setSelectedWard(e.target.value)}
-              className="bg-white border border-slate-200 text-xs font-bold rounded-xl px-3 py-2 text-slate-700 focus:outline-none"
+              className="bg-white border border-slate-200 text-xs font-semibold rounded-xl px-3 py-2 text-slate-700 focus:outline-none shadow-xs"
             >
               <option value="ALL">All Hospital Wards</option>
               {wards.map(w => (
@@ -252,26 +256,26 @@ export default function InpatientDashboard() {
             </select>
 
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
               <input 
                 type="text" 
                 placeholder="Search bed or patient..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 shadow-xs"
               />
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {loading && beds.length === 0 ? (
-            <div className="col-span-full py-20 text-center">
-              <Loader2 className="animate-spin mx-auto text-brand-600 mb-4" size={32} />
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Syncing Ward Beds...</p>
+            <div className="col-span-full py-12 text-center">
+              <Loader2 className="animate-spin mx-auto text-slate-500 mb-2" size={24} />
+              <p className="text-slate-400 font-medium text-xs">Syncing Ward Beds...</p>
             </div>
           ) : filteredBeds.length === 0 ? (
-            <div className="col-span-full py-16 text-center text-slate-400 font-bold text-sm">
+            <div className="col-span-full py-12 text-center text-slate-400 font-normal text-xs">
               No beds found matching your search query.
             </div>
           ) : filteredBeds.map((bed) => {
@@ -281,85 +285,91 @@ export default function InpatientDashboard() {
             return (
               <div 
                 key={bed.id} 
-                className={clsx(
-                  "rounded-2xl border-2 p-6 transition-all duration-200 hover:shadow-lg relative overflow-hidden group",
-                  bedStatusStyles[bed.status as keyof typeof bedStatusStyles]
-                )}
+                className="rounded-2xl border border-slate-200/80 bg-white p-5 transition-all duration-150 hover:border-slate-300 hover:shadow-xs relative overflow-hidden flex flex-col justify-between"
               >
                 {/* Bed Header */}
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <span className="text-2xl font-black tracking-tight text-slate-900">Bed {bed.bed_number}</span>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{bed.wards?.name || 'General Ward'}</p>
-                  </div>
-                  <span className={clsx(
-                    "text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border shadow-sm",
-                    bed.status === 'OCCUPIED' ? "bg-blue-600 text-white border-blue-600" : 
-                    bed.status === 'VACANT' ? "bg-emerald-600 text-white border-emerald-600" :
-                    bed.status === 'CLEANING' ? "bg-amber-600 text-white border-amber-600" :
-                    "bg-slate-500 text-white border-slate-500"
-                  )}>
-                    {bed.status}
-                  </span>
-                </div>
-
-                {/* Patient Information & Actions */}
-                {bed.status === 'OCCUPIED' ? (
-                  <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-start mb-3">
                     <div>
-                      <p className="text-sm font-black text-slate-900 truncate">
-                        {patient ? `${patient.first_name} ${patient.last_name}` : 'Admitted Inpatient'}
-                      </p>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase mt-0.5">
-                        File: {patient?.file_number || 'N/A'}
-                      </p>
-                      <p className="text-[11px] font-medium text-slate-500 mt-1">
-                        Admitted: {activeAdmission?.admission_date ? new Date(activeAdmission.admission_date).toLocaleDateString() : 'Active'}
-                      </p>
+                      <span className="text-lg font-bold tracking-tight text-slate-900">Bed {bed.bed_number}</span>
+                      <p className="text-[10px] font-medium text-slate-400">{bed.wards?.name || 'General Ward'}</p>
                     </div>
+                    <span className={clsx(
+                      "inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full border",
+                      bed.status === 'OCCUPIED' ? "bg-blue-50 text-blue-700 border-blue-200/60" : 
+                      bed.status === 'VACANT' ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" :
+                      bed.status === 'CLEANING' ? "bg-amber-50 text-amber-700 border-amber-200/60" :
+                      "bg-slate-100 text-slate-700 border-slate-200/60"
+                    )}>
+                      <span className={clsx(
+                        "w-1.5 h-1.5 rounded-full",
+                        bed.status === 'OCCUPIED' ? "bg-blue-500 animate-pulse" :
+                        bed.status === 'VACANT' ? "bg-emerald-500" :
+                        bed.status === 'CLEANING' ? "bg-amber-500" :
+                        "bg-slate-400"
+                      )} />
+                      {bed.status}
+                    </span>
+                  </div>
 
-                    <div className="flex gap-2">
+                  {/* Patient Information & Actions */}
+                  {bed.status === 'OCCUPIED' ? (
+                    <div className="space-y-3 pt-1">
+                      <div>
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {patient ? `${patient.first_name} ${patient.last_name}` : 'Admitted Inpatient'}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          MRN: {patient?.file_number || 'N/A'}
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Admitted: {activeAdmission?.admission_date ? new Date(activeAdmission.admission_date).toLocaleDateString() : 'Active'}
+                        </p>
+                      </div>
+
+                      <div className="pt-2">
+                        <button 
+                          onClick={() => activeAdmission && handleDischargePatient(activeAdmission.id, bed.id, `${patient?.first_name} ${patient?.last_name}`)}
+                          className="w-full bg-white border border-rose-200 text-rose-700 py-1.5 rounded-xl text-xs font-medium hover:bg-rose-50 transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                        >
+                          <LogOut size={13} />
+                          Discharge Patient
+                        </button>
+                      </div>
+                    </div>
+                  ) : bed.status === 'VACANT' ? (
+                    <div className="pt-2">
+                      <p className="text-[11px] text-slate-400 font-normal mb-3">Sanitized and ready for admission.</p>
                       <button 
-                        onClick={() => activeAdmission && handleDischargePatient(activeAdmission.id, bed.id, `${patient?.first_name} ${patient?.last_name}`)}
-                        className="flex-1 bg-rose-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-rose-700 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                        onClick={() => setIsAdmissionModalOpen(true)}
+                        className="w-full bg-slate-900 text-white py-1.5 rounded-xl text-xs font-medium hover:bg-slate-800 transition-all shadow-xs"
                       >
-                        <LogOut size={14} />
-                        Discharge
+                        Admit Patient
                       </button>
                     </div>
-                  </div>
-                ) : bed.status === 'VACANT' ? (
-                  <div className="pt-2">
-                    <p className="text-xs text-emerald-600 font-bold mb-4">Bed sanitization complete. Ready for patient admission.</p>
-                    <button 
-                      onClick={() => setIsAdmissionModalOpen(true)}
-                      className="w-full bg-emerald-600 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm shadow-emerald-500/20"
-                    >
-                      Admit Patient Here
-                    </button>
-                  </div>
-                ) : bed.status === 'CLEANING' ? (
-                  <div className="pt-2">
-                    <p className="text-xs text-amber-700 font-bold mb-4">Ward sanitization in progress.</p>
-                    <button 
-                      onClick={() => handleUpdateBedStatus(bed.id, 'VACANT')}
-                      className="w-full bg-amber-600 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-amber-700 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                    >
-                      <CheckCircle2 size={14} />
-                      Mark Vacant & Ready
-                    </button>
-                  </div>
-                ) : (
-                  <div className="pt-2">
-                    <p className="text-xs text-slate-500 font-bold mb-4">Bed undergoing facility maintenance.</p>
-                    <button 
-                      onClick={() => handleUpdateBedStatus(bed.id, 'VACANT')}
-                      className="w-full bg-slate-800 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-slate-700 transition-colors shadow-sm"
-                    >
-                      Mark Available
-                    </button>
-                  </div>
-                )}
+                  ) : bed.status === 'CLEANING' ? (
+                    <div className="pt-2">
+                      <p className="text-[11px] text-amber-700 font-medium mb-3">Sanitization in progress.</p>
+                      <button 
+                        onClick={() => handleUpdateBedStatus(bed.id, 'VACANT')}
+                        className="w-full bg-white border border-slate-200 text-slate-700 py-1.5 rounded-xl text-xs font-medium hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                      >
+                        <CheckCircle2 size={13} className="text-emerald-600" />
+                        Mark Vacant
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="pt-2">
+                      <p className="text-[11px] text-slate-400 font-normal mb-3">Bed undergoing maintenance.</p>
+                      <button 
+                        onClick={() => handleUpdateBedStatus(bed.id, 'VACANT')}
+                        className="w-full bg-white border border-slate-200 text-slate-700 py-1.5 rounded-xl text-xs font-medium hover:bg-slate-50 transition-colors shadow-xs"
+                      >
+                        Mark Available
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -367,30 +377,25 @@ export default function InpatientDashboard() {
       </section>
 
       {/* Ward Activity Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-          <h2 className="text-lg font-black text-slate-900">Recent Inpatient Admission Log</h2>
-          <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Recent Inpatient Admission Log</h2>
+          <div className="space-y-2">
             {activeAdmissionsList.length === 0 ? (
-              <p className="text-xs text-slate-400 font-bold text-center py-6">No inpatient admission records logged.</p>
+              <p className="text-xs text-slate-400 font-normal text-center py-4">No inpatient admission records logged.</p>
             ) : activeAdmissionsList.slice(0, 5).map((adm) => {
               const pName = adm.patients ? `${adm.patients.first_name} ${adm.patients.last_name}` : 'Inpatient';
               return (
-                <div key={adm.id} className="flex gap-4 items-center p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
-                    <BedDouble size={18} />
+                <div key={adm.id} className="flex gap-3 items-center p-3 rounded-xl bg-slate-50/70 border border-slate-100">
+                  <div className="w-8 h-8 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
+                    <BedDouble size={15} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-900">{pName}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Assigned to Bed {adm.bed_number} ({adm.ward_name || 'Ward'}). Primary Diagnosis: {adm.primary_diagnosis || 'Under Observation'}
-                    </p>
+                    <p className="text-xs font-bold text-slate-900 truncate">{pName}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{adm.ward_name} &bull; Bed {adm.bed_number}</p>
                   </div>
-                  <span className={clsx(
-                    "text-[10px] font-black uppercase px-2.5 py-1 rounded-full",
-                    adm.status === 'ACTIVE' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-700'
-                  )}>
-                    {adm.status}
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {new Date(adm.admission_date).toLocaleDateString()}
                   </span>
                 </div>
               );
@@ -399,27 +404,26 @@ export default function InpatientDashboard() {
         </div>
 
         {/* IPD Ward Occupancy Stats */}
-        <div className="bg-slate-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-between border border-slate-800">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/10 blur-2xl rounded-full pointer-events-none" />
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
           <div>
-            <h2 className="text-lg font-black mb-6">Ward Capacity Summary</h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-slate-800/60 rounded-2xl border border-slate-700/50">
-                <span className="text-xs text-slate-300 font-bold">Occupancy Rate</span>
-                <span className="text-lg font-black text-blue-400">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Ward Capacity Summary</h2>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3.5 bg-slate-50/70 rounded-xl border border-slate-100">
+                <span className="text-xs text-slate-600 font-medium">Occupancy Rate</span>
+                <span className="text-sm font-bold text-slate-900">
                   {stats.total > 0 ? Math.round((stats.occupied / stats.total) * 100) : 0}%
                 </span>
               </div>
-              <div className="flex items-center justify-between p-4 bg-slate-800/60 rounded-2xl border border-slate-700/50">
-                <span className="text-xs text-slate-300 font-bold">Available Beds</span>
-                <span className="text-lg font-black text-emerald-400">{stats.vacant}</span>
+              <div className="flex items-center justify-between p-3.5 bg-slate-50/70 rounded-xl border border-slate-100">
+                <span className="text-xs text-slate-600 font-medium">Available Beds</span>
+                <span className="text-sm font-bold text-slate-900">{stats.vacant}</span>
               </div>
             </div>
           </div>
 
           <button 
             onClick={() => setIsAdmissionModalOpen(true)}
-            className="w-full mt-8 bg-brand-600 hover:bg-brand-500 text-white py-3 rounded-2xl text-xs font-bold transition-all shadow-lg shadow-brand-500/20"
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-xs font-semibold transition-all shadow-xs active:scale-98"
           >
             Admit New Inpatient
           </button>

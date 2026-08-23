@@ -58,53 +58,53 @@ export function HospitalHeader() {
   }, []);
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 z-50">
+    <header className="fixed top-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between px-4 sm:px-6 z-50">
       {/* Left side / Brand & Search Bar */}
-      <div className="flex items-center gap-4 sm:gap-10">
+      <div className="flex items-center gap-4 sm:gap-8">
         <button 
           onClick={toggle}
           className="lg:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-xl"
         >
-          <Menu size={24} />
+          <Menu size={22} />
         </button>
 
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-2.5">
           {logoUrl ? (
-            <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 p-1 flex items-center justify-center overflow-hidden shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 p-0.5 flex items-center justify-center overflow-hidden shrink-0">
               <img src={logoUrl} alt={hospitalName} className="max-w-full max-h-full object-contain" />
             </div>
           ) : (
-            <div className="bg-brand-500 p-2 rounded-xl text-white shadow-sm shadow-brand-500/20">
-              <HeartPulse size={24} strokeWidth={2.5} />
+            <div className="bg-slate-900 p-1.5 rounded-lg text-white shadow-xs">
+              <HeartPulse size={18} strokeWidth={2.2} />
             </div>
           )}
           <div className="hidden sm:flex flex-col">
-            <span className="font-bold text-base leading-tight text-slate-900">
+            <span className="font-bold text-sm tracking-tight text-slate-900">
               {brandTitle}
             </span>
             {tagline && (
-              <span className="text-[11px] font-semibold text-slate-500 leading-tight">
+              <span className="text-[10px] font-medium text-slate-400 leading-none">
                 {tagline}
               </span>
             )}
           </div>
         </Link>
 
-        <GlobalSearch variant="hospital" className="w-80 hidden md:block" />
+        <GlobalSearch variant="hospital" className="w-72 hidden md:block" />
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-3">
         {/* Quick Actions */}
         <button 
           onClick={() => setIsCheckInOpen(true)}
-          className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-full text-sm font-semibold hover:bg-brand-600 transition-colors shadow-sm"
+          className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs"
         >
-          <LogIn size={16} />
-          <span>OPD Check-in</span>
+          <LogIn size={14} />
+          <span>Patient Intake</span>
         </button>
 
-        <div className="w-px h-6 bg-slate-200 hidden md:block" />
+        <div className="w-px h-5 bg-slate-200 hidden md:block" />
 
         {/* Notifications */}
         <NotificationCenterDropdown />
@@ -113,20 +113,20 @@ export function HospitalHeader() {
         <div className="relative">
           <button 
             onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-1.5 pr-3 rounded-full transition-all hover:bg-slate-100 shadow-sm"
+            className="flex items-center gap-2.5 bg-white border border-slate-200/80 p-1 pr-2.5 rounded-xl transition-all hover:bg-slate-50 shadow-xs"
           >
-            <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm">
+            <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-xs">
               {user ? `${user.first_name?.[0] || 'S'}${user.last_name?.[0] || 'T'}` : '...'}
             </div>
             <div className="text-left hidden md:block">
-              <p className="text-sm font-semibold text-slate-800 leading-tight">
+              <p className="text-xs font-bold text-slate-800 leading-tight">
                 {user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Loading...'}
               </p>
-              <p className="text-xs text-brand-600 font-medium">
-                {user?.role || 'HOSPITAL STAFF'}
+              <p className="text-[10px] text-slate-500 font-semibold leading-none">
+                {user?.role || 'STAFF'}
               </p>
             </div>
-            <ChevronDown size={16} className={`text-slate-400 ml-1 transition-transform ${isProfileOpen ? "rotate-180" : ""}`} />
+            <ChevronDown size={14} className={`text-slate-400 ml-0.5 transition-transform ${isProfileOpen ? "rotate-180" : ""}`} />
           </button>
 
           {isProfileOpen && (
@@ -135,26 +135,26 @@ export function HospitalHeader() {
                 className="fixed inset-0 z-10" 
                 onClick={() => setIsProfileOpen(false)}
               />
-              <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-200/50 z-20 py-2 animate-in fade-in zoom-in-95 duration-200">
-                <div className="px-4 py-3 border-b border-slate-100 mb-1">
-                  <p className="text-sm font-bold text-slate-900">
+              <div className="absolute right-0 mt-2 w-60 bg-white border border-slate-200 rounded-2xl shadow-lg z-20 py-1.5 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-3.5 py-2.5 border-b border-slate-100 mb-1">
+                  <p className="text-xs font-bold text-slate-900">
                     {user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '...'}
                   </p>
-                  <p className="text-xs text-slate-500 truncate">{user?.email || '...'}</p>
+                  <p className="text-[11px] text-slate-400 truncate">{user?.email || '...'}</p>
                 </div>
                 
                 <Link 
                   href="/hospital/hr"
-                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-brand-600 transition-colors"
+                  className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
                 >
-                  <UserIcon size={16} />
+                  <UserIcon size={14} />
                   My Personnel Profile
                 </Link>
                 <Link 
                   href="/hospital/settings"
-                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-brand-600 transition-colors"
+                  className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
                 >
-                  <Settings size={16} />
+                  <Settings size={14} />
                   System Settings
                 </Link>
                 
@@ -162,9 +162,9 @@ export function HospitalHeader() {
                 
                 <button 
                   onClick={() => signOut()}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
                 >
-                  <LogOut size={16} />
+                  <LogOut size={14} />
                   Sign Out
                 </button>
               </div>

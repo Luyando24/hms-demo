@@ -207,46 +207,46 @@ export default function ReceptionDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            Front Office & Reception Hub
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Front Desk & Reception
           </h1>
-          <p className="text-slate-500 mt-1 font-medium">
-            Multi-service patient intake, department routing, queue management, and registration.
+          <p className="text-xs text-slate-500 font-normal mt-0.5">
+            Patient intake, department routing, queue coordination, and registrations.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={fetchReceptionData}
-            className="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
+            className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
           >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             Refresh
           </button>
           <Link
             href="/hospital/queue-display"
             target="_blank"
-            className="bg-slate-900 text-white border border-slate-800 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-md"
+            className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-xs flex items-center gap-2"
           >
-            <Tv size={16} className="text-emerald-400 animate-pulse" />
-            TV Queue Screen
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            TV Screen
           </Link>
           <button
             onClick={() => handleOpenCheckInWithDestination('TRIAGE', null)}
-            className="bg-white border border-brand-200 text-brand-700 px-4 py-2.5 rounded-xl text-sm font-black hover:bg-brand-50 transition-all shadow-sm flex items-center gap-2"
+            className="bg-white border border-slate-200 text-slate-800 px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
           >
-            <LogIn size={16} className="text-brand-600" />
-            Check-In / Route Patient
+            <LogIn size={14} className="text-slate-600" />
+            Route Patient
           </button>
           <button
             onClick={() => setIsRegisterModalOpen(true)}
-            className="bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20 flex items-center gap-2"
+            className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5"
           >
-            <UserPlus size={16} />
-            Register New Patient
+            <UserPlus size={14} />
+            Register Patient
           </button>
         </div>
       </div>
@@ -281,155 +281,144 @@ export default function ReceptionDashboard() {
       />
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Patient Search & Recent Check-ins */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm relative overflow-hidden">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs relative overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-xl font-black text-slate-900">Patient Search & Rapid Intake</h2>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  Search any patient to route for OPD, Lab, Pharmacy, Radiology, ER, or Billing.
+                <h2 className="text-base font-bold text-slate-900">Patient Intake & Search</h2>
+                <p className="text-xs text-slate-500 font-normal mt-0.5">
+                  Search patients to route for OPD, Lab, Pharmacy, Radiology, ER, or Billing.
                 </p>
               </div>
-              <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-brand-50 border border-brand-200 text-brand-700">
-                Live Intake
-              </span>
             </div>
 
-            <div className="relative mb-6 group">
+            <div className="relative mb-5 group">
               <Search
-                className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors"
-                size={20}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-slate-700 transition-colors"
+                size={16}
               />
               <input
                 type="text"
-                placeholder="Search by Patient Name, File Number, or Phone..."
+                placeholder="Search patient by name, MRN file number, or phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-14 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-base focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:bg-white transition-all shadow-sm font-semibold"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
               />
             </div>
 
             {/* Quick Department Intake Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
               <button
                 type="button"
                 onClick={() => handleOpenCheckInWithDestination('TRIAGE')}
-                className="p-3.5 rounded-2xl border border-slate-200 hover:border-brand-400 hover:bg-brand-50/60 transition-all text-left group flex flex-col justify-between hover:shadow-sm"
+                className="p-3 rounded-xl border border-slate-200/80 bg-white hover:border-slate-400 hover:bg-slate-50/60 transition-all text-left group flex items-center gap-3 shadow-xs"
               >
-                <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center group-hover:bg-brand-600 group-hover:text-white transition-colors mb-2 shadow-xs">
-                  <Stethoscope size={18} />
+                <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-colors shrink-0">
+                  <Stethoscope size={15} />
                 </div>
-                <div>
-                  <p className="text-xs font-black text-slate-900 group-hover:text-brand-700 transition-colors">
-                    Doctor OPD
-                  </p>
-                  <p className="text-[10px] text-slate-500 font-semibold">Triage & Consult</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 truncate">Doctor OPD</p>
+                  <p className="text-[10px] text-slate-400 font-medium truncate">Triage & Consult</p>
                 </div>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleOpenCheckInWithDestination('LAB')}
-                className="p-3.5 rounded-2xl border border-slate-200 hover:border-purple-400 hover:bg-purple-50/60 transition-all text-left group flex flex-col justify-between hover:shadow-sm"
+                className="p-3 rounded-xl border border-slate-200/80 bg-white hover:border-slate-400 hover:bg-slate-50/60 transition-all text-left group flex items-center gap-3 shadow-xs"
               >
-                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors mb-2 shadow-xs">
-                  <FlaskConical size={18} />
+                <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-colors shrink-0">
+                  <FlaskConical size={15} />
                 </div>
-                <div>
-                  <p className="text-xs font-black text-slate-900 group-hover:text-purple-700 transition-colors">
-                    Direct Lab
-                  </p>
-                  <p className="text-[10px] text-slate-500 font-semibold">Blood / Diagnostics</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 truncate">Direct Lab</p>
+                  <p className="text-[10px] text-slate-400 font-medium truncate">Blood / Tests</p>
                 </div>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleOpenCheckInWithDestination('PHARMACY')}
-                className="p-3.5 rounded-2xl border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/60 transition-all text-left group flex flex-col justify-between hover:shadow-sm"
+                className="p-3 rounded-xl border border-slate-200/80 bg-white hover:border-slate-400 hover:bg-slate-50/60 transition-all text-left group flex items-center gap-3 shadow-xs"
               >
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors mb-2 shadow-xs">
-                  <Pill size={18} />
+                <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-colors shrink-0">
+                  <Pill size={15} />
                 </div>
-                <div>
-                  <p className="text-xs font-black text-slate-900 group-hover:text-emerald-700 transition-colors">
-                    Pharmacy
-                  </p>
-                  <p className="text-[10px] text-slate-500 font-semibold">Refills & Meds</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 truncate">Pharmacy</p>
+                  <p className="text-[10px] text-slate-400 font-medium truncate">Meds & Refills</p>
                 </div>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleOpenCheckInWithDestination('RADIOLOGY')}
-                className="p-3.5 rounded-2xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/60 transition-all text-left group flex flex-col justify-between hover:shadow-sm"
+                className="p-3 rounded-xl border border-slate-200/80 bg-white hover:border-slate-400 hover:bg-slate-50/60 transition-all text-left group flex items-center gap-3 shadow-xs"
               >
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors mb-2 shadow-xs">
-                  <Camera size={18} />
+                <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-colors shrink-0">
+                  <Camera size={15} />
                 </div>
-                <div>
-                  <p className="text-xs font-black text-slate-900 group-hover:text-indigo-700 transition-colors">
-                    Radiology
-                  </p>
-                  <p className="text-[10px] text-slate-500 font-semibold">X-Ray & Scans</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 truncate">Radiology</p>
+                  <p className="text-[10px] text-slate-400 font-medium truncate">X-Ray & Scans</p>
                 </div>
               </button>
             </div>
 
             {/* Live Search Results */}
             {searchQuery.length > 0 && (
-              <div className="mb-8 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
-                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <div className="mb-6 bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm animate-in fade-in duration-200">
+                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
+                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                     Search Results
                   </h3>
-                  <p className="text-[10px] font-bold text-brand-600 uppercase tracking-widest">
+                  <p className="text-[11px] font-semibold text-slate-600">
                     {patients.length} records found
                   </p>
                 </div>
                 <div className="divide-y divide-slate-100">
                   {searching ? (
-                    <div className="p-12 text-center">
-                      <Loader2 className="animate-spin text-brand-600 mx-auto" size={32} />
-                      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-4">
+                    <div className="p-8 text-center">
+                      <Loader2 className="animate-spin text-slate-600 mx-auto" size={24} />
+                      <p className="text-xs font-medium text-slate-400 mt-2">
                         Searching database...
                       </p>
                     </div>
                   ) : patients.length === 0 ? (
-                    <div className="p-12 text-center">
-                      <Users className="text-slate-200 mx-auto mb-4" size={48} />
-                      <p className="text-sm font-bold text-slate-500">
+                    <div className="p-8 text-center">
+                      <Users className="text-slate-300 mx-auto mb-2" size={32} />
+                      <p className="text-xs font-medium text-slate-500">
                         No patients found matching your search query.
                       </p>
                       <button
                         onClick={() => setIsRegisterModalOpen(true)}
-                        className="text-brand-600 text-xs font-black uppercase tracking-widest mt-2 hover:underline"
+                        className="text-slate-900 text-xs font-semibold mt-2 hover:underline inline-block"
                       >
-                        Register as new patient
+                        + Register as new patient
                       </button>
                     </div>
                   ) : (
                     patients.map((patient) => (
                       <div
                         key={patient.id}
-                        className="flex items-center justify-between p-5 hover:bg-slate-50 transition-colors group"
+                        className="flex items-center justify-between p-4 hover:bg-slate-50/60 transition-colors"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center font-black text-sm border border-brand-100">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs border border-slate-200/60">
                             {patient.first_name?.[0]}
                             {patient.last_name?.[0]}
                           </div>
                           <div>
-                            <p className="font-black text-slate-900 group-hover:text-brand-600 transition-colors">
+                            <p className="font-bold text-sm text-slate-900">
                               {patient.first_name} {patient.last_name}
                             </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[10px] bg-slate-200 text-slate-600 font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.2 rounded">
                                 {patient.file_number}
                               </span>
-                              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                              <span className="text-[11px] text-slate-400 font-normal">
                                 &bull; {patient.gender || 'N/A'} • {patient.phone || 'No phone'}
                               </span>
                             </div>
@@ -437,10 +426,10 @@ export default function ReceptionDashboard() {
                         </div>
                         <button
                           onClick={() => handleOpenCheckInWithDestination('TRIAGE', patient)}
-                          className="bg-brand-600 text-white px-5 py-2.5 rounded-xl hover:bg-brand-700 transition-all shadow-md shadow-brand-500/20 flex items-center gap-2 text-xs font-black active:scale-95"
+                          className="bg-slate-900 text-white px-3.5 py-2 rounded-xl hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 text-xs font-medium active:scale-98"
                         >
-                          <LogIn size={15} />
-                          Check-in / Route
+                          <LogIn size={13} />
+                          Route Patient
                         </button>
                       </div>
                     ))
@@ -450,26 +439,26 @@ export default function ReceptionDashboard() {
             )}
 
             {/* Live Front Desk Queue Table */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Recent Front Office Queue Activity
                 </h3>
                 <Link
                   href="/hospital/patients"
-                  className="text-[10px] font-black text-brand-600 uppercase tracking-widest hover:underline flex items-center gap-1"
+                  className="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1"
                 >
-                  Patient Directory <ArrowRight size={10} />
+                  Patient Directory <ArrowRight size={12} />
                 </Link>
               </div>
-              <div className="bg-slate-50/50 rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
                 <table className="w-full text-sm text-left border-collapse">
-                  <thead className="bg-slate-100/50 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">
+                  <thead className="bg-slate-50/70 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200/60">
                     <tr>
-                      <th className="px-6 py-4">Patient & Token</th>
-                      <th className="px-6 py-4">Destination & Reason</th>
-                      <th className="px-6 py-4">Time</th>
-                      <th className="px-6 py-4 text-right">Status</th>
+                      <th className="px-4 py-3">Patient & Token</th>
+                      <th className="px-4 py-3">Destination & Reason</th>
+                      <th className="px-4 py-3">Time</th>
+                      <th className="px-4 py-3 text-right">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -477,7 +466,7 @@ export default function ReceptionDashboard() {
                       <tr>
                         <td
                           colSpan={4}
-                          className="px-6 py-8 text-center text-slate-400 font-bold text-xs"
+                          className="px-4 py-8 text-center text-slate-400 font-medium text-xs"
                         >
                           Loading activity...
                         </td>
@@ -486,7 +475,7 @@ export default function ReceptionDashboard() {
                       <tr>
                         <td
                           colSpan={4}
-                          className="px-6 py-8 text-center text-slate-400 font-bold text-xs"
+                          className="px-4 py-8 text-center text-slate-400 font-medium text-xs"
                         >
                           No recent queue activity recorded.
                         </td>
@@ -497,48 +486,56 @@ export default function ReceptionDashboard() {
                         const isEmergency = row.priority === 'EMERGENCY';
 
                         return (
-                          <tr key={row.id} className="hover:bg-white transition-colors group">
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-2.5">
-                                <div>
-                                  <p className="font-bold text-slate-900 group-hover:text-brand-600 transition-colors">
-                                    {row.patients
-                                      ? `${row.patients.first_name} ${row.patients.last_name}`
-                                      : 'Walk-in Patient'}
-                                  </p>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase">
-                                      {row.patients?.file_number || 'N/A'}
+                          <tr key={row.id} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="px-4 py-3.5">
+                              <div>
+                                <p className="font-bold text-sm text-slate-900">
+                                  {row.patients
+                                    ? `${row.patients.first_name} ${row.patients.last_name}`
+                                    : 'Walk-in Patient'}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[10px] text-slate-400 font-medium">
+                                    {row.patients?.file_number || 'N/A'}
+                                  </span>
+                                  {row.token_number && (
+                                    <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded">
+                                      #{row.token_number}
                                     </span>
-                                    {row.token_number && (
-                                      <span className="text-[10px] font-mono font-extrabold text-brand-700 bg-brand-50 px-1.5 py-0.2 rounded border border-brand-200">
-                                        #{row.token_number}
-                                      </span>
-                                    )}
-                                  </div>
+                                  )}
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-4">
-                              <p className="text-xs font-black text-slate-800">{deptName}</p>
-                              <p className="text-[11px] text-slate-500 font-medium truncate max-w-[200px]">
+                            <td className="px-4 py-3.5">
+                              <p className="text-xs font-bold text-slate-800">{deptName}</p>
+                              <p className="text-[11px] text-slate-400 font-normal truncate max-w-[200px]">
                                 {row.reason || 'General Intake'}
                               </p>
                             </td>
-                            <td className="px-6 py-4 text-slate-400 text-xs font-bold">
+                            <td className="px-4 py-3.5 text-slate-400 text-xs font-normal">
                               {formatTimeAgo(row.created_at)}
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-4 py-3.5 text-right">
                               <span
                                 className={clsx(
-                                  'inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest',
+                                  'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide border',
                                   isEmergency
-                                    ? 'bg-rose-100 text-rose-700 animate-pulse'
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200/60'
                                     : row.status === 'WAITING'
-                                      ? 'bg-blue-50 text-blue-600'
-                                      : 'bg-emerald-50 text-emerald-600',
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200/60'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
                                 )}
                               >
+                                <span
+                                  className={clsx(
+                                    'w-1.5 h-1.5 rounded-full',
+                                    isEmergency
+                                      ? 'bg-rose-500 animate-pulse'
+                                      : row.status === 'WAITING'
+                                        ? 'bg-amber-500'
+                                        : 'bg-emerald-500',
+                                  )}
+                                />
                                 {isEmergency ? 'EMERGENCY' : row.status}
                               </span>
                             </td>
@@ -554,60 +551,58 @@ export default function ReceptionDashboard() {
         </div>
 
         {/* Right: Reception Summary Stats & Physician Queue */}
-        <div className="space-y-8">
-          <div className="bg-brand-600 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-2xl rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500" />
-            <h2 className="text-xl font-black mb-6 relative flex items-center justify-between">
-              Reception Summary
-              <Sparkles size={18} className="text-brand-200" />
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center justify-between">
+              Reception Metrics
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
             </h2>
-            <div className="grid grid-cols-2 gap-4 relative">
-              <div className="bg-white/10 p-5 rounded-2xl border border-white/10 text-center backdrop-blur-sm">
-                <p className="text-3xl font-black tracking-tighter">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-100 text-center">
+                <p className="text-2xl font-bold tracking-tight text-slate-900">
                   {receptionStats.checkedInToday}
                 </p>
-                <p className="text-[10px] uppercase font-black text-brand-100 tracking-widest mt-1">
+                <p className="text-[11px] font-medium text-slate-500 mt-0.5">
                   Checked-in Today
                 </p>
               </div>
-              <div className="bg-white/10 p-5 rounded-2xl border border-white/10 text-center backdrop-blur-sm">
-                <p className="text-3xl font-black tracking-tighter">
+              <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-100 text-center">
+                <p className="text-2xl font-bold tracking-tight text-slate-900">
                   {receptionStats.newRegToday}
                 </p>
-                <p className="text-[10px] uppercase font-black text-brand-100 tracking-widest mt-1">
-                  New Registrations
+                <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                  New Registered
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm overflow-hidden relative">
-            <div className="absolute top-0 left-0 w-1 h-full bg-brand-600" />
-            <h2 className="text-lg font-black text-slate-900 mb-6 flex items-center justify-between">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center justify-between">
               Physician Consultation Roster
-              <Calendar size={18} className="text-brand-600" />
+              <Calendar size={15} className="text-slate-400" />
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-2">
               {doctorSchedules.length === 0 ? (
-                <p className="text-xs text-slate-400 font-bold text-center py-4">
+                <p className="text-xs text-slate-400 font-medium text-center py-4">
                   No physician schedules found.
                 </p>
               ) : (
                 doctorSchedules.map((doc, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-brand-200 transition-colors group"
+                    className="flex items-center justify-between p-3 bg-slate-50/70 rounded-xl border border-slate-100 hover:border-slate-300 transition-colors"
                   >
                     <div>
-                      <p className="text-sm font-black text-slate-800 group-hover:text-brand-600 transition-colors">
+                      <p className="text-xs font-bold text-slate-800">
                         {doc.doctor_name}
                       </p>
-                      <p className="text-[10px] text-brand-600 font-black uppercase tracking-widest mt-0.5">
+                      <p className="text-[10px] text-slate-400 font-medium">
                         Outpatient Department
                       </p>
                     </div>
-                    <div className="bg-white w-10 h-10 rounded-xl flex items-center justify-center border border-slate-200 shadow-sm group-hover:bg-brand-600 group-hover:text-white transition-all">
-                      <span className="text-sm font-black">{doc.queue_count}</span>
+                    <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 shadow-xs">
+                      {doc.queue_count} queued
                     </div>
                   </div>
                 ))

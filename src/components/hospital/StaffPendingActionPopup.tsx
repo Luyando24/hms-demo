@@ -474,26 +474,26 @@ export default function StaffPendingActionPopup() {
   const IconComp = theme.icon;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-white rounded-2xl max-w-md w-full shadow-xl border border-slate-200/80 overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-150">
         {/* Header Banner */}
-        <div className={clsx('p-6 text-white flex items-center justify-between relative', theme.bannerBg)}>
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner text-white">
-              <IconComp size={24} />
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-xs">
+              <IconComp size={16} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/20 text-white">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   {activeAction.type} Referral
                 </span>
                 {activeAction.priority === 'EMERGENCY' || activeAction.priority === 'URGENT' ? (
-                  <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-rose-500 text-white animate-pulse">
+                  <span className="text-[10px] font-bold uppercase px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 border border-rose-200">
                     {activeAction.priority}
                   </span>
                 ) : null}
               </div>
-              <h2 className="text-lg font-black text-white mt-1 leading-tight">
+              <h2 className="text-sm font-bold text-slate-900 mt-0.5 leading-tight">
                 {activeAction.title}
               </h2>
             </div>
@@ -502,36 +502,36 @@ export default function StaffPendingActionPopup() {
           <div className="flex items-center gap-1">
             <button
               onClick={toggleVoice}
-              className="p-2 rounded-xl hover:bg-white/20 text-white/80 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
               title={isVoiceOn ? 'Mute Sound Alerts' : 'Enable Sound Alerts'}
             >
-              {isVoiceOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
+              {isVoiceOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
             </button>
             <button
               onClick={handleDismiss}
-              className="p-2 rounded-xl hover:bg-white/20 text-white/80 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
               title="Dismiss Alert"
             >
-              <X size={20} />
+              <X size={16} />
             </button>
           </div>
         </div>
 
         {/* Modal Body Card */}
-        <div className="p-6 sm:p-7 space-y-4">
+        <div className="p-5 space-y-3">
           {/* Patient Details Card */}
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+          <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-200/80 space-y-1.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center font-bold">
-                  <User size={16} />
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs">
+                  <User size={14} />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-900 uppercase">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase">
                     {activeAction.patientName}
                   </h3>
                   {activeAction.patientFileNo && (
-                    <p className="text-[11px] font-mono font-bold text-slate-500">
+                    <p className="text-[10px] font-mono text-slate-400">
                       MRN: {activeAction.patientFileNo}
                     </p>
                   )}
@@ -540,57 +540,54 @@ export default function StaffPendingActionPopup() {
 
               {activeAction.tokenNumber && (
                 <div className="text-right">
-                  <span className="px-2.5 py-1 rounded-xl bg-brand-50 border border-brand-200 text-brand-700 text-xs font-black font-mono">
+                  <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 text-xs font-bold font-mono">
                     Token #{activeAction.tokenNumber}
                   </span>
                 </div>
               )}
             </div>
 
-            <p className="text-xs text-slate-600 font-medium leading-relaxed pt-1">
+            <p className="text-xs text-slate-600 font-normal leading-relaxed pt-0.5">
               {activeAction.detail}
             </p>
           </div>
 
           {/* Pending Queue Count Banner */}
           {totalPendingCount > 1 && (
-            <div className="flex items-center justify-between text-xs font-bold text-slate-500 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200/80">
-              <span className="flex items-center gap-1.5 text-slate-700">
-                <Sparkles size={14} className="text-amber-500" />
-                Your Pending Department Queue
+            <div className="flex items-center justify-between text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200/60">
+              <span className="flex items-center gap-1.5 text-slate-600 font-medium text-[11px]">
+                <Sparkles size={13} className="text-slate-400" />
+                Pending Queue Items
               </span>
-              <span className="text-brand-600 font-extrabold">{totalPendingCount} pending items</span>
+              <span className="text-slate-900 font-bold text-[11px]">{totalPendingCount} pending</span>
             </div>
           )}
         </div>
 
         {/* Modal Footer Controls: Snooze 5 min, Dismiss, Take Action */}
-        <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+        <div className="p-3.5 px-5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2.5 shrink-0">
           <button
             onClick={() => handleSnooze(5)}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white transition-all flex items-center justify-center gap-1.5 shadow-xs"
+            className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 shadow-xs"
             title="Snooze popup alerts for 5 minutes"
           >
-            <Clock size={15} className="text-slate-400" />
-            <span>Snooze for 5 Mins</span>
+            <Clock size={13} className="text-slate-400" />
+            <span>Snooze</span>
           </button>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div className="flex items-center gap-2">
             <button
               onClick={handleDismiss}
-              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white transition-colors text-center"
+              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
             >
               Dismiss
             </button>
             <button
               onClick={handleTakeAction}
-              className={clsx(
-                'flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs font-black shadow-lg transition-all flex items-center justify-center gap-2',
-                theme.buttonColor,
-              )}
+              className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-1.5 rounded-xl text-xs font-semibold shadow-xs transition-all flex items-center justify-center gap-1.5 active:scale-98"
             >
               <span>{activeAction.actionLabel}</span>
-              <ArrowRight size={15} />
+              <ArrowRight size={13} />
             </button>
           </div>
         </div>

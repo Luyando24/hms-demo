@@ -176,10 +176,10 @@ export function HospitalSidebar() {
 
           return (
             <div key={group.title}>
-              <h4 className="px-4 text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
+              <h4 className="px-4 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                 {group.title}
               </h4>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {visibleItems.map((item) => {
                   const subPath = item.href.replace('/hospital', '');
                   const isActive = 
@@ -193,18 +193,18 @@ export function HospitalSidebar() {
                     key={item.name}
                     href={item.href}
                     className={clsx(
-                      "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                      "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
                       isActive 
-                        ? "bg-brand-600 text-white shadow-md shadow-brand-500/20" 
-                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                        ? "bg-slate-900 text-white shadow-xs font-semibold" 
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
                     )}
                   >
-                    <item.icon size={18} strokeWidth={isActive ? 2.5 : 2} className={isActive ? "text-white" : "text-slate-400"} />
+                    <item.icon size={17} strokeWidth={isActive ? 2.2 : 1.8} className={isActive ? "text-white" : "text-slate-400"} />
                     <span className="flex-1">{item.name}</span>
                     {item.name === "Outpatient (OPD)" && opdCount > 0 && (
                       <span className={clsx(
-                        "px-2 py-0.5 rounded-full text-[10px] font-black animate-pulse",
-                        isActive ? "bg-white text-brand-600" : "bg-brand-600 text-white shadow-lg shadow-brand-500/30"
+                        "px-2 py-0.5 rounded-full text-[10px] font-bold",
+                        isActive ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
                       )}>
                         {opdCount}
                       </span>
@@ -219,24 +219,24 @@ export function HospitalSidebar() {
       </nav>
 
       {/* Bottom Actions */}
-      <div className="px-4 mt-8 pt-4 border-t border-slate-200/60 shrink-0 space-y-1">
+      <div className="px-4 mt-6 pt-4 border-t border-slate-100 shrink-0 space-y-1">
         <Link
           href="/hospital/settings"
           className={clsx(
-            "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+            "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
             pathname === "/hospital/settings"
-              ? "bg-brand-600 text-white shadow-md shadow-brand-500/20"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+              ? "bg-slate-900 text-white shadow-xs font-semibold"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
           )}
         >
-          <Settings size={18} strokeWidth={pathname === "/hospital/settings" ? 2.5 : 2} className={pathname === "/hospital/settings" ? "text-white" : "text-slate-400"} />
+          <Settings size={17} strokeWidth={pathname === "/hospital/settings" ? 2.2 : 1.8} className={pathname === "/hospital/settings" ? "text-white" : "text-slate-400"} />
           Settings
         </Link>
         <button
           onClick={() => signOut()}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition-all duration-200 group"
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50/70 transition-all duration-150 group"
         >
-          <LogOut size={18} strokeWidth={2} className="text-slate-400 group-hover:text-rose-500" />
+          <LogOut size={17} strokeWidth={1.8} className="text-slate-400 group-hover:text-rose-500" />
           Sign Out
         </button>
       </div>

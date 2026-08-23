@@ -60,130 +60,127 @@ export default function BillingDashboard() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Billing & Claims</h1>
-          <p className="text-slate-500 mt-1">Financial Management & Insurance Processing.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Billing & Claims</h1>
+          <p className="text-xs text-slate-500 font-normal mt-0.5">Financial management, invoice settlements, and insurance processing.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button 
             onClick={() => setIsGenerateModalOpen(true)}
-            className="bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-md flex items-center gap-2"
+            className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
           >
-            <Plus size={16} />
+            <Plus size={14} />
             Generate Invoice
           </button>
         </div>
       </div>
 
       {/* Financial Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <DollarSign size={20} />
-            </div>
-            <span className="flex items-center text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-              <ArrowUpRight size={12} className="mr-1" /> Live
-            </span>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Revenue</p>
+            <DollarSign size={15} className="text-slate-400" />
           </div>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Revenue</p>
-          <p className="text-2xl font-black text-slate-900">{formatCurrencyAmount(stats.totalRevenue, currencyConfig.symbol, currencyConfig.position)}</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{formatCurrencyAmount(stats.totalRevenue, currencyConfig.symbol, currencyConfig.position)}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Verified settled payments</p>
         </div>
-        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <FileText size={20} />
-            </div>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Collection</p>
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
           </div>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pending Collection</p>
-          <p className="text-2xl font-black text-slate-900">{formatCurrencyAmount(stats.pendingAmount, currencyConfig.symbol, currencyConfig.position)}</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{formatCurrencyAmount(stats.pendingAmount, currencyConfig.symbol, currencyConfig.position)}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Outstanding receivables</p>
         </div>
-        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-              <AlertCircle size={20} />
-            </div>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Unpaid Invoices</p>
+            <span className="w-2 h-2 rounded-full bg-rose-500" />
           </div>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Unpaid Invoices</p>
-          <p className="text-2xl font-black text-slate-900">{stats.overdueCount}</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.overdueCount}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Requires follow-up</p>
         </div>
-        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <CheckCircle2 size={20} />
-            </div>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Collection Rate</p>
+            <CheckCircle2 size={15} className="text-emerald-500" />
           </div>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Collection Rate</p>
-          <p className="text-2xl font-black text-slate-900">{stats.collectionRate}%</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.collectionRate}%</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Efficiency metric</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Invoices Table */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-slate-900">Recent Invoices</h2>
-              <div className="flex gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input 
-                    type="text" 
-                    placeholder="Search patient or ID..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  />
-                </div>
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-slate-900">Recent Invoices</h2>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+                <input 
+                  type="text" 
+                  placeholder="Search patient or ID..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 pr-3 py-1.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 shadow-xs"
+                />
               </div>
             </div>
             
-            <div className="overflow-hidden border border-slate-200 rounded-2xl">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+            <div className="overflow-x-auto border border-slate-200/80 rounded-xl">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">
                   <tr>
-                    <th className="px-6 py-3">Patient</th>
-                    <th className="px-6 py-3">Amount</th>
-                    <th className="px-6 py-3">Balance</th>
-                    <th className="px-6 py-3 text-right">Action</th>
+                    <th className="px-4 py-2.5">Patient</th>
+                    <th className="px-4 py-2.5">Amount</th>
+                    <th className="px-4 py-2.5">Balance</th>
+                    <th className="px-4 py-2.5 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
-                    <tr><td colSpan={4} className="px-6 py-8 text-center text-slate-400">Loading invoices...</td></tr>
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-normal">Loading invoices...</td></tr>
                   ) : filteredInvoices.length === 0 ? (
-                    <tr><td colSpan={4} className="px-6 py-8 text-center text-slate-400">No invoices found.</td></tr>
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-normal">No invoices found.</td></tr>
                   ) : filteredInvoices.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3">
                         <p className="font-bold text-slate-900">{row.patients?.first_name} {row.patients?.last_name}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">ID: {row.id.slice(0, 8)}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">ID: {row.id.slice(0, 8)}</p>
                       </td>
-                      <td className="px-6 py-4 font-black text-slate-900">{formatCurrencyAmount(row.total_amount, currencyConfig.symbol, currencyConfig.position)}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3 font-semibold text-slate-900">{formatCurrencyAmount(row.total_amount, currencyConfig.symbol, currencyConfig.position)}</td>
+                      <td className="px-4 py-3">
                         <span className={clsx(
-                          "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
-                          row.status === 'PAID' ? "bg-emerald-50 text-emerald-600" : 
-                          row.status === 'PARTIAL' ? "bg-amber-50 text-amber-600" :
-                          row.status === 'CANCELLED' ? "bg-slate-100 text-slate-400" : "bg-rose-50 text-rose-600"
+                          "text-[10px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1",
+                          row.status === 'PAID' ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60" : 
+                          row.status === 'PARTIAL' ? "bg-amber-50 text-amber-700 border border-amber-200/60" :
+                          row.status === 'CANCELLED' ? "bg-slate-100 text-slate-500 border border-slate-200" : "bg-rose-50 text-rose-700 border border-rose-200/60"
                         )}>
+                          <span className={clsx(
+                            "w-1.5 h-1.5 rounded-full",
+                            row.status === 'PAID' ? "bg-emerald-500" :
+                            row.status === 'PARTIAL' ? "bg-amber-500" :
+                            row.status === 'CANCELLED' ? "bg-slate-400" : "bg-rose-500"
+                          )} />
                           {formatCurrencyAmount(row.total_amount - (row.paid_amount || 0), currencyConfig.symbol, currencyConfig.position)} {row.status}
                         </span>
                       </td>
 
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           {row.status !== 'PAID' && row.status !== 'CANCELLED' && (
                             <>
                               <button 
                                 onClick={() => { setSelectedInvoice(row); setIsPaymentModalOpen(true); }}
-                                className="bg-brand-50 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-600 hover:text-white transition-all flex items-center gap-1.5"
+                                className="bg-slate-900 text-white px-2.5 py-1 rounded-lg text-xs font-medium hover:bg-slate-800 transition-all flex items-center gap-1 shadow-xs"
                               >
-                                <CreditCard size={14} />
+                                <CreditCard size={12} />
                                 Pay
                               </button>
                               <button 
@@ -194,7 +191,7 @@ export default function BillingDashboard() {
                                     else fetchInvoices();
                                   }
                                 }}
-                                className="text-slate-400 hover:text-rose-600 text-xs font-bold transition-all"
+                                className="text-slate-400 hover:text-rose-600 text-xs px-2 py-1 transition-all"
                               >
                                 Void
                               </button>
@@ -211,29 +208,37 @@ export default function BillingDashboard() {
         </div>
 
         {/* Claims Status Summary */}
-        <div className="bg-slate-900 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/10 blur-2xl rounded-full" />
-          <h2 className="text-lg font-bold mb-6 relative z-10">Insurance Insights</h2>
-          
-          <div className="space-y-4 flex-1 relative z-10">
-            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 p-5 rounded-2xl">
-              <div className="flex justify-between items-start mb-4">
-                <p className="text-sm font-bold text-slate-100">Pending Approvals</p>
-                <span className="text-[9px] font-black bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase">In Review</span>
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Insurance Insights</h2>
+            
+            <div className="space-y-3">
+              <div className="bg-slate-50/70 border border-slate-100 p-4 rounded-xl">
+                <div className="flex justify-between items-start mb-2">
+                  <p className="text-xs font-semibold text-slate-700">Pending Approvals</p>
+                  <span className="text-[9px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded uppercase">In Review</span>
+                </div>
+                <p className="text-xl font-bold text-slate-900">{formatCurrencyAmount(stats.pendingAmount * 0.4, currencyConfig.symbol, currencyConfig.position)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Insurance claims pending settlement</p>
               </div>
-              <p className="text-2xl font-black">{formatCurrencyAmount(stats.pendingAmount * 0.4, currencyConfig.symbol, currencyConfig.position)}</p>
-              <p className="text-[10px] text-slate-500 mt-1 font-bold">INSURANCE CLAIMS IN REVIEW</p>
-            </div>
 
-            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 p-5 rounded-2xl">
-              <div className="flex justify-between items-start mb-4">
-                <p className="text-sm font-bold text-slate-100">Settled This Period</p>
-                <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded uppercase">Paid</span>
+              <div className="bg-slate-50/70 border border-slate-100 p-4 rounded-xl">
+                <div className="flex justify-between items-start mb-2">
+                  <p className="text-xs font-semibold text-slate-700">Settled This Period</p>
+                  <span className="text-[9px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded uppercase">Paid</span>
+                </div>
+                <p className="text-xl font-bold text-slate-900">{formatCurrencyAmount(stats.totalRevenue, currencyConfig.symbol, currencyConfig.position)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">All payments verified & posted</p>
               </div>
-              <p className="text-2xl font-black">{formatCurrencyAmount(stats.totalRevenue, currencyConfig.symbol, currencyConfig.position)}</p>
-              <p className="text-[10px] text-slate-500 mt-1 font-bold">ALL PAYMENTS VERIFIED</p>
             </div>
           </div>
+
+          <button 
+            onClick={() => setIsGenerateModalOpen(true)}
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-xs font-semibold transition-all shadow-xs active:scale-98"
+          >
+            Create Claim or Invoice
+          </button>
         </div>
       </div>
 

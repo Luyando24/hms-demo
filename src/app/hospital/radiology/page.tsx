@@ -267,58 +267,67 @@ export default function RadiologyDashboard() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Radiology Information System (RIS)</h1>
-          <p className="text-slate-500 mt-1 font-medium">PACS Diagnostic Imaging Worklist & Radiologist Reporting.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Radiology Information System (RIS)</h1>
+          <p className="text-xs text-slate-500 font-normal mt-0.5">PACS diagnostic imaging worklist and radiologist reporting desk.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button 
             onClick={fetchOrders}
-            className="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
+            className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
           >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
             Refresh
           </button>
           <button 
             onClick={() => setIsCreateModalOpen(true)}
-            className="bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20 flex items-center gap-2"
+            className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
           >
-            <Plus size={16} />
+            <Plus size={14} />
             New Imaging Order
           </button>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Imaging Orders</p>
-          <p className="text-3xl font-black text-slate-900">{stats.total}</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Total Imaging Orders</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.total}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">All recorded modalities</p>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-1">Pending DICOM Studies</p>
-          <p className="text-3xl font-black text-slate-900">{stats.pending}</p>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Studies</p>
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.pending}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Awaiting radiologist review</p>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Signed Reports</p>
-          <p className="text-3xl font-black text-slate-900">{stats.completed}</p>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Signed Reports</p>
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.completed}</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Finalized & dispatched</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left: Imaging Worklist */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="space-y-3">
+        <div className="lg:col-span-4 space-y-4">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black text-slate-900">Worklist ({filteredOrders.length})</h2>
+              <h2 className="text-base font-bold text-slate-900">Worklist ({filteredOrders.length})</h2>
               <select
                 value={filterModality}
                 onChange={(e) => setFilterModality(e.target.value)}
-                className="bg-white border border-slate-200 text-xs font-bold rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none"
+                className="bg-white border border-slate-200 text-xs font-semibold rounded-xl px-2.5 py-1 text-slate-700 focus:outline-none shadow-xs"
               >
                 <option value="ALL">All Modalities</option>
                 <option value="X-RAY">X-Ray</option>
@@ -329,25 +338,25 @@ export default function RadiologyDashboard() {
             </div>
 
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
               <input 
-                type="text"
-                placeholder="Search patient or body part..."
+                type="text" 
+                placeholder="Search patient or body part..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 shadow-xs"
               />
             </div>
           </div>
 
-          <div className="space-y-4 max-h-[650px] overflow-y-auto pr-1">
+          <div className="space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
             {loading ? (
-              <div className="p-8 text-center text-slate-400 font-bold">
-                <Loader2 className="animate-spin text-brand-600 mx-auto mb-2" size={24} />
+              <div className="p-8 text-center text-slate-400 font-normal text-xs">
+                <Loader2 className="animate-spin text-slate-500 mx-auto mb-2" size={20} />
                 Loading RIS worklist...
               </div>
             ) : filteredOrders.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 font-bold">
+              <div className="p-8 text-center text-slate-400 font-normal text-xs">
                 No radiology orders found.
               </div>
             ) : filteredOrders.map((order) => {
@@ -358,37 +367,45 @@ export default function RadiologyDashboard() {
                   key={order.id} 
                   onClick={() => handleSelectOrder(order)}
                   className={clsx(
-                    "p-4 rounded-2xl border-2 transition-all cursor-pointer hover:shadow-md relative group",
-                    isSelected ? "border-brand-500 bg-brand-50/30 shadow-sm" : "border-slate-200 bg-white"
+                    "p-3.5 rounded-2xl border transition-all cursor-pointer relative",
+                    isSelected ? "border-slate-900 bg-slate-900 text-white shadow-xs" : "border-slate-200/80 bg-white hover:border-slate-300 text-slate-900"
                   )}
                 >
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex justify-between items-start mb-1.5">
                     <span className={clsx(
-                      "text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full text-white",
-                      order.modality === 'CT' ? 'bg-purple-600' : order.modality === 'MRI' ? 'bg-blue-600' : 'bg-brand-600'
+                      "text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md",
+                      isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
                     )}>
                       {order.modality}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-400">
+                    <span className={clsx("text-[10px]", isSelected ? "text-slate-300" : "text-slate-400")}>
                       {new Date(order.created_at).toLocaleDateString()}
                     </span>
                   </div>
-                  <h3 className="font-bold text-slate-900 capitalize">{patientName}</h3>
-                  <p className="text-xs text-slate-500 mt-1 font-medium">{order.body_part} &bull; #{order.id.slice(0, 8)}</p>
+                  <h3 className="text-xs font-bold capitalize">{patientName}</h3>
+                  <p className={clsx("text-[11px] mt-0.5 font-normal", isSelected ? "text-slate-300" : "text-slate-500")}>
+                    {order.body_part} &bull; #{order.id.slice(0, 8)}
+                  </p>
                   
-                  <div className="mt-4 flex items-center justify-between">
+                  <div className="mt-2.5 flex items-center justify-between">
                     <span className={clsx(
-                      "text-[10px] font-bold px-2 py-0.5 rounded-md uppercase",
-                      order.status === 'COMPLETED' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                      "text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase inline-flex items-center gap-1",
+                      isSelected
+                        ? "bg-white/20 text-white"
+                        : order.status === 'COMPLETED' ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60" : "bg-amber-50 text-amber-700 border border-amber-200/60"
                     )}>
+                      <span className={clsx(
+                        "w-1.5 h-1.5 rounded-full",
+                        isSelected ? "bg-white" : order.status === 'COMPLETED' ? "bg-emerald-500" : "bg-amber-500"
+                      )} />
                       {order.status}
                     </span>
                     <button 
                       onClick={(e) => { e.stopPropagation(); handleDeleteOrder(order.id); }}
-                      className="text-slate-400 hover:text-rose-600 transition-colors p-1"
+                      className={clsx("transition-colors p-1", isSelected ? "text-slate-400 hover:text-white" : "text-slate-400 hover:text-rose-600")}
                       title="Cancel Order"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={13} />
                     </button>
                   </div>
                 </div>
@@ -398,35 +415,33 @@ export default function RadiologyDashboard() {
         </div>
 
         {/* Right: PACS Viewer Workstation */}
-        <div className="lg:col-span-8 flex flex-col space-y-6">
-          <div className="bg-slate-900 rounded-3xl overflow-hidden flex flex-col h-[700px] shadow-2xl relative border border-slate-800">
+        <div className="lg:col-span-8 flex flex-col space-y-4">
+          <div className="bg-slate-900 rounded-2xl overflow-hidden flex flex-col h-[650px] shadow-lg relative border border-slate-800">
             {/* PACS Toolbar Header */}
-            <div className="bg-slate-800/80 backdrop-blur-md px-6 py-4 border-b border-slate-700 flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-3 text-white">
-                <ImageIcon size={20} className="text-brand-400" />
-                <span className="font-bold text-sm tracking-tight text-slate-200">
+            <div className="bg-slate-800/90 backdrop-blur-md px-5 py-3 border-b border-slate-700 flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-2.5 text-white">
+                <ImageIcon size={16} className="text-slate-300" />
+                <span className="font-semibold text-xs text-slate-200 truncate">
                   {selectedOrder ? `${selectedOrder.patients?.first_name || ''} ${selectedOrder.patients?.last_name || ''} • ${selectedOrder.modality} (${selectedOrder.body_part})` : 'Select an order from worklist'}
                 </span>
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded bg-slate-700 text-slate-300">
+              <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-700 text-slate-300">
                 DICOM 3.0 Viewer
               </span>
             </div>
 
             {/* Diagnostic Image Display Area */}
-            <div className="flex-1 bg-black flex items-center justify-center relative p-8">
-              <div className="relative w-full h-full max-w-lg mx-auto bg-slate-800/60 rounded-2xl overflow-hidden border border-slate-700 flex items-center justify-center shadow-inner">
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-700/20 via-black to-slate-900/40 mix-blend-overlay" />
-                
-                <div className="absolute top-4 left-4 text-[10px] font-mono text-emerald-400/60 leading-tight">
+            <div className="flex-1 bg-slate-950 flex items-center justify-center relative p-6">
+              <div className="relative w-full h-full max-w-md mx-auto bg-slate-900/60 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center shadow-inner">
+                <div className="absolute top-3 left-3 text-[10px] font-mono text-emerald-400/60 leading-tight">
                   <p>ORDER_ID: {selectedOrder?.id.slice(0, 8) || 'N/A'}</p>
                   <p>MODALITY: {selectedOrder?.modality || 'DICOM'}</p>
                   <p>REGION: {selectedOrder?.body_part || 'FULL'}</p>
                 </div>
 
-                <div className="text-center opacity-40">
-                  <Microscope size={90} className="text-white mx-auto mb-3" />
-                  <p className="text-white text-xs font-bold uppercase tracking-widest">
+                <div className="text-center opacity-30">
+                  <Microscope size={60} className="text-white mx-auto mb-2" />
+                  <p className="text-white text-[11px] font-semibold uppercase tracking-wider">
                     {selectedOrder ? `PACS Diagnostic Station - ${selectedOrder.modality}` : 'No DICOM Image Loaded'}
                   </p>
                 </div>
@@ -434,21 +449,21 @@ export default function RadiologyDashboard() {
             </div>
 
             {/* Diagnostic Report Editor */}
-            <div className="bg-slate-800/95 backdrop-blur-md p-6 border-t border-slate-700 relative z-10 space-y-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Radiologist Diagnostic Findings & Impression</label>
+            <div className="bg-slate-900 p-5 border-t border-slate-800 relative z-10 space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Radiologist Diagnostic Findings & Impression</label>
                 <textarea 
                   value={findings}
                   onChange={e => setFindings(e.target.value)}
-                  className="w-full bg-slate-900/80 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500 placeholder:text-slate-600 h-20 outline-none"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400 placeholder:text-slate-600 h-16 outline-none resize-none font-normal"
                   placeholder="Enter diagnostic findings, impression, and conclusion..."
                 />
               </div>
 
               {/* Next Step Selector & Finalize Action */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-700/60">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-800">
                 <div className="flex items-center gap-1.5 overflow-x-auto">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 shrink-0">Forward to:</span>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 mr-1 shrink-0">Forward to:</span>
                   {[
                     { id: 'DOCTOR_REVIEW' as const, label: 'Doctor OPD', tag: 'Review' },
                     { id: 'IPD' as const, label: 'Ward (IPD)', tag: 'Inpatient' },
@@ -460,10 +475,10 @@ export default function RadiologyDashboard() {
                       type="button"
                       onClick={() => setNextStep(opt.id)}
                       className={clsx(
-                        'px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0',
+                        'px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all shrink-0',
                         nextStep === opt.id
-                          ? 'bg-brand-600 text-white shadow-sm ring-1 ring-brand-400'
-                          : 'bg-slate-900 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                          ? 'bg-white text-slate-900 font-semibold'
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
                       )}
                     >
                       {opt.label}
@@ -474,9 +489,9 @@ export default function RadiologyDashboard() {
                 <button 
                   disabled={!selectedOrder || isSubmittingReport}
                   onClick={handleSaveReport}
-                  className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
+                  className="bg-white hover:bg-slate-100 text-slate-900 px-4 py-1.5 rounded-xl text-xs font-semibold shadow-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 active:scale-98"
                 >
-                  {isSubmittingReport ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                  {isSubmittingReport ? <Loader2 className="animate-spin" size={13} /> : <CheckCircle2 size={13} />}
                   Sign & Forward Report
                 </button>
               </div>

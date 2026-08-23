@@ -29,26 +29,20 @@ export default function StatusModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="bg-white rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
-        {/* Top Accent Bar */}
-        <div className={clsx(
-          "h-2 w-full",
-          type === 'success' ? "bg-emerald-500" : "bg-rose-500"
-        )} />
-
-        <div className="p-8 flex flex-col items-center text-center">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-[100] flex items-center justify-center p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl border border-slate-200/80 animate-in zoom-in-95 duration-150">
+        <div className="p-6 flex flex-col items-center text-center">
           {/* Icon */}
           <div className={clsx(
-            "w-20 h-20 rounded-3xl flex items-center justify-center mb-6 shadow-lg",
-            type === 'success' ? "bg-emerald-50 text-emerald-500 shadow-emerald-500/10" : "bg-rose-50 text-rose-500 shadow-rose-500/10"
+            "w-12 h-12 rounded-xl flex items-center justify-center mb-4 shadow-xs",
+            type === 'success' ? "bg-emerald-50 text-emerald-600 border border-emerald-200/60" : "bg-rose-50 text-rose-600 border border-rose-200/60"
           )}>
-            {type === 'success' ? <CheckCircle2 size={40} strokeWidth={2.5} /> : <AlertCircle size={40} strokeWidth={2.5} />}
+            {type === 'success' ? <CheckCircle2 size={24} strokeWidth={2.2} /> : <AlertCircle size={24} strokeWidth={2.2} />}
           </div>
 
           {/* Content */}
-          <h3 className="text-2xl font-black text-slate-900 mb-2">{title}</h3>
-          <p className="text-slate-500 text-[15px] leading-relaxed mb-8">
+          <h3 className="text-base font-bold text-slate-900 mb-1.5">{title}</h3>
+          <p className="text-slate-500 text-xs leading-relaxed mb-6 font-normal">
             {message}
           </p>
 
@@ -56,10 +50,10 @@ export default function StatusModal({
           <button
             onClick={onClose}
             className={clsx(
-              "w-full py-4 rounded-2xl font-bold text-sm transition-all shadow-lg",
+              "w-full py-2.5 rounded-xl font-semibold text-xs transition-all shadow-xs active:scale-98",
               type === 'success' 
-                ? "bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/20" 
-                : "bg-rose-600 text-white hover:bg-rose-700 shadow-rose-600/20"
+                ? "bg-slate-900 text-white hover:bg-slate-800" 
+                : "bg-rose-600 text-white hover:bg-rose-700"
             )}
           >
             {actionLabel}

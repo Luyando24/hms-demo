@@ -246,33 +246,33 @@ export default function CaptureVitalsModal({
 
   return (
     <>
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150 border border-slate-200/80">
           {/* Header */}
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-md shadow-brand-500/20">
-                <Activity size={22} />
+              <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
+                <Activity size={16} />
               </div>
               <div>
-                <h2 className="text-xl font-black text-slate-900">Capture Vitals & Triage</h2>
-                <p className="text-xs text-slate-500 font-medium">
-                  Recording vitals for <span className="text-brand-600 font-bold">{patientName}</span>
+                <h2 className="text-base font-bold text-slate-900">Capture Vitals & Triage</h2>
+                <p className="text-xs text-slate-500 font-normal mt-0.5">
+                  Recording vitals for <span className="text-slate-900 font-semibold">{patientName}</span>
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400 hover:text-slate-600 border border-transparent hover:border-slate-200"
+              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 sm:p-7 space-y-5 overflow-y-auto flex-1">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 ml-1 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
                   <Activity size={12} className="text-rose-500" /> BP Systolic (mmHg) *
                 </label>
                 <input
@@ -280,11 +280,11 @@ export default function CaptureVitalsModal({
                   name="bp_systolic"
                   type="number"
                   placeholder="120"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 ml-1 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
                   <Activity size={12} className="text-rose-500" /> BP Diastolic (mmHg) *
                 </label>
                 <input
@@ -292,11 +292,11 @@ export default function CaptureVitalsModal({
                   name="bp_diastolic"
                   type="number"
                   placeholder="80"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 ml-1 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
                   <Activity size={12} className="text-rose-500" /> Heart Rate (bpm) *
                 </label>
                 <input
@@ -304,11 +304,11 @@ export default function CaptureVitalsModal({
                   name="heart_rate"
                   type="number"
                   placeholder="72"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 ml-1 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
                   <Thermometer size={12} className="text-amber-500" /> Temp (°C) *
                 </label>
                 <input
@@ -317,11 +317,11 @@ export default function CaptureVitalsModal({
                   type="number"
                   step="0.1"
                   placeholder="36.5"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 ml-1 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
                   <Activity size={12} className="text-blue-500" /> SpO2 (%) *
                 </label>
                 <input
@@ -329,11 +329,11 @@ export default function CaptureVitalsModal({
                   name="sp_o2"
                   type="number"
                   placeholder="98"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 ml-1 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
                   <Weight size={12} className="text-slate-500" /> Weight (kg) *
                 </label>
                 <input
@@ -342,22 +342,17 @@ export default function CaptureVitalsModal({
                   type="number"
                   step="0.1"
                   placeholder="70"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
             </div>
 
             {/* Next Step / Destination Selector */}
-            <div className="pt-4 border-t border-slate-200 space-y-3">
-              <div>
-                <label className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Send size={14} className="text-brand-600" />
-                  Route Patient Next *
-                </label>
-                <p className="text-[11px] text-slate-500 font-medium">
-                  Direct patient to appropriate consultation or critical care area:
-                </p>
-              </div>
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Send size={13} className="text-slate-600" />
+                Route Patient Next *
+              </label>
 
               <div className="grid grid-cols-3 gap-2">
                 {destinationOptions.map((opt) => {
@@ -369,32 +364,32 @@ export default function CaptureVitalsModal({
                       type="button"
                       onClick={() => setDestination(opt.id)}
                       className={clsx(
-                        'p-2.5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-1 shadow-xs',
+                        'p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-1 shadow-xs',
                         isSelected
                           ? opt.id === 'ER'
-                            ? 'border-rose-600 bg-rose-50/70 ring-2 ring-rose-500/20'
-                            : 'border-brand-600 bg-brand-50/70 ring-2 ring-brand-500/20'
-                          : 'border-slate-200 bg-white hover:bg-slate-50',
+                            ? 'border-rose-600 bg-rose-50 text-rose-900'
+                            : 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50 text-slate-900',
                       )}
                     >
                       <div className="flex items-center justify-between w-full">
                         <div
                           className={clsx(
-                            'w-7 h-7 rounded-xl flex items-center justify-center transition-colors',
+                            'w-6 h-6 rounded-lg flex items-center justify-center transition-colors',
                             isSelected
                               ? opt.id === 'ER'
                                 ? 'bg-rose-600 text-white'
-                                : 'bg-brand-600 text-white'
-                              : 'bg-slate-100 text-slate-500',
+                                : 'bg-white/20 text-white'
+                              : 'bg-slate-100 text-slate-600',
                           )}
                         >
-                          <Icon size={14} />
+                          <Icon size={13} />
                         </div>
                         {isSelected && (
                           <div
                             className={clsx(
                               'w-3.5 h-3.5 rounded-full text-white flex items-center justify-center',
-                              opt.id === 'ER' ? 'bg-rose-600' : 'bg-brand-600',
+                              opt.id === 'ER' ? 'bg-rose-600' : 'bg-white/20',
                             )}
                           >
                             <Check size={8} strokeWidth={3} />
@@ -402,10 +397,10 @@ export default function CaptureVitalsModal({
                         )}
                       </div>
                       <div>
-                        <div className="text-[11px] font-black text-slate-900 leading-tight">
+                        <div className={clsx('text-[11px] font-bold leading-tight', isSelected && opt.id !== 'ER' ? 'text-white' : 'text-slate-900')}>
                           {opt.label}
                         </div>
-                        <div className="text-[9px] font-semibold text-slate-400 mt-0.5">
+                        <div className={clsx('text-[9px] mt-0.5', isSelected && opt.id !== 'ER' ? 'text-slate-300' : 'text-slate-400')}>
                           {opt.tag}
                         </div>
                       </div>
@@ -417,13 +412,13 @@ export default function CaptureVitalsModal({
 
             {/* Room Assignment (Shown when DOCTOR is selected) */}
             {destination === 'DOCTOR' && (
-              <div className="space-y-1.5 pt-2 animate-in fade-in">
-                <label className="text-xs font-bold text-slate-700 ml-1 flex items-center gap-1.5">
-                  <DoorOpen size={13} className="text-brand-600" /> Assign Consultation Room
+              <div className="space-y-1 pt-1 animate-in fade-in">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <DoorOpen size={13} className="text-slate-500" /> Assign Consultation Room (Optional)
                 </label>
                 <select
                   name="room_id"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                 >
                   <option value="">Select a doctor room (Optional)...</option>
                   {rooms.map((room) => (
@@ -436,11 +431,11 @@ export default function CaptureVitalsModal({
             )}
 
             {/* Actions */}
-            <div className="flex gap-3 pt-3 border-t border-slate-100">
+            <div className="flex gap-2.5 pt-3 border-t border-slate-100 justify-end">
               <button
                 onClick={onClose}
                 type="button"
-                className="flex-1 px-5 py-3 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors"
+                className="px-4 py-2 border border-slate-200 bg-white text-slate-700 rounded-xl text-xs font-medium hover:bg-slate-50 transition-colors shadow-xs"
               >
                 Cancel
               </button>
@@ -448,17 +443,17 @@ export default function CaptureVitalsModal({
                 disabled={loading}
                 type="submit"
                 className={clsx(
-                  'flex-[2] text-white px-5 py-3 rounded-xl text-xs font-black shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50',
+                  'text-white px-5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-98',
                   destination === 'ER'
-                    ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20'
-                    : 'bg-brand-600 hover:bg-brand-700 shadow-brand-500/20',
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : 'bg-slate-900 hover:bg-slate-800',
                 )}
               >
                 {loading ? (
-                  <Loader2 className="animate-spin" size={16} />
+                  <Loader2 className="animate-spin" size={14} />
                 ) : (
                   <>
-                    <Save size={16} /> Complete Triage & Forward <CornerDownRight size={14} />
+                    <Save size={14} /> Forward Triage
                   </>
                 )}
               </button>
