@@ -8,6 +8,7 @@ import { HospitalBottomNav } from "@/components/layout/hospital-bottom-nav";
 import QueueFloatingIndicator from "@/components/hospital/QueueFloatingIndicator";
 import StaffPendingActionPopup from "@/components/hospital/StaffPendingActionPopup";
 import { GeofenceGuard } from "@/components/hospital/GeofenceGuard";
+import { OfflineProtectionBanner } from "@/components/common/OfflineProtectionBanner";
 
 export function HospitalLayoutClient({
   children,
@@ -24,6 +25,7 @@ export function HospitalLayoutClient({
   return (
     <MobileNavProvider>
       <div className="min-h-screen bg-[#F8FAFC] pb-20 lg:pb-0">
+        <OfflineProtectionBanner />
         <HospitalHeader />
         <HospitalSidebar />
         <HospitalBottomNav />

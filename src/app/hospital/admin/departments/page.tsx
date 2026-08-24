@@ -5,6 +5,8 @@ import { Plus, Search, Building, Edit2, Trash2, Loader2, Save, X, RefreshCw, Doo
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 import StatusModal from "@/components/hospital/StatusModal";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface Department {
   id: string;
@@ -112,6 +114,16 @@ export default function DepartmentsAdminPage() {
     d.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedDepartments,
+  } = usePagination(filteredDepartments, { initialPageSize: 10 });
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
@@ -194,7 +206,7 @@ export default function DepartmentsAdminPage() {
                   No departments found.
                 </td>
               </tr>
-            ) : filteredDepartments.map((dept) => (
+            ) : paginatedDepartments.map((dept) => (
               <tr key={dept.id} className="hover:bg-slate-50/50 transition-colors group">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
@@ -237,6 +249,15 @@ export default function DepartmentsAdminPage() {
             ))}
           </tbody>
         </table>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          itemName="departments"
+        />
       </div>
 
       {/* Department Modal */}

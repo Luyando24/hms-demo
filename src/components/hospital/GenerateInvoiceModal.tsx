@@ -1,10 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, FileText, Plus, Trash2, Save, Loader2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, FileText, Plus, Trash2, Save, Loader2, Printer, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { formatCurrencyAmount } from '@/utils/currency';
+import { printInvoiceDocument, PrintableInvoiceData } from '@/utils/invoicePrintGenerator';
 import StatusModal from './StatusModal';
+import { useFormDraft } from '@/hooks/useFormDraft';
+import { FormDraftAlert } from '@/components/common/FormDraftAlert';
 
 interface GenerateInvoiceModalProps {
   isOpen: boolean;
@@ -17,6 +21,7 @@ export default function GenerateInvoiceModal({
   onClose,
   onSuccess,
 }: GenerateInvoiceModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [patients, setPatients] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState('');
@@ -24,6 +29,7 @@ export default function GenerateInvoiceModal({
     symbol: string;
     position: 'prefix' | 'suffix';
   }>({ symbol: '$', position: 'prefix' });
+  const [hospitalDetails, setHospitalDetails] = useState<any>(null);
 
   const [items, setItems] = useState<
     Array<{ description: string; quantity: number; unit_price: number }>
@@ -32,14 +38,41 @@ export default function GenerateInvoiceModal({
     type: 'success' | 'error';
     title: string;
     message: string;
+    invoiceData?: PrintableInvoiceData;
   } | null>(null);
+
+  const invoiceDraftData = {
+    selectedPatientId,
+    items,
+  };
+
+  const handleRestoreInvoice = (saved: any) => {
+    if (saved.selectedPatientId !== undefined) setSelectedPatientId(saved.selectedPatientId);
+    if (saved.items !== undefined && Array.isArray(saved.items)) setItems(saved.items);
+  };
+
+  const {
+    hasDraft,
+    draftTimestamp,
+    restoreDraft,
+    clearDraft,
+    lastSavedAt,
+  } = useFormDraft('generate_invoice', invoiceDraftData, handleRestoreInvoice as any, {
+    debounceMs: 300,
+    isEnabled: isOpen,
+  });
+
   const supabase = createClient();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
       void supabase
         .from('patients')
-        .select('id, first_name, last_name, file_number')
+        .select('*')
         .order('first_name')
         .then(({ data }) => {
           if (data) setPatients(data);
@@ -47,11 +80,12 @@ export default function GenerateInvoiceModal({
 
       void supabase
         .from('system_settings')
-        .select('currency_symbol, currency_position, consultation_fee')
+        .select('*')
         .limit(1)
         .maybeSingle()
         .then(({ data }) => {
           if (data) {
+            setHospitalDetails(data);
             setCurrencyConfig({
               symbol: data.currency_symbol || '$',
               position: (data.currency_position as 'prefix' | 'suffix') || 'prefix',
@@ -63,7 +97,7 @@ export default function GenerateInvoiceModal({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const addItem = () => {
     setItems((prev) => [...prev, { description: '', quantity: 1, unit_price: 0 }]);
@@ -86,8 +120,7 @@ export default function GenerateInvoiceModal({
     0,
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerate = async (shouldPrint = true) => {
     if (!selectedPatientId) {
       alert('Please select a patient.');
       return;
@@ -97,61 +130,125 @@ export default function GenerateInvoiceModal({
       return;
     }
 
-    setLoading(true);
-
-    // 1. Create invoice record
-    const { data: invoice, error: invoiceError } = await supabase
-      .from('invoices')
-      .insert({
-        patient_id: selectedPatientId,
-        total_amount: totalAmount,
-        paid_amount: 0,
-        status: 'UNPAID',
-      })
-      .select()
-      .single();
-
-    if (invoiceError) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
       setStatus({
         type: 'error',
-        title: 'Invoice Failed',
-        message: invoiceError.message,
+        title: 'Offline Mode Active',
+        message: 'Your billing invoice draft is securely preserved locally. Please wait until your connection returns to register and print the invoice.',
       });
-      setLoading(false);
       return;
     }
 
-    // 2. Insert line items
-    const lineItems = items.map((i) => ({
-      invoice_id: invoice.id,
-      description: i.description,
-      quantity: i.quantity,
-      unit_price: i.unit_price,
-      total_price: i.quantity * i.unit_price,
-    }));
+    setLoading(true);
 
-    await supabase.from('invoice_items').insert(lineItems);
+    try {
+      // 1. Create invoice record
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          patient_id: selectedPatientId,
+          total_amount: totalAmount,
+          paid_amount: 0,
+          status: 'UNPAID',
+        })
+        .select()
+        .single();
 
-    setStatus({
-      type: 'success',
-      title: 'Invoice Generated',
-      message: `Invoice for ${formatCurrencyAmount(
-        totalAmount,
-        currencyConfig.symbol,
-        currencyConfig.position,
-      )} has been created.`,
-    });
-    setLoading(false);
+      if (invoiceError || !invoice) {
+        setStatus({
+          type: 'error',
+          title: 'Invoice Failed',
+          message: invoiceError?.message || 'Failed to create invoice record.',
+        });
+        setLoading(false);
+        return;
+      }
+
+      // 2. Insert line items
+      const lineItems = items.map((i) => ({
+        invoice_id: invoice.id,
+        description: i.description,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        total_price: i.quantity * i.unit_price,
+      }));
+
+      await supabase.from('invoice_items').insert(lineItems);
+
+      // Clear draft on successful creation
+      clearDraft();
+
+      const patientObj = patients.find((p) => p.id === selectedPatientId) || {
+        first_name: 'Patient',
+        last_name: '',
+      };
+
+      const printableData: PrintableInvoiceData = {
+        invoiceId: invoice.id,
+        createdAt: invoice.created_at || new Date().toISOString(),
+        status: invoice.status || 'UNPAID',
+        totalAmount: totalAmount,
+        paidAmount: 0,
+        hospital: {
+          name: hospitalDetails?.hospital_name || 'Hospital Medical Center',
+          brandTitle: hospitalDetails?.brand_title,
+          tagline: hospitalDetails?.tagline,
+          logoUrl: hospitalDetails?.logo_url,
+          address: hospitalDetails?.address,
+          phone: hospitalDetails?.phone,
+          email: hospitalDetails?.email,
+          currencySymbol: currencyConfig.symbol,
+          currencyPosition: currencyConfig.position,
+        },
+        patient: {
+          firstName: patientObj.first_name || '',
+          lastName: patientObj.last_name || '',
+          fileNumber: patientObj.file_number,
+          phone: patientObj.phone,
+          email: patientObj.email,
+          gender: patientObj.gender,
+          dob: patientObj.dob,
+        },
+        items: items.map((i) => ({
+          description: i.description,
+          quantity: i.quantity,
+          unitPrice: i.unit_price,
+          totalPrice: i.quantity * i.unit_price,
+        })),
+      };
+
+      // 3. Trigger Print Screen if requested
+      if (shouldPrint) {
+        printInvoiceDocument(printableData);
+      }
+
+      setStatus({
+        type: 'success',
+        title: 'Invoice Generated Successfully',
+        message: shouldPrint
+          ? `Invoice #${invoice.id.slice(0, 8).toUpperCase()} for ${formatCurrencyAmount(totalAmount, currencyConfig.symbol, currencyConfig.position)} was created and sent to print.`
+          : `Invoice #${invoice.id.slice(0, 8).toUpperCase()} for ${formatCurrencyAmount(totalAmount, currencyConfig.symbol, currencyConfig.position)} was saved as UNPAID.`,
+        invoiceData: printableData,
+      });
+    } catch (err: any) {
+      setStatus({
+        type: 'error',
+        title: 'Unexpected Error',
+        message: err?.message || 'An unexpected error occurred while generating invoice.',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
+  return createPortal(
     <>
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl w-full max-w-xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl w-full max-w-xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200 border border-slate-200">
           <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <div>
               <h2 className="text-xl font-black text-slate-900">Generate New Invoice</h2>
-              <p className="text-sm text-slate-500 font-medium">Create itemized patient bill.</p>
+              <p className="text-sm text-slate-500 font-medium">Create itemized patient bill & print.</p>
             </div>
             <button
               onClick={onClose}
@@ -161,11 +258,15 @@ export default function GenerateInvoiceModal({
             </button>
           </div>
 
-          <form
-            id="generate-invoice-form"
-            onSubmit={handleSubmit}
-            className="flex-1 overflow-y-auto p-8 space-y-6"
-          >
+          <div className="flex-1 overflow-y-auto p-8 space-y-6">
+            {/* Offline & Auto-save Draft Alert */}
+            <FormDraftAlert
+              hasDraft={hasDraft}
+              draftTimestamp={draftTimestamp}
+              onRestore={restoreDraft}
+              onDiscard={clearDraft}
+              lastSavedAt={lastSavedAt}
+            />
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">
                 Select Patient *
@@ -174,7 +275,7 @@ export default function GenerateInvoiceModal({
                 required
                 value={selectedPatientId}
                 onChange={(e) => setSelectedPatientId(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-brand-500/20"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
               >
                 <option value="">Choose Patient...</option>
                 {patients.map((p) => (
@@ -193,7 +294,7 @@ export default function GenerateInvoiceModal({
                 <button
                   type="button"
                   onClick={addItem}
-                  className="text-brand-600 text-xs font-bold flex items-center gap-1 hover:underline"
+                  className="text-slate-900 text-xs font-bold flex items-center gap-1 hover:underline"
                 >
                   <Plus size={14} /> Add Item
                 </button>
@@ -206,7 +307,7 @@ export default function GenerateInvoiceModal({
                     placeholder="Description (e.g. Consultation, Lab Test)"
                     value={item.description}
                     onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                    className="flex-[3] px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
+                    className="flex-[3] px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                   />
                   <input
                     type="number"
@@ -215,7 +316,7 @@ export default function GenerateInvoiceModal({
                     onChange={(e) =>
                       updateItem(idx, 'quantity', parseInt(e.target.value) || 1)
                     }
-                    className="w-16 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-center"
+                    className="w-16 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                   />
                   <input
                     type="number"
@@ -225,13 +326,13 @@ export default function GenerateInvoiceModal({
                     onChange={(e) =>
                       updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)
                     }
-                    className="w-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-right"
+                    className="w-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-right focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                   />
                   {items.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeItem(idx)}
-                      className="text-slate-400 hover:text-rose-600 p-1"
+                      className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -241,7 +342,7 @@ export default function GenerateInvoiceModal({
 
               <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
                 <span className="text-sm font-black text-slate-900">Total Invoice Amount</span>
-                <span className="text-xl font-black text-brand-600">
+                <span className="text-xl font-black text-slate-900">
                   {formatCurrencyAmount(
                     totalAmount,
                     currencyConfig.symbol,
@@ -250,27 +351,35 @@ export default function GenerateInvoiceModal({
                 </span>
               </div>
             </div>
-          </form>
+          </div>
 
-          <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3">
+          <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row gap-2.5">
             <button
               onClick={onClose}
               type="button"
-              className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-white transition-colors"
+              className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-white transition-colors"
             >
               Cancel
             </button>
             <button
               disabled={loading}
-              type="submit"
-              form="generate-invoice-form"
-              className="flex-[2] bg-brand-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+              onClick={() => handleGenerate(false)}
+              type="button"
+              className="flex-1 bg-white border border-slate-300 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
+            >
+              <Save size={14} /> Save Only
+            </button>
+            <button
+              disabled={loading}
+              onClick={() => handleGenerate(true)}
+              type="button"
+              className="flex-[1.5] bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98"
             >
               {loading ? (
-                <Loader2 className="animate-spin" size={18} />
+                <Loader2 className="animate-spin" size={15} />
               ) : (
                 <>
-                  <FileText size={18} /> Generate Invoice
+                  <Printer size={15} /> Generate & Print
                 </>
               )}
             </button>
@@ -292,6 +401,7 @@ export default function GenerateInvoiceModal({
           }
         }}
       />
-    </>
+    </>,
+    document.body
   );
 }

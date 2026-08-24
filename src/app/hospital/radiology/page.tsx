@@ -6,6 +6,8 @@ import clsx from "clsx";
 import { createClient } from "@/utils/supabase/client";
 import CreateRadiologyOrderModal from "@/components/hospital/CreateRadiologyOrderModal";
 import StatusModal from "@/components/hospital/StatusModal";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface RadiologyOrder {
   id: string;
@@ -260,6 +262,16 @@ export default function RadiologyDashboard() {
     return matchesSearch && matchesModality;
   });
 
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedOrders,
+  } = usePagination(filteredOrders, { initialPageSize: 8 });
+
   const stats = {
     total: orders.length,
     pending: orders.filter(o => o.status !== 'COMPLETED').length,
@@ -359,7 +371,7 @@ export default function RadiologyDashboard() {
               <div className="p-8 text-center text-slate-400 font-normal text-xs">
                 No radiology orders found.
               </div>
-            ) : filteredOrders.map((order) => {
+            ) : paginatedOrders.map((order) => {
               const isSelected = selectedOrder?.id === order.id;
               const patientName = `${order.patients?.first_name || 'Unknown'} ${order.patients?.last_name || ''}`;
               return (
@@ -412,6 +424,18 @@ export default function RadiologyDashboard() {
               );
             })}
           </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            itemName="orders"
+            showPageNumbers={false}
+            className="rounded-2xl border border-slate-200/80 bg-white"
+          />
         </div>
 
         {/* Right: PACS Viewer Workstation */}

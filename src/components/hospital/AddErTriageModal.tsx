@@ -1,8 +1,11 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { X, AlertTriangle, Search, Loader2, ArrowRight, ArrowLeft, CheckCircle2, Stethoscope, MapPin, User } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, AlertTriangle, Search, Loader2, ArrowRight, ArrowLeft, CheckCircle2, Stethoscope, MapPin, User, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { useFormDraft } from '@/hooks/useFormDraft';
+import { FormDraftAlert } from '@/components/common/FormDraftAlert';
 
 interface AddErTriageModalProps {
   isOpen: boolean;
@@ -11,6 +14,7 @@ interface AddErTriageModalProps {
 }
 
 export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTriageModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [existingPatients, setExistingPatients] = useState<any[]>([]);
@@ -33,6 +37,49 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
   const [location, setLocation] = useState('ER Trauma Bay 1');
 
   const supabase = createClient();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const erFormData = {
+    firstName,
+    lastName,
+    gender,
+    dob,
+    priority,
+    triageLevel,
+    chiefComplaint,
+    location,
+    selectedPatientId,
+    selectedPatientName,
+    isNewPatient,
+  };
+
+  const handleRestoreEr = (saved: any) => {
+    if (saved.firstName !== undefined) setFirstName(saved.firstName);
+    if (saved.lastName !== undefined) setLastName(saved.lastName);
+    if (saved.gender !== undefined) setGender(saved.gender);
+    if (saved.dob !== undefined) setDob(saved.dob);
+    if (saved.priority !== undefined) setPriority(saved.priority);
+    if (saved.triageLevel !== undefined) setTriageLevel(saved.triageLevel);
+    if (saved.chiefComplaint !== undefined) setChiefComplaint(saved.chiefComplaint);
+    if (saved.location !== undefined) setLocation(saved.location);
+    if (saved.selectedPatientId !== undefined) setSelectedPatientId(saved.selectedPatientId);
+    if (saved.selectedPatientName !== undefined) setSelectedPatientName(saved.selectedPatientName);
+    if (saved.isNewPatient !== undefined) setIsNewPatient(saved.isNewPatient);
+  };
+
+  const {
+    hasDraft,
+    draftTimestamp,
+    restoreDraft,
+    clearDraft,
+    lastSavedAt,
+  } = useFormDraft('er_triage', erFormData, handleRestoreEr as any, {
+    debounceMs: 300,
+    isEnabled: isOpen,
+  });
 
   useEffect(() => {
     if (searchQuery.length > 1) {
@@ -82,9 +129,16 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
     setCurrentStep(prev => (prev > 1 ? (prev - 1) as 1 | 2 | 3 : prev));
   };
 
+  if (!isOpen || !mounted) return null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateStep(1) || !validateStep(2)) return;
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setStepError('Offline Mode Active: Your emergency triage case is securely saved locally. Please wait until your connection returns to queue the patient.');
+      return;
+    }
 
     setLoading(true);
     let patientIdToUse = selectedPatientId;
@@ -125,14 +179,15 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
     if (queueErr) {
       alert(`Error logging ER triage: ${queueErr.message}`);
     } else {
+      clearDraft();
       onSuccess();
       onClose();
     }
     setLoading(false);
   };
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-xl w-full overflow-hidden border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header & Step Bar */}
@@ -158,11 +213,11 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
               currentStep === 1 
                 ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-500/20' 
                 : currentStep > 1 
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold' 
+                ? 'bg-rose-100/60 border-rose-200 text-rose-900' 
                 : 'bg-white border-slate-200 text-slate-400'
             }`}>
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
-                currentStep === 1 ? 'bg-white text-rose-600' : currentStep > 1 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                currentStep === 1 ? 'bg-white text-rose-600' : currentStep > 1 ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-400'
               }`}>
                 {currentStep > 1 ? <CheckCircle2 size={12} /> : '1'}
               </div>
@@ -173,15 +228,15 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
               currentStep === 2 
                 ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-500/20' 
                 : currentStep > 2 
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold' 
+                ? 'bg-rose-100/60 border-rose-200 text-rose-900' 
                 : 'bg-white border-slate-200 text-slate-400'
             }`}>
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
-                currentStep === 2 ? 'bg-white text-rose-600' : currentStep > 2 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                currentStep === 2 ? 'bg-white text-rose-600' : currentStep > 2 ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-400'
               }`}>
                 {currentStep > 2 ? <CheckCircle2 size={12} /> : '2'}
               </div>
-              <span className="text-[11px] font-bold truncate">Severity & Complaint</span>
+              <span className="text-[11px] font-bold truncate">Acuity</span>
             </div>
 
             <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${
@@ -189,7 +244,7 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
                 ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-500/20' 
                 : 'bg-white border-slate-200 text-slate-400'
             }`}>
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
                 currentStep === 3 ? 'bg-white text-rose-600' : 'bg-slate-100 text-slate-400'
               }`}>
                 3
@@ -201,6 +256,15 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
 
         {/* Modal Form Body */}
         <form id="er-triage-form" onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-5">
+          {/* Offline & Form Draft Alert */}
+          <FormDraftAlert
+            hasDraft={hasDraft}
+            draftTimestamp={draftTimestamp}
+            onRestore={restoreDraft}
+            onDiscard={clearDraft}
+            lastSavedAt={lastSavedAt}
+          />
+
           {stepError && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold animate-in fade-in">
               ⚠️ {stepError}
@@ -463,6 +527,7 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

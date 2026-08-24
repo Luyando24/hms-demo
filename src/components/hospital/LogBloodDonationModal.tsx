@@ -1,8 +1,11 @@
-'use client'
+'use client';
 
-import React, { useState } from 'react';
-import { X, Droplet, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Droplet, Loader2, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { useFormDraft } from '@/hooks/useFormDraft';
+import { FormDraftAlert } from '@/components/common/FormDraftAlert';
 
 interface LogBloodDonationModalProps {
   isOpen: boolean;
@@ -11,17 +14,55 @@ interface LogBloodDonationModalProps {
 }
 
 export default function LogBloodDonationModal({ isOpen, onClose, onSuccess }: LogBloodDonationModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [donorName, setDonorName] = useState('');
   const [bloodGroup, setBloodGroup] = useState('O+');
   const [units, setUnits] = useState(1);
   const [componentType, setComponentType] = useState('Whole Blood');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const supabase = createClient();
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const donationFormData = {
+    donorName,
+    bloodGroup,
+    units,
+    componentType,
+  };
+
+  const handleRestoreDonation = (saved: any) => {
+    if (saved.donorName !== undefined) setDonorName(saved.donorName);
+    if (saved.bloodGroup !== undefined) setBloodGroup(saved.bloodGroup);
+    if (saved.units !== undefined) setUnits(saved.units);
+    if (saved.componentType !== undefined) setComponentType(saved.componentType);
+  };
+
+  const {
+    hasDraft,
+    draftTimestamp,
+    restoreDraft,
+    clearDraft,
+    lastSavedAt,
+  } = useFormDraft('blood_donation', donationFormData, handleRestoreDonation as any, {
+    debounceMs: 300,
+    isEnabled: isOpen,
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setErrorMsg('Offline Mode Active: Your blood donation entry is preserved locally. Please wait until your connection returns to log donor units.');
+      return;
+    }
+
     setLoading(true);
+    setErrorMsg(null);
 
     try {
       const { error } = await supabase.rpc('log_blood_donation', {
@@ -33,10 +74,11 @@ export default function LogBloodDonationModal({ isOpen, onClose, onSuccess }: Lo
       });
       if (error) throw error;
 
+      clearDraft();
       onSuccess();
       onClose();
     } catch (err: unknown) {
-      alert(
+      setErrorMsg(
         'Error logging blood donation: ' +
           (err instanceof Error ? err.message : 'Unknown error')
       );
@@ -45,10 +87,10 @@ export default function LogBloodDonationModal({ isOpen, onClose, onSuccess }: Lo
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-md w-full p-8 border border-slate-200 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
@@ -66,6 +108,21 @@ export default function LogBloodDonationModal({ isOpen, onClose, onSuccess }: Lo
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Offline & Auto-save Draft Alert */}
+          <FormDraftAlert
+            hasDraft={hasDraft}
+            draftTimestamp={draftTimestamp}
+            onRestore={restoreDraft}
+            onDiscard={clearDraft}
+            lastSavedAt={lastSavedAt}
+          />
+
+          {errorMsg && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold animate-in fade-in">
+              ⚠️ {errorMsg}
+            </div>
+          )}
+
           <div>
             <label className="text-xs font-bold text-slate-700">Donor Name</label>
             <input 
@@ -137,6 +194,7 @@ export default function LogBloodDonationModal({ isOpen, onClose, onSuccess }: Lo
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

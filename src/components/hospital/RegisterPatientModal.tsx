@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   User,
@@ -21,11 +22,14 @@ import {
   Send,
   CornerDownRight,
   ShieldCheck,
+  WifiOff,
 } from 'lucide-react';
 import StatusModal from './StatusModal';
 import { registerPatientAction } from '@/app/hospital/actions';
 import { SearchableCombobox } from '../ui/SearchableCombobox';
 import { createClient } from '@/utils/supabase/client';
+import { useFormDraft } from '@/hooks/useFormDraft';
+import { FormDraftAlert } from '@/components/common/FormDraftAlert';
 import clsx from 'clsx';
 
 type PatientNextAction = 'TRIAGE' | 'DOCTOR' | 'BILLING' | 'NONE';
@@ -39,6 +43,7 @@ export default function RegisterPatientModal({
   onClose: () => void;
   onSuccess?: () => void;
 }) {
+  const [mounted, setMounted] = useState(false);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [nextAction, setNextAction] = useState<PatientNextAction>('TRIAGE');
@@ -48,9 +53,13 @@ export default function RegisterPatientModal({
     message: string;
   } | null>(null);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const supabase = createClient();
 
-  // Controlled Form State for smooth multi-step validation
+  // Controlled Form State with Auto-save Draft Recovery
   const [formData, setFormData] = useState({
     file_number: '',
     first_name: '',
@@ -66,9 +75,20 @@ export default function RegisterPatientModal({
     insurance_policy_number: '',
   });
 
+  const {
+    hasDraft,
+    draftTimestamp,
+    restoreDraft,
+    clearDraft,
+    lastSavedAt,
+  } = useFormDraft('patient_registration', formData, setFormData, {
+    debounceMs: 300,
+    isEnabled: isOpen,
+  });
+
   const [stepError, setStepError] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
@@ -113,6 +133,15 @@ export default function RegisterPatientModal({
       return;
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setStatus({
+        type: 'error',
+        title: 'Offline Mode Active',
+        message: 'Your patient registration draft is securely saved locally. Please wait until internet connection returns to finalize hospital census routing.',
+      });
+      return;
+    }
+
     setLoading(true);
     const patientPayload = {
       ...(formData.file_number.trim() ? { file_number: formData.file_number.trim() } : {}),
@@ -140,6 +169,9 @@ export default function RegisterPatientModal({
       setLoading(false);
       return;
     }
+
+    // Clear auto-saved draft on confirmed success
+    clearDraft();
 
     const createdPatientId = result.patientId;
     const tokenNumber = `${Math.floor(100 + Math.random() * 900)}`;
@@ -245,10 +277,10 @@ export default function RegisterPatientModal({
     },
   ];
 
-  return (
+  return createPortal(
     <>
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200 border border-slate-200">
           {/* Header & Step Wizard Bar */}
           <div className="p-5 border-b border-slate-100 bg-white shrink-0">
             <div className="flex items-center justify-between mb-3">
@@ -339,6 +371,15 @@ export default function RegisterPatientModal({
             onSubmit={handleSubmit}
             className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4"
           >
+            {/* Offline & Form Draft Recovery Alert */}
+            <FormDraftAlert
+              hasDraft={hasDraft}
+              draftTimestamp={draftTimestamp}
+              onRestore={restoreDraft}
+              onDiscard={clearDraft}
+              lastSavedAt={lastSavedAt}
+            />
+
             {stepError && (
               <div className="p-3 bg-rose-50 border border-rose-200/60 rounded-xl text-rose-700 text-xs font-medium animate-in fade-in">
                 ⚠️ {stepError}
@@ -630,6 +671,7 @@ export default function RegisterPatientModal({
           }
         }}
       />
-    </>
+    </>,
+    document.body
   );
 }

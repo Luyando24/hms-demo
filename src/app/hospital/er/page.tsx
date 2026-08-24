@@ -6,6 +6,8 @@ import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import AddErTriageModal from "@/components/hospital/AddErTriageModal";
 import StatusModal from "@/components/hospital/StatusModal";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 import clsx from "clsx";
 
 interface ErQueueItem {
@@ -102,6 +104,16 @@ export default function EmergencyDashboard() {
     const matchesPriority = filterPriority === 'ALL' || c.priority === filterPriority;
     return matchesSearch && matchesPriority;
   });
+
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedCases,
+  } = usePagination(filteredCases, { initialPageSize: 10 });
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -249,7 +261,7 @@ export default function EmergencyDashboard() {
                   <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 font-bold text-xs uppercase">Loading ER Triage Cases...</td></tr>
                 ) : filteredCases.length === 0 ? (
                   <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 font-bold text-xs uppercase">No emergency queue records found.</td></tr>
-                ) : filteredCases.map((row) => {
+                ) : paginatedCases.map((row) => {
                   const pName = row.patients ? `${row.patients.first_name} ${row.patients.last_name}` : 'Walk-in ER Patient';
                   const pAge = row.patients?.dob ? new Date().getFullYear() - new Date(row.patients.dob).getFullYear() : 'N/A';
                   const gender = row.patients?.gender || 'N/A';
@@ -301,6 +313,15 @@ export default function EmergencyDashboard() {
                 })}
               </tbody>
             </table>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              itemName="ER cases"
+            />
           </div>
         </div>
       </section>

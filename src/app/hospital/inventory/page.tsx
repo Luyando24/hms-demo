@@ -8,6 +8,8 @@ import UpdateStockModal from "@/components/hospital/UpdateStockModal";
 import AddItemModal from "@/components/hospital/AddItemModal";
 import DispenseMedicationModal from "@/components/hospital/DispenseMedicationModal";
 import StatusModal from "@/components/hospital/StatusModal";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface InventoryItem {
   id: string;
@@ -133,6 +135,16 @@ export default function InventoryDashboard() {
     return matchesSearch && matchesCategory;
   });
 
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedItems,
+  } = usePagination(filteredItems, { initialPageSize: 10 });
+
   const stats = {
     totalItems: items.length,
     outOfStock: items.filter(i => i.stock_level === 0).length,
@@ -252,7 +264,7 @@ export default function InventoryDashboard() {
                   </tr>
                 ) : filteredItems.length === 0 ? (
                   <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 font-normal">No items found matching filter.</td></tr>
-                ) : filteredItems.map((item) => {
+                ) : paginatedItems.map((item) => {
                   const reorderVal = item.reorder_level || item.min_reorder_level || 50;
                   const isOut = item.stock_level === 0;
                   const isLow = !isOut && item.stock_level <= reorderVal;
@@ -309,6 +321,15 @@ export default function InventoryDashboard() {
                 })}
               </tbody>
             </table>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              itemName="items"
+            />
           </div>
         </div>
 

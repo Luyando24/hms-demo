@@ -27,6 +27,8 @@ import { createClient } from "@/utils/supabase/client";
 import AddStaffModal from "@/components/hospital/AddStaffModal";
 import ProcessPayrollModal from "@/components/hospital/ProcessPayrollModal";
 import StatusModal from "@/components/hospital/StatusModal";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 import { formatCurrencyAmount } from "@/utils/currency";
 
 interface StaffProfile {
@@ -224,6 +226,26 @@ export default function HRDashboard() {
     }
   };
 
+  const {
+    currentPage: payrollPage,
+    setCurrentPage: setPayrollPage,
+    pageSize: payrollPageSize,
+    setPageSize: setPayrollPageSize,
+    totalItems: totalPayroll,
+    totalPages: totalPayrollPages,
+    paginatedItems: paginatedPayroll,
+  } = usePagination(payrollRecords, { initialPageSize: 5 });
+
+  const {
+    currentPage: leavePage,
+    setCurrentPage: setLeavePage,
+    pageSize: leavePageSize,
+    setPageSize: setLeavePageSize,
+    totalItems: totalLeave,
+    totalPages: totalLeavePages,
+    paginatedItems: paginatedLeave,
+  } = usePagination(leaveRequests, { initialPageSize: 5 });
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
@@ -345,7 +367,7 @@ export default function HRDashboard() {
                         No payroll records processed yet. Click &quot;Process Payroll&quot; to disburse.
                       </td>
                     </tr>
-                  ) : payrollRecords.map((row) => (
+                  ) : paginatedPayroll.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4">
                         <p className="font-bold text-slate-900">
@@ -370,6 +392,15 @@ export default function HRDashboard() {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                currentPage={payrollPage}
+                totalPages={totalPayrollPages}
+                totalItems={totalPayroll}
+                pageSize={payrollPageSize}
+                onPageChange={setPayrollPage}
+                onPageSizeChange={setPayrollPageSize}
+                itemName="payroll records"
+              />
             </div>
           </div>
 
@@ -390,7 +421,7 @@ export default function HRDashboard() {
                 <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-slate-400 font-bold text-xs uppercase tracking-wider">
                   No active leave requests recorded.
                 </div>
-              ) : leaveRequests.map((req) => (
+              ) : paginatedLeave.map((req) => (
                 <div key={req.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
@@ -433,6 +464,16 @@ export default function HRDashboard() {
                   </div>
                 </div>
               ))}
+              <Pagination
+                currentPage={leavePage}
+                totalPages={totalLeavePages}
+                totalItems={totalLeave}
+                pageSize={leavePageSize}
+                onPageChange={setLeavePage}
+                onPageSizeChange={setLeavePageSize}
+                itemName="leave requests"
+                showPageNumbers={false}
+              />
             </div>
           </div>
         </div>

@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { X, Search, BedDouble, User, Calendar, Save, Loader2, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, Search, BedDouble, User, Calendar, Save, Loader2, ArrowRight, ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { useFormDraft } from '@/hooks/useFormDraft';
+import { FormDraftAlert } from '@/components/common/FormDraftAlert';
 import clsx from 'clsx';
 
 interface NewAdmissionModalProps {
@@ -12,6 +15,7 @@ interface NewAdmissionModalProps {
 }
 
 export default function NewAdmissionModal({ isOpen, onClose, onSuccess }: NewAdmissionModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
   const [patients, setPatients] = useState<any[]>([]);
@@ -25,6 +29,37 @@ export default function NewAdmissionModal({ isOpen, onClose, onSuccess }: NewAdm
   const [stepError, setStepError] = useState<string | null>(null);
 
   const supabase = createClient();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const admissionFormData = {
+    selectedPatient,
+    selectedPatientObj,
+    selectedBed,
+    selectedBedObj,
+    admissionReason,
+  };
+
+  const handleRestoreAdmission = (saved: any) => {
+    if (saved.selectedPatient !== undefined) setSelectedPatient(saved.selectedPatient);
+    if (saved.selectedPatientObj !== undefined) setSelectedPatientObj(saved.selectedPatientObj);
+    if (saved.selectedBed !== undefined) setSelectedBed(saved.selectedBed);
+    if (saved.selectedBedObj !== undefined) setSelectedBedObj(saved.selectedBedObj);
+    if (saved.admissionReason !== undefined) setAdmissionReason(saved.admissionReason);
+  };
+
+  const {
+    hasDraft,
+    draftTimestamp,
+    restoreDraft,
+    clearDraft,
+    lastSavedAt,
+  } = useFormDraft('new_admission', admissionFormData, handleRestoreAdmission as any, {
+    debounceMs: 300,
+    isEnabled: isOpen,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -54,7 +89,7 @@ export default function NewAdmissionModal({ isOpen, onClose, onSuccess }: NewAdm
     if (data) setPatients(data);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const validateStep = (step: number): boolean => {
     if (step === 1) {
@@ -82,6 +117,11 @@ export default function NewAdmissionModal({ isOpen, onClose, onSuccess }: NewAdm
     e.preventDefault();
     if (!selectedPatient || !selectedBed) return;
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setStepError('Offline Mode Active: Your ward admission draft is preserved locally. Please wait until your connection returns to confirm bed placement.');
+      return;
+    }
+
     setLoading(true);
     const { error: admissionError } = await supabase
       .from('admissions')
@@ -98,6 +138,7 @@ export default function NewAdmissionModal({ isOpen, onClose, onSuccess }: NewAdm
         .update({ status: 'OCCUPIED' })
         .eq('id', selectedBed);
       
+      clearDraft();
       onSuccess();
       onClose();
     } else {
@@ -106,9 +147,9 @@ export default function NewAdmissionModal({ isOpen, onClose, onSuccess }: NewAdm
     setLoading(false);
   };
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
+  return createPortal(
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200 border border-slate-200">
         
         {/* Header & Wizard Bar */}
         <div className="p-6 border-b border-slate-100 bg-slate-50/50">
@@ -159,6 +200,15 @@ export default function NewAdmissionModal({ isOpen, onClose, onSuccess }: NewAdm
 
         {/* Modal Form Body */}
         <form id="admission-form" onSubmit={handleAdmit} className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6">
+          {/* Offline & Form Draft Alert */}
+          <FormDraftAlert
+            hasDraft={hasDraft}
+            draftTimestamp={draftTimestamp}
+            onRestore={restoreDraft}
+            onDiscard={clearDraft}
+            lastSavedAt={lastSavedAt}
+          />
+
           {stepError && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold animate-in fade-in">
               ⚠️ {stepError}
@@ -332,6 +382,7 @@ export default function NewAdmissionModal({ isOpen, onClose, onSuccess }: NewAdm
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

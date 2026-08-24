@@ -23,6 +23,8 @@ import clsx from "clsx";
 import CaptureVitalsModal from "@/components/hospital/CaptureVitalsModal";
 import ConsultationModal from "@/components/hospital/ConsultationModal";
 import RegisterPatientModal from "@/components/hospital/RegisterPatientModal";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 import Link from "next/link";
 
 interface DoctorItem {
@@ -148,6 +150,16 @@ export default function OutpatientDashboard() {
     const matchesStatus = filterStatus === 'ALL' || item.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedQueue,
+  } = usePagination(filteredQueue, { initialPageSize: 10 });
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -287,7 +299,7 @@ export default function OutpatientDashboard() {
                     <p className="text-slate-500 font-medium text-xs">No OPD queue records found.</p>
                   </td>
                 </tr>
-              ) : filteredQueue.map((item) => (
+              ) : paginatedQueue.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
                   <td className="px-4 py-3.5">
                     <span className="font-mono text-xs font-bold text-slate-700">#{item.id.slice(0, 8)}</span>
@@ -369,6 +381,15 @@ export default function OutpatientDashboard() {
               ))}
             </tbody>
           </table>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            itemName="queue items"
+          />
         </div>
       </section>
 

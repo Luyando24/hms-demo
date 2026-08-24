@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { FileText, Shield, Calendar, AlertTriangle, Plus, Search, ExternalLink, Download, Trash2, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function ManagementDashboard() {
   const [documents, setDocuments] = useState<any[]>([]);
@@ -30,6 +32,16 @@ export default function ManagementDashboard() {
     doc.issuer?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     doc.document_type.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedDocs,
+  } = usePagination(filteredDocs, { initialPageSize: 10 });
 
   const stats = {
     total: documents.length,
@@ -111,7 +123,7 @@ export default function ManagementDashboard() {
                 <tr><td colSpan={6} className="px-8 py-12 text-center text-slate-400 font-bold uppercase tracking-widest">Loading registry...</td></tr>
               ) : filteredDocs.length === 0 ? (
                 <tr><td colSpan={6} className="px-8 py-12 text-center text-slate-400 font-bold uppercase tracking-widest">No documents found</td></tr>
-              ) : filteredDocs.map((doc) => (
+              ) : paginatedDocs.map((doc) => (
                 <tr key={doc.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
@@ -162,6 +174,15 @@ export default function ManagementDashboard() {
               ))}
             </tbody>
           </table>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            itemName="documents"
+          />
         </div>
       </div>
     </div>

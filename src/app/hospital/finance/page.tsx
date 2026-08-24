@@ -18,6 +18,8 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import { formatCurrencyAmount } from '@/utils/currency';
 import clsx from 'clsx';
+import { Pagination } from '@/components/ui/Pagination';
+import { usePagination } from '@/hooks/usePagination';
 
 export default function FinanceDashboard() {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -81,6 +83,16 @@ export default function FinanceDashboard() {
   const pendingCount = invoices.filter(
     (inv) => inv.status === 'UNPAID' || inv.status === 'PARTIAL',
   ).length;
+
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedExpenses,
+  } = usePagination(expenses, { initialPageSize: 6 });
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -198,7 +210,7 @@ export default function FinanceDashboard() {
                   No expenses recorded
                 </div>
               ) : (
-                expenses.map((exp) => (
+                paginatedExpenses.map((exp) => (
                   <div
                     key={exp.id}
                     className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors group"
@@ -242,9 +254,16 @@ export default function FinanceDashboard() {
               )}
             </div>
 
-            <button className="w-full mt-8 py-4 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-slate-600 transition-colors">
-              Load More Transactions
-            </button>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              itemName="expenses"
+              className="mt-6 border-t border-slate-100 pt-4"
+            />
           </div>
         </div>
 

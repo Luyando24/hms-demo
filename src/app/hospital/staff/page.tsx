@@ -11,8 +11,6 @@ import {
   MoreVertical, 
   Edit2, 
   Trash2, 
-  ChevronLeft, 
-  ChevronRight,
   Filter,
   RefreshCw,
   KeyRound,
@@ -24,6 +22,7 @@ import AddStaffModal from "@/components/hospital/AddStaffModal";
 import EditStaffModal from "@/components/hospital/EditStaffModal";
 import ChangeStaffPasswordModal from "@/components/hospital/ChangeStaffPasswordModal";
 import StatusModal from "@/components/hospital/StatusModal";
+import { Pagination } from "@/components/ui/Pagination";
 import { deleteStaffAction } from "@/app/hospital/actions";
 
 const PAGE_SIZE = 10;
@@ -282,47 +281,14 @@ export default function StaffDirectory() {
           </table>
         </div>
 
-        {/* Pagination Footer */}
-        <div className="px-4 py-3 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
-          <p className="text-xs text-slate-400 font-normal">
-            Showing <span className="text-slate-900 font-semibold">{staff.length}</span> of <span className="text-slate-900 font-semibold">{totalCount}</span> staff
-          </p>
-          <div className="flex items-center gap-1.5">
-            <button 
-              disabled={currentPage === 1 || loading}
-              onClick={() => setCurrentPage(prev => prev - 1)}
-              className="p-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-30 transition-all shadow-xs"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <button 
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={clsx(
-                      "w-7 h-7 rounded-lg text-xs font-semibold transition-all",
-                      currentPage === pageNum 
-                        ? "bg-slate-900 text-white shadow-xs" 
-                        : "text-slate-600 hover:bg-slate-100"
-                    )}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-            </div>
-            <button 
-              disabled={currentPage === totalPages || totalPages === 0 || loading}
-              onClick={() => setCurrentPage(prev => prev + 1)}
-              className="p-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-30 transition-all shadow-xs"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalCount}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
+          itemName="staff"
+        />
       </div>
 
       <AddStaffModal 

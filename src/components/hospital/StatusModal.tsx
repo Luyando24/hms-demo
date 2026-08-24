@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { CheckCircle2, AlertCircle, X } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -21,14 +22,15 @@ export default function StatusModal({
   message,
   actionLabel = 'Continue'
 }: StatusModalProps) {
-  // StatusModal relies on visual confirmation rather than spoken TTS voice announcements
+  const [mounted, setMounted] = useState(false)
+
   useEffect(() => {
-    // Silent confirmation
-  }, [isOpen]);
+    setMounted(true)
+  }, [])
 
-  if (!isOpen) return null
+  if (!isOpen || !mounted) return null
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-[100] flex items-center justify-center p-4 animate-in fade-in duration-150">
       <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl border border-slate-200/80 animate-in zoom-in-95 duration-150">
         <div className="p-6 flex flex-col items-center text-center">
@@ -60,6 +62,7 @@ export default function StatusModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

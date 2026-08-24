@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Activity,
   Beaker,
@@ -23,6 +24,7 @@ import {
   Trash2,
   UserCheck,
   X,
+  ShieldCheck,
 } from 'lucide-react';
 import clsx from 'clsx';
 import StatusModal from './StatusModal';
@@ -30,6 +32,8 @@ import { createClient } from '@/utils/supabase/client';
 import { formatCurrencyAmount } from '@/utils/currency';
 import type { Database, Json } from '@/types/supabase';
 import { SearchableCombobox } from '../ui/SearchableCombobox';
+import { useFormDraft } from '@/hooks/useFormDraft';
+import { FormDraftAlert } from '@/components/common/FormDraftAlert';
 
 type InventoryItem = Database['public']['Tables']['inventory_items']['Row'];
 type Vital = Database['public']['Tables']['vitals']['Row'];
@@ -99,6 +103,7 @@ export default function ConsultationModal({
   patientName,
   queueId,
 }: ConsultationModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [supabase] = useState(() => createClient());
   const [loading, setLoading] = useState(false);
   const [vitals, setVitals] = useState<Vital | null>(null);
@@ -130,6 +135,43 @@ export default function ConsultationModal({
     title: string;
     message: string;
   } | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const consultationDraftBundle = {
+    notes,
+    medications,
+    labTests,
+    radiologyStudies,
+    charges,
+    disposition,
+    admissionReason,
+    externalReferralData,
+  };
+
+  const handleRestoreConsultation = (saved: any) => {
+    if (saved.notes) setNotes(saved.notes);
+    if (saved.medications) setMedications(saved.medications);
+    if (saved.labTests) setLabTests(saved.labTests);
+    if (saved.radiologyStudies) setRadiologyStudies(saved.radiologyStudies);
+    if (saved.charges) setCharges(saved.charges);
+    if (saved.disposition) setDisposition(saved.disposition);
+    if (saved.admissionReason) setAdmissionReason(saved.admissionReason);
+    if (saved.externalReferralData) setExternalReferralData(saved.externalReferralData);
+  };
+
+  const {
+    hasDraft,
+    draftTimestamp,
+    restoreDraft,
+    clearDraft,
+    lastSavedAt,
+  } = useFormDraft(`consultation_${patientId}`, consultationDraftBundle, handleRestoreConsultation as any, {
+    debounceMs: 400,
+    isEnabled: isOpen,
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -219,6 +261,7 @@ export default function ConsultationModal({
     setIsCustomDisposition(false);
     setAdmissionReason('Observation & Inpatient Management');
     setExternalReferralData({ destination: '', reason: '' });
+    clearDraft();
   }
 
   function addMedication() {
@@ -298,6 +341,15 @@ export default function ConsultationModal({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setStatus({
+        type: 'error',
+        title: 'Offline Mode Active',
+        message: 'Your clinical notes, diagnosis, and orders are securely preserved in your local draft. Please wait until your connection returns to finalize and route the patient.',
+      });
+      return;
+    }
 
     if (
       medications.some(
@@ -558,7 +610,7 @@ export default function ConsultationModal({
     }
   }
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const tabs: Array<{ id: TabId; label: string; icon: typeof FileText; count?: number }> = [
     { id: 'notes', label: 'Clinical Notes', icon: FileText },
@@ -652,10 +704,10 @@ export default function ConsultationModal({
 
   const activeDispositionInfo = getDispositionDetails();
 
-  return (
+  return createPortal(
     <>
-      <div className='fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 sm:p-4 backdrop-blur-sm'>
-        <div className='flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200'>
+      <div className='fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 sm:p-4 backdrop-blur-xs'>
+        <div className='flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200 border border-slate-200'>
           
           {/* Header */}
           <div className='flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5 sm:p-6 shrink-0'>
@@ -755,6 +807,15 @@ export default function ConsultationModal({
                 onSubmit={handleSubmit}
                 className='flex-1 overflow-y-auto p-5 sm:p-7 space-y-6'
               >
+                {/* Offline & Auto-save Draft Recovery Alert */}
+                <FormDraftAlert
+                  hasDraft={hasDraft}
+                  draftTimestamp={draftTimestamp}
+                  onRestore={restoreDraft}
+                  onDiscard={clearDraft}
+                  lastSavedAt={lastSavedAt}
+                />
+
                 {/* TAB 1: CLINICAL NOTES */}
                 {activeTab === 'notes' && (
                   <div className='space-y-5 animate-in fade-in duration-150'>
@@ -1352,7 +1413,8 @@ export default function ConsultationModal({
           if (succeeded) onClose();
         }}
       />
-    </>
+    </>,
+    document.body
   );
 }
 

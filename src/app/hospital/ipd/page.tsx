@@ -6,6 +6,8 @@ import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 import NewAdmissionModal from "@/components/hospital/NewAdmissionModal";
 import StatusModal from "@/components/hospital/StatusModal";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 const bedStatusStyles = {
   VACANT: "bg-emerald-50 text-emerald-700 border-emerald-100",
@@ -163,6 +165,16 @@ export default function InpatientDashboard() {
     return matchesWard && matchesSearch;
   });
 
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedBeds,
+  } = usePagination(filteredBeds, { initialPageSize: 8 });
+
   const stats = {
     total: beds.length,
     occupied: beds.filter(b => b.status === 'OCCUPIED').length,
@@ -278,7 +290,7 @@ export default function InpatientDashboard() {
             <div className="col-span-full py-12 text-center text-slate-400 font-normal text-xs">
               No beds found matching your search query.
             </div>
-          ) : filteredBeds.map((bed) => {
+          ) : paginatedBeds.map((bed) => {
             const patient = getBedPatient(bed);
             const activeAdmission = getActiveAdmission(bed);
             
@@ -297,8 +309,8 @@ export default function InpatientDashboard() {
                     <span className={clsx(
                       "inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full border",
                       bed.status === 'OCCUPIED' ? "bg-blue-50 text-blue-700 border-blue-200/60" : 
-                      bed.status === 'VACANT' ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" :
-                      bed.status === 'CLEANING' ? "bg-amber-50 text-amber-700 border-amber-200/60" :
+                      bed.status === 'VACANT' ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" : 
+                      bed.status === 'CLEANING' ? "bg-amber-50 text-amber-700 border-amber-200/60" : 
                       "bg-slate-100 text-slate-700 border-slate-200/60"
                     )}>
                       <span className={clsx(
@@ -374,6 +386,16 @@ export default function InpatientDashboard() {
             );
           })}
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          itemName="beds"
+          className="rounded-2xl border border-slate-200/80 bg-white shadow-xs mt-3"
+        />
       </section>
 
       {/* Ward Activity Feed */}

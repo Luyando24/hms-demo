@@ -7,6 +7,8 @@ import { createClient } from "@/utils/supabase/client";
 import CreateLabOrderModal from "@/components/hospital/CreateLabOrderModal";
 import EnterLabResultModal from "@/components/hospital/EnterLabResultModal";
 import StatusModal from "@/components/hospital/StatusModal";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface LabOrder {
   id: string;
@@ -103,6 +105,16 @@ export default function LaboratoryDashboard() {
     const matchesStatus = statusFilter === 'ALL' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedOrders,
+  } = usePagination(filteredOrders, { initialPageSize: 10 });
 
   const stats = {
     total: orders.length,
@@ -215,7 +227,7 @@ export default function LaboratoryDashboard() {
                     No laboratory orders found.
                   </td>
                 </tr>
-              ) : filteredOrders.map((order) => {
+              ) : paginatedOrders.map((order) => {
                 const result = order.lab_results?.[0];
                 const patientName = `${order.patients?.first_name || 'Unknown'} ${order.patients?.last_name || ''}`;
                 return (
@@ -290,6 +302,15 @@ export default function LaboratoryDashboard() {
               })}
             </tbody>
           </table>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            itemName="specimens"
+          />
         </div>
       </div>
 

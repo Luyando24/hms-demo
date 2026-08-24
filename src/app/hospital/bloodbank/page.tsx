@@ -6,6 +6,8 @@ import clsx from "clsx";
 import { createClient } from "@/utils/supabase/client";
 import LogBloodDonationModal from "@/components/hospital/LogBloodDonationModal";
 import StatusModal from "@/components/hospital/StatusModal";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface BloodStockItem {
   blood_group: string;
@@ -129,6 +131,16 @@ export default function BloodBankDashboard() {
     d.blood_group?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedDonations,
+  } = usePagination(filteredDonations, { initialPageSize: 8 });
+
   const totalReserveUnits = bloodStock.reduce((sum, s) => sum + s.units_in_stock, 0);
   const criticalGroups = bloodStock.filter(s => s.status === 'critical');
 
@@ -239,7 +251,7 @@ export default function BloodBankDashboard() {
                     <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 font-bold text-xs">Loading donor registry...</td></tr>
                   ) : filteredDonations.length === 0 ? (
                     <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 font-bold text-xs">No donor records found.</td></tr>
-                  ) : filteredDonations.map((row) => (
+                  ) : paginatedDonations.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4 font-bold text-slate-900">{row.donor_name || 'Anonymous Donor'}</td>
                       <td className="px-6 py-4 font-black text-rose-600">{row.blood_group}</td>
@@ -254,6 +266,15 @@ export default function BloodBankDashboard() {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                itemName="donors"
+              />
             </div>
           </div>
         </div>

@@ -1,9 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { X, DollarSign, Calculator, Loader2, Save, FileText, CheckCircle2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, DollarSign, Calculator, Loader2, Save, FileText, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { formatCurrencyAmount } from '@/utils/currency';
+import { useFormDraft } from '@/hooks/useFormDraft';
+import { FormDraftAlert } from '@/components/common/FormDraftAlert';
 
 interface ProcessPayrollModalProps {
   isOpen: boolean;
@@ -20,6 +23,7 @@ export default function ProcessPayrollModal({
   currencySymbol = '$',
   currencyPosition = 'prefix'
 }: ProcessPayrollModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetchingStaff, setFetchingStaff] = useState(true);
   const [staffList, setStaffList] = useState<any[]>([]);
@@ -30,8 +34,42 @@ export default function ProcessPayrollModal({
   const [allowances, setAllowances] = useState<number>(500);
   const [deductions, setDeductions] = useState<number>(350);
   const [paymentMethod, setPaymentMethod] = useState<string>('BANK_TRANSFER');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const supabase = createClient();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const payrollFormData = {
+    payPeriod,
+    selectedStaffId,
+    baseSalary,
+    allowances,
+    deductions,
+    paymentMethod,
+  };
+
+  const handleRestorePayroll = (saved: any) => {
+    if (saved.payPeriod !== undefined) setPayPeriod(saved.payPeriod);
+    if (saved.selectedStaffId !== undefined) setSelectedStaffId(saved.selectedStaffId);
+    if (saved.baseSalary !== undefined) setBaseSalary(saved.baseSalary);
+    if (saved.allowances !== undefined) setAllowances(saved.allowances);
+    if (saved.deductions !== undefined) setDeductions(saved.deductions);
+    if (saved.paymentMethod !== undefined) setPaymentMethod(saved.paymentMethod);
+  };
+
+  const {
+    hasDraft,
+    draftTimestamp,
+    restoreDraft,
+    clearDraft,
+    lastSavedAt,
+  } = useFormDraft('process_payroll', payrollFormData, handleRestorePayroll as any, {
+    debounceMs: 300,
+    isEnabled: isOpen,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -50,12 +88,14 @@ export default function ProcessPayrollModal({
 
     if (data && data.length > 0) {
       setStaffList(data);
-      setSelectedStaffId(data[0].id);
+      if (!selectedStaffId) {
+        setSelectedStaffId(data[0].id);
+      }
     }
     setFetchingStaff(false);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const netSalary = Math.max(0, baseSalary + allowances - deductions);
 
@@ -66,7 +106,14 @@ export default function ProcessPayrollModal({
       return;
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setErrorMsg('Offline Mode Active: Your payroll calculation is preserved locally. Please wait until your connection returns to disburse.');
+      return;
+    }
+
     setLoading(true);
+    setErrorMsg(null);
+
     try {
       const { error } = await supabase
         .from('payroll_records')
@@ -83,17 +130,18 @@ export default function ProcessPayrollModal({
 
       if (error) throw error;
 
+      clearDraft();
       onSuccess();
       onClose();
     } catch (err: any) {
-      alert('Error processing payroll record: ' + err.message);
+      setErrorMsg('Error processing payroll record: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-xl w-full p-8 border border-slate-200 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200">
         
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -112,6 +160,21 @@ export default function ProcessPayrollModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Offline & Auto-save Draft Alert */}
+          <FormDraftAlert
+            hasDraft={hasDraft}
+            draftTimestamp={draftTimestamp}
+            onRestore={restoreDraft}
+            onDiscard={clearDraft}
+            lastSavedAt={lastSavedAt}
+          />
+
+          {errorMsg && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold animate-in fade-in">
+              ⚠️ {errorMsg}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Pay Period</label>
@@ -120,83 +183,82 @@ export default function ProcessPayrollModal({
                 required
                 value={payPeriod}
                 onChange={(e) => setPayPeriod(e.target.value)}
-                placeholder="e.g. July 2026"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 mt-1"
+                placeholder="e.g. August 2026"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 mt-1 font-bold"
               />
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Disbursement Method</label>
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Employee Staff *</label>
               <select 
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 mt-1"
+                value={selectedStaffId}
+                onChange={(e) => setSelectedStaffId(e.target.value)}
+                disabled={fetchingStaff}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 mt-1 font-bold text-slate-900"
               >
-                <option value="BANK_TRANSFER">Bank Direct Deposit</option>
-                <option value="CHEQUE">Corporate Cheque</option>
-                <option value="MOBILE_MONEY">Mobile Money Transfer</option>
-                <option value="CASH">Cash Disbursement</option>
+                {fetchingStaff ? (
+                  <option>Loading staff list...</option>
+                ) : (
+                  staffList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.first_name} {s.last_name} ({s.role})
+                    </option>
+                  ))
+                )}
               </select>
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Select Staff Member</label>
-            {fetchingStaff ? (
-              <div className="p-3 text-xs text-slate-400 font-bold animate-pulse">Loading staff roster...</div>
-            ) : (
-              <select 
-                required
-                value={selectedStaffId}
-                onChange={(e) => setSelectedStaffId(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500/20 mt-1"
-              >
-                {staffList.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.first_name} {s.last_name} ({s.role}) &bull; {s.staff_number || 'STF-ID'}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* Salary Component Breakdown */}
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Earnings & Deductions Calculator</h3>
+          <div className="p-5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-4">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Salary Breakdown</h3>
             
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Base Salary</label>
+                <label className="text-[11px] font-bold text-slate-600">Base Salary</label>
                 <input 
-                  type="number"
-                  step="10"
+                  type="number" 
+                  min="0"
                   value={baseSalary}
-                  onChange={(e) => setBaseSalary(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setBaseSalary(Number(e.target.value) || 0)}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500/20 mt-1"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-emerald-600 uppercase">Allowances (+)</label>
+                <label className="text-[11px] font-bold text-emerald-600">+ Allowances</label>
                 <input 
-                  type="number"
-                  step="10"
+                  type="number" 
+                  min="0"
                   value={allowances}
-                  onChange={(e) => setAllowances(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-emerald-600 focus:ring-2 focus:ring-emerald-500/20 mt-1"
+                  onChange={(e) => setAllowances(Number(e.target.value) || 0)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500/20 mt-1 text-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-rose-600 uppercase">PAYE / Deductions (-)</label>
+                <label className="text-[11px] font-bold text-rose-600">- Deductions (Tax/SSN)</label>
                 <input 
-                  type="number"
-                  step="10"
+                  type="number" 
+                  min="0"
                   value={deductions}
-                  onChange={(e) => setDeductions(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-rose-600 focus:ring-2 focus:ring-rose-500/20 mt-1"
+                  onChange={(e) => setDeductions(Number(e.target.value) || 0)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500/20 mt-1 text-rose-600"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-600">Payment Channel</label>
+              <select 
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500/20 mt-1 text-slate-900"
+              >
+                <option value="BANK_TRANSFER">Direct Bank Deposit / Wire</option>
+                <option value="CASH">Cash in Hand</option>
+                <option value="CHEQUE">Corporate Cheque</option>
+                <option value="MOBILE_MONEY">Mobile Money</option>
+              </select>
             </div>
 
             {/* Net Calculation Summary */}
@@ -227,6 +289,7 @@ export default function ProcessPayrollModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

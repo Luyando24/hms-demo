@@ -26,6 +26,7 @@ import RegisterPatientModal from '@/components/hospital/RegisterPatientModal';
 import EditPatientModal from '@/components/hospital/EditPatientModal';
 import StatusModal from '@/components/hospital/StatusModal';
 import { deletePatientAction } from '@/app/hospital/actions';
+import { Pagination } from '@/components/ui/Pagination';
 import clsx from 'clsx';
 
 export default function PatientsPage() {
@@ -366,45 +367,14 @@ export default function PatientsPage() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="p-6 border-t border-slate-50 flex items-center justify-between">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-              Showing <span className="text-slate-900">{(page - 1) * pageSize + 1}</span> to <span className="text-slate-900">{Math.min(page * pageSize, totalCount)}</span> of <span className="text-slate-900">{totalCount}</span> records
-            </p>
-            <div className="flex gap-2">
-              <button 
-                disabled={page === 1}
-                onClick={() => setPage(prev => prev - 1)}
-                className="p-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-all shadow-sm"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <div className="flex gap-1">
-                {[...Array(totalPages)].map((_, i) => (
-                  <button
-                    key={i + 1}
-                    onClick={() => setPage(i + 1)}
-                    className={clsx(
-                      "w-10 h-10 rounded-xl text-xs font-black transition-all",
-                      page === i + 1 
-                        ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20' 
-                        : 'hover:bg-slate-50 text-slate-600'
-                    )}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-              </div>
-              <button 
-                disabled={page === totalPages}
-                onClick={() => setPage(prev => prev + 1)}
-                className="p-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-all shadow-sm"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
-          </div>
-        )}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalCount}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          itemName="patients"
+        />
       </div>
 
       <RegisterPatientModal 

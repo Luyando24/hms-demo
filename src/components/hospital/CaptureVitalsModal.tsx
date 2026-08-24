@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@/utils/supabase/client';
 import {
   X,
@@ -17,8 +18,11 @@ import {
   Send,
   CornerDownRight,
   Loader2,
+  ShieldCheck,
 } from 'lucide-react';
 import StatusModal from './StatusModal';
+import { useFormDraft } from '@/hooks/useFormDraft';
+import { FormDraftAlert } from '@/components/common/FormDraftAlert';
 import clsx from 'clsx';
 
 type TriageDestination = 'DOCTOR' | 'ER' | 'LAB';
@@ -34,6 +38,7 @@ export default function CaptureVitalsModal({
   patientId: string;
   patientName: string;
 }) {
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [destination, setDestination] = useState<TriageDestination>('DOCTOR');
   const [status, setStatus] = useState<{
@@ -44,6 +49,32 @@ export default function CaptureVitalsModal({
   const [rooms, setRooms] = useState<any[]>([]);
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
   const supabase = createClient();
+
+  const [formData, setFormData] = useState({
+    bp_systolic: '',
+    bp_diastolic: '',
+    heart_rate: '',
+    temperature: '',
+    sp_o2: '',
+    weight: '',
+    height: '',
+    room_id: '',
+  });
+
+  const {
+    hasDraft,
+    draftTimestamp,
+    restoreDraft,
+    clearDraft,
+    lastSavedAt,
+  } = useFormDraft(`vitals_${patientId}`, formData, setFormData, {
+    debounceMs: 300,
+    isEnabled: isOpen,
+  });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -79,10 +110,20 @@ export default function CaptureVitalsModal({
     return found?.id || null;
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setStatus({
+        type: 'error',
+        title: 'Offline Mode Active',
+        message: 'Your vitals measurements are securely saved in your local draft. Please wait until your connection returns to finalize and submit to triage.',
+      });
+      return;
+    }
+
     setLoading(true);
 
     const { data: authData } = await supabase.auth.getUser();
@@ -122,15 +163,15 @@ export default function CaptureVitalsModal({
       return;
     }
 
-    const formData = new FormData(e.currentTarget);
-    const roomId = formData.get('room_id') as string;
-    const bpSystolic = parseInt(formData.get('bp_systolic') as string);
-    const bpDiastolic = parseInt(formData.get('bp_diastolic') as string);
-    const heartRate = parseInt(formData.get('heart_rate') as string);
-    const temperature = parseFloat(formData.get('temperature') as string);
-    const spO2 = parseInt(formData.get('sp_o2') as string);
-    const weight = parseFloat(formData.get('weight') as string);
-    const height = parseFloat(formData.get('height') as string);
+    const fData = new FormData(e.currentTarget);
+    const roomId = (fData.get('room_id') as string) || formData.room_id;
+    const bpSystolic = parseInt((fData.get('bp_systolic') as string) || formData.bp_systolic);
+    const bpDiastolic = parseInt((fData.get('bp_diastolic') as string) || formData.bp_diastolic);
+    const heartRate = parseInt((fData.get('heart_rate') as string) || formData.heart_rate);
+    const temperature = parseFloat((fData.get('temperature') as string) || formData.temperature);
+    const spO2 = parseInt((fData.get('sp_o2') as string) || formData.sp_o2);
+    const weight = parseFloat((fData.get('weight') as string) || formData.weight);
+    const height = parseFloat((fData.get('height') as string) || formData.height);
 
     // 1. Insert vitals
     const vitalsData = {
@@ -143,28 +184,30 @@ export default function CaptureVitalsModal({
       sp_o2: spO2 || null,
       weight: weight || null,
       height: height || null,
-      recorded_at: new Date().toISOString(),
     };
 
     const { error: vitalsError } = await supabase.from('vitals').insert(vitalsData);
 
     if (vitalsError) {
+      console.error('Vitals insertion error:', vitalsError);
       setStatus({
         type: 'error',
         title: 'Save Failed',
-        message: vitalsError.message,
+        message: vitalsError.message || 'Could not record vitals.',
       });
       setLoading(false);
       return;
     }
 
-    // 2. Queue & Department Routing
+    // 2. Clear saved draft on success
+    clearDraft();
+
+    // 3. Forward patient based on destination
     const { data: queueRow } = await supabase
       .from('walkin_queue')
       .select('token_number')
       .eq('patient_id', patientId)
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .eq('status', 'WAITING')
       .maybeSingle();
 
     const token = queueRow?.token_number || null;
@@ -244,7 +287,7 @@ export default function CaptureVitalsModal({
     },
   ];
 
-  return (
+  return createPortal(
     <>
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150 border border-slate-200/80">
@@ -270,6 +313,15 @@ export default function CaptureVitalsModal({
           </div>
 
           <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+            {/* Offline & Auto-save Draft Alert */}
+            <FormDraftAlert
+              hasDraft={hasDraft}
+              draftTimestamp={draftTimestamp}
+              onRestore={restoreDraft}
+              onDiscard={clearDraft}
+              lastSavedAt={lastSavedAt}
+            />
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
@@ -280,6 +332,8 @@ export default function CaptureVitalsModal({
                   name="bp_systolic"
                   type="number"
                   placeholder="120"
+                  value={formData.bp_systolic}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, bp_systolic: e.target.value }))}
                   className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
@@ -292,6 +346,8 @@ export default function CaptureVitalsModal({
                   name="bp_diastolic"
                   type="number"
                   placeholder="80"
+                  value={formData.bp_diastolic}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, bp_diastolic: e.target.value }))}
                   className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
@@ -304,6 +360,8 @@ export default function CaptureVitalsModal({
                   name="heart_rate"
                   type="number"
                   placeholder="72"
+                  value={formData.heart_rate}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, heart_rate: e.target.value }))}
                   className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
@@ -317,6 +375,8 @@ export default function CaptureVitalsModal({
                   type="number"
                   step="0.1"
                   placeholder="36.5"
+                  value={formData.temperature}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, temperature: e.target.value }))}
                   className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
@@ -329,6 +389,8 @@ export default function CaptureVitalsModal({
                   name="sp_o2"
                   type="number"
                   placeholder="98"
+                  value={formData.sp_o2}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, sp_o2: e.target.value }))}
                   className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
@@ -342,6 +404,22 @@ export default function CaptureVitalsModal({
                   type="number"
                   step="0.1"
                   placeholder="70"
+                  value={formData.weight}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, weight: e.target.value }))}
+                  className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
+                />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Ruler size={12} className="text-slate-500" /> Height (cm)
+                </label>
+                <input
+                  name="height"
+                  type="number"
+                  step="0.1"
+                  placeholder="175"
+                  value={formData.height}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, height: e.target.value }))}
                   className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                 />
               </div>
@@ -473,6 +551,7 @@ export default function CaptureVitalsModal({
           if (isSuccess) onClose();
         }}
       />
-    </>
+    </>,
+    document.body
   );
 }

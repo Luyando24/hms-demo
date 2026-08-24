@@ -5,6 +5,8 @@ import { Plus, Search, Filter, DoorOpen, Edit2, Trash2, Loader2, Save, X, Buildi
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 import StatusModal from "@/components/hospital/StatusModal";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface Room {
   id: string;
@@ -121,6 +123,16 @@ export default function RoomsAdminPage() {
     return matchesSearch && matchesDept;
   });
 
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedRooms,
+  } = usePagination(filteredRooms, { initialPageSize: 10 });
+
   const stats = {
     total: rooms.length,
     active: rooms.filter(r => r.is_active).length,
@@ -220,7 +232,7 @@ export default function RoomsAdminPage() {
                   No rooms found matching filter.
                 </td>
               </tr>
-            ) : filteredRooms.map((room) => (
+            ) : paginatedRooms.map((room) => (
               <tr key={room.id} className="hover:bg-slate-50/50 transition-colors group">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
@@ -266,6 +278,15 @@ export default function RoomsAdminPage() {
             ))}
           </tbody>
         </table>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          itemName="rooms"
+        />
       </div>
 
       {/* Room Modal */}

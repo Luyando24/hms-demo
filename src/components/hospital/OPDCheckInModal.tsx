@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Search,
@@ -84,12 +85,17 @@ export default function OPDCheckInModal({
   }>({ symbol: '$', position: 'prefix' });
   const [consultationFee, setConsultationFee] = useState<number>(150);
 
+  const [mounted, setMounted] = useState(false);
   const [status, setStatus] = useState<{
     type: 'success' | 'error';
     title: string;
     message: string;
   } | null>(null);
   const supabase = createClient();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -191,6 +197,15 @@ export default function OPDCheckInModal({
   const handleCheckIn = async () => {
     if (!selectedPatient) return;
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setStatus({
+        type: 'error',
+        title: 'Offline Mode Active',
+        message: 'Your patient intake selections are preserved locally. Please wait until your network connection returns to route into department queues.',
+      });
+      return;
+    }
+
     setLoading(true);
 
     const tokenNumber = `${Math.floor(100 + Math.random() * 900)}`;
@@ -277,60 +292,60 @@ export default function OPDCheckInModal({
   const destinationOptions = [
     {
       id: 'TRIAGE' as CheckInDestination,
-      label: 'Doctor Consultation (OPD)',
-      tag: 'Nurse Triage & Vitals First',
+      label: 'Doctor (OPD)',
+      tag: 'Nurse Triage First',
       icon: Stethoscope,
     },
     {
       id: 'LAB' as CheckInDestination,
-      label: 'Diagnostic Laboratory',
-      tag: 'Blood / Specimen Collection',
+      label: 'Laboratory',
+      tag: 'Blood & Specimen',
       icon: FlaskConical,
     },
     {
       id: 'PHARMACY' as CheckInDestination,
-      label: 'Central Pharmacy',
-      tag: 'Medication Refill & Collection',
+      label: 'Pharmacy',
+      tag: 'Medication Refill',
       icon: Pill,
     },
     {
       id: 'RADIOLOGY' as CheckInDestination,
-      label: 'Radiology & Imaging',
-      tag: 'X-Ray, Ultrasound, CT, MRI',
+      label: 'Radiology',
+      tag: 'X-Ray & Scans',
       icon: Camera,
     },
     {
       id: 'ER' as CheckInDestination,
       label: 'Emergency (ER)',
-      tag: 'Acute Trauma & Resuscitation',
+      tag: 'Acute Trauma',
       icon: AlertTriangle,
     },
     {
       id: 'BILLING' as CheckInDestination,
-      label: 'Billing & Cashier',
-      tag: 'Invoice Payment & Settlement',
+      label: 'Billing / Cashier',
+      tag: 'Invoice Payment',
       icon: CreditCard,
     },
     {
       id: 'ADMISSION' as CheckInDestination,
-      label: 'Inpatient Ward Admission',
-      tag: 'IPD Bed & Room Placement',
+      label: 'Inpatient (IPD)',
+      tag: 'Ward Admission',
       icon: Building,
     },
     {
       id: 'DOCTOR' as CheckInDestination,
-      label: 'Direct Doctor Consultation',
-      tag: 'Skip Triage (Follow-up / Specialist)',
+      label: 'Doctor (Direct)',
+      tag: 'Skip Triage / Review',
       icon: Activity,
     },
   ];
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <>
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh] border border-slate-200/80">
+        <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh] border border-slate-200/80">
           {/* Header */}
           <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
             <div className="flex items-center gap-3">
@@ -455,7 +470,7 @@ export default function OPDCheckInModal({
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                 {destinationOptions.map((opt) => {
                   const isSelected = destination === opt.id;
                   const Icon = opt.icon;
@@ -465,33 +480,33 @@ export default function OPDCheckInModal({
                       type="button"
                       onClick={() => handleSelectDestination(opt.id)}
                       className={clsx(
-                        'p-3 rounded-xl border text-left transition-all flex items-center justify-between gap-2 shadow-xs',
+                        'p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-1.5 shadow-xs',
                         isSelected
                           ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
                           : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50 text-slate-900',
                       )}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
                         <div
                           className={clsx(
-                            'w-7 h-7 rounded-lg flex items-center justify-center shrink-0',
+                            'w-6 h-6 rounded-lg flex items-center justify-center shrink-0',
                             isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700',
                           )}
                         >
-                          <Icon size={14} />
+                          <Icon size={13} />
                         </div>
                         <div className="min-w-0">
-                          <div className={clsx('text-xs font-bold leading-tight truncate', isSelected ? 'text-white' : 'text-slate-900')}>
+                          <div className={clsx('text-[11px] font-bold leading-tight truncate', isSelected ? 'text-white' : 'text-slate-900')}>
                             {opt.label}
                           </div>
-                          <div className={clsx('text-[10px] mt-0.5 truncate', isSelected ? 'text-slate-300' : 'text-slate-400')}>
+                          <div className={clsx('text-[9px] mt-0.5 truncate', isSelected ? 'text-slate-300' : 'text-slate-400')}>
                             {opt.tag}
                           </div>
                         </div>
                       </div>
 
                       {isSelected && (
-                        <Check size={14} className="text-white shrink-0" />
+                        <Check size={13} className="text-white shrink-0" />
                       )}
                     </button>
                   );
@@ -594,6 +609,7 @@ export default function OPDCheckInModal({
           }
         }}
       />
-    </>
+    </>,
+    document.body,
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@/utils/supabase/client';
 import {
   X,
@@ -16,8 +17,10 @@ import {
   Send,
   CornerDownRight,
   Loader2,
+  Printer,
 } from 'lucide-react';
 import { formatCurrencyAmount } from '@/utils/currency';
+import { printInvoiceDocument, PrintableInvoiceData } from '@/utils/invoicePrintGenerator';
 import StatusModal from './StatusModal';
 import clsx from 'clsx';
 
@@ -36,6 +39,7 @@ export default function RecordPaymentModal({
   invoice,
   onSuccess,
 }: RecordPaymentModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [amount, setAmount] = useState(invoice?.total_amount || 0);
   const [method, setMethod] = useState('CASH');
   const [insuranceProvider, setInsuranceProvider] = useState('');
@@ -43,10 +47,15 @@ export default function RecordPaymentModal({
   const [nextStep, setNextStep] = useState<PaymentNextStep>('DISCHARGE');
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(false);
+  const [hospitalSettings, setHospitalSettings] = useState<any>(null);
   const [currencyConfig, setCurrencyConfig] = useState<{
     symbol: string;
     position: 'prefix' | 'suffix';
   }>({ symbol: '$', position: 'prefix' });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [availableMethods, setAvailableMethods] = useState<string[]>([
     'CASH',
@@ -115,11 +124,12 @@ export default function RecordPaymentModal({
   const fetchPaymentSettings = async () => {
     const { data } = await supabase
       .from('system_settings')
-      .select('payment_methods, insurance_providers, currency_symbol, currency_position')
+      .select('payment_methods, insurance_providers, currency_symbol, currency_position, hospital_name, brand_title, tagline, logo_url, address, phone, email')
       .limit(1)
       .maybeSingle();
 
     if (data) {
+      setHospitalSettings(data);
       if (data.currency_symbol) {
         setCurrencyConfig({
           symbol: data.currency_symbol,
@@ -145,7 +155,7 @@ export default function RecordPaymentModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const getDeptId = (key: string): string | null => {
     const norm = key.toLowerCase();
@@ -159,7 +169,7 @@ export default function RecordPaymentModal({
     return found?.id || null;
   };
 
-  const handlePayment = async () => {
+  const handlePayment = async (shouldPrint = true) => {
     const outstanding = invoice.total_amount - (invoice.paid_amount || 0);
     if (amount <= 0 || amount > outstanding) {
       setStatus({
@@ -191,6 +201,66 @@ export default function RecordPaymentModal({
       });
       setLoading(false);
       return;
+    }
+
+    // If print requested, prepare and launch print screen
+    if (shouldPrint) {
+      try {
+        const { data: items } = await supabase
+          .from('invoice_items')
+          .select('*')
+          .eq('invoice_id', invoice.id);
+
+        const newPaidAmount = (invoice.paid_amount || 0) + Number(amount);
+        const newStatus = newPaidAmount >= invoice.total_amount ? 'PAID' : 'PARTIAL';
+
+        const printableData: PrintableInvoiceData = {
+          invoiceId: invoice.id,
+          createdAt: new Date().toISOString(),
+          status: newStatus,
+          totalAmount: invoice.total_amount,
+          paidAmount: newPaidAmount,
+          paymentMethod: method,
+          paymentReference: finalReference || undefined,
+          hospital: {
+            name: hospitalSettings?.hospital_name || 'Hospital Medical Center',
+            brandTitle: hospitalSettings?.brand_title,
+            tagline: hospitalSettings?.tagline,
+            logoUrl: hospitalSettings?.logo_url,
+            address: hospitalSettings?.address,
+            phone: hospitalSettings?.phone,
+            email: hospitalSettings?.email,
+            currencySymbol: currencyConfig.symbol,
+            currencyPosition: currencyConfig.position,
+          },
+          patient: {
+            firstName: invoice.patients?.first_name || 'Patient',
+            lastName: invoice.patients?.last_name || '',
+            fileNumber: invoice.patients?.file_number,
+            phone: invoice.patients?.phone,
+            email: invoice.patients?.email,
+            gender: invoice.patients?.gender,
+            dob: invoice.patients?.dob,
+          },
+          items: (items && items.length > 0) ? items.map((i: any) => ({
+            description: i.description,
+            quantity: i.quantity,
+            unitPrice: i.unit_price,
+            totalPrice: i.total_price || (i.quantity * i.unit_price),
+          })) : [
+            {
+              description: 'General Medical Consultation / Service',
+              quantity: 1,
+              unitPrice: invoice.total_amount,
+              totalPrice: invoice.total_amount,
+            }
+          ],
+        };
+
+        printInvoiceDocument(printableData);
+      } catch (err) {
+        console.error('Failed to trigger receipt print:', err);
+      }
     }
 
     // Patient Direction Routing
@@ -265,7 +335,6 @@ export default function RecordPaymentModal({
           message: `Payment of ${formattedAmt} recorded. ${patientName} was queued for Doctor OPD Consultation.`,
         });
       } else {
-        // DISCHARGE
         const formattedAmt = formatCurrencyAmount(amount, currencyConfig.symbol, currencyConfig.position);
         setStatus({
           type: 'success',
@@ -312,16 +381,16 @@ export default function RecordPaymentModal({
     },
   ];
 
-  return (
+  return createPortal(
     <>
       <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200 border border-slate-200 flex flex-col max-h-[92vh]">
           
           {/* Header */}
-          <div className="bg-brand-600 p-6 text-white flex justify-between items-center shrink-0">
+          <div className="bg-slate-900 p-6 text-white flex justify-between items-center shrink-0">
             <div>
               <h2 className="text-xl font-black">Record Patient Payment</h2>
-              <p className="text-brand-100 text-xs font-bold uppercase tracking-wider mt-1">
+              <p className="text-slate-300 text-xs font-bold uppercase tracking-wider mt-1">
                 Invoice #{invoice?.id?.slice(0, 8)} •{' '}
                 {invoice.patients
                   ? `${invoice.patients.first_name || ''} ${invoice.patients.last_name || ''}`.trim()
@@ -330,57 +399,67 @@ export default function RecordPaymentModal({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+              className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white/80 hover:text-white"
             >
               <X size={20} />
             </button>
           </div>
 
-          <div className="p-6 sm:p-7 space-y-5 overflow-y-auto flex-1">
-            <div>
-              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">
-                Payment Amount ({currencyConfig.symbol}) *
+          <div className="p-6 overflow-y-auto space-y-5 flex-1">
+            {/* Amount input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">
+                Amount Paid *
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
                   {currencyConfig.symbol}
                 </span>
                 <input
                   type="number"
                   step="0.01"
+                  min="0.01"
                   value={amount}
                   onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-black focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-bold focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">
-                Payment Method
+            {/* Payment Method */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">
+                Payment Method *
               </label>
-              <select
-                value={method}
-                onChange={(e) => setMethod(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              >
+              <div className="grid grid-cols-3 gap-2">
                 {availableMethods.map((m) => (
-                  <option key={m} value={m}>
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMethod(m)}
+                    className={clsx(
+                      'py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center uppercase tracking-wider',
+                      method === m
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100',
+                    )}
+                  >
                     {m.replace('_', ' ')}
-                  </option>
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
 
+            {/* Insurance Provider Selector */}
             {method === 'INSURANCE' && (
-              <div className="space-y-1.5 animate-in fade-in duration-200">
-                <label className="block text-xs font-black text-purple-600 uppercase tracking-widest flex items-center gap-1.5">
-                  <Shield size={14} /> Insurance Provider
+              <div className="space-y-1.5 animate-in fade-in duration-150">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">
+                  Insurance Provider *
                 </label>
                 <select
                   value={insuranceProvider}
                   onChange={(e) => setInsuranceProvider(e.target.value)}
-                  className="w-full px-4 py-3 bg-purple-50/50 border border-purple-200 rounded-2xl text-sm font-bold text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
                 >
                   {availableInsurances.map((ins) => (
                     <option key={ins} value={ins}>
@@ -391,44 +470,43 @@ export default function RecordPaymentModal({
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">
-                Reference / Policy # (Optional)
+            {/* Transaction / Policy Reference */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">
+                {method === 'INSURANCE' ? 'Member / Claim No.' : 'Transaction Reference'}
               </label>
               <input
                 type="text"
-                placeholder="e.g. Policy #, Claim #, Transaction ID"
+                placeholder={
+                  method === 'INSURANCE'
+                    ? 'e.g. NHIMA-992384'
+                    : 'e.g. Mobile Money Ref / POS Auth'
+                }
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
               />
             </div>
 
-            {/* Next Action / Patient Direction */}
-            <div className="pt-4 border-t border-slate-200 space-y-2.5">
-              <div>
-                <label className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Send size={14} className="text-brand-600" />
-                  Direct Patient Next:
-                </label>
-                <p className="text-[11px] text-slate-500 font-medium">
-                  Select destination queue following payment confirmation:
-                </p>
-              </div>
-
+            {/* Next Step / Patient Routing Selector */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <label className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <CornerDownRight size={14} className="text-slate-400" />
+                Route Patient After Settlement
+              </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {nextStepOptions.map((opt) => {
-                  const isSelected = nextStep === opt.id;
                   const Icon = opt.icon;
+                  const isSelected = nextStep === opt.id;
                   return (
                     <button
                       key={opt.id}
                       type="button"
                       onClick={() => setNextStep(opt.id)}
                       className={clsx(
-                        'p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-1 shadow-xs',
+                        'p-2.5 rounded-xl border text-left flex flex-col justify-between gap-1.5 transition-all',
                         isSelected
-                          ? 'border-brand-600 bg-brand-50/70 ring-2 ring-brand-500/20'
+                          ? 'border-slate-900 bg-slate-50 ring-2 ring-slate-900/10'
                           : 'border-slate-200 bg-white hover:bg-slate-50',
                       )}
                     >
@@ -437,14 +515,14 @@ export default function RecordPaymentModal({
                           className={clsx(
                             'w-6 h-6 rounded-lg flex items-center justify-center',
                             isSelected
-                              ? 'bg-brand-600 text-white'
+                              ? 'bg-slate-900 text-white'
                               : 'bg-slate-100 text-slate-500',
                           )}
                         >
                           <Icon size={12} />
                         </div>
                         {isSelected && (
-                          <div className="w-3.5 h-3.5 rounded-full bg-brand-600 text-white flex items-center justify-center">
+                          <div className="w-3.5 h-3.5 rounded-full bg-slate-900 text-white flex items-center justify-center">
                             <Check size={8} strokeWidth={3} />
                           </div>
                         )}
@@ -463,17 +541,26 @@ export default function RecordPaymentModal({
               </div>
             </div>
 
-            <div className="pt-3">
+            <div className="pt-3 flex flex-col sm:flex-row gap-2.5">
               <button
-                onClick={handlePayment}
+                type="button"
+                onClick={() => handlePayment(false)}
                 disabled={loading}
-                className="w-full bg-slate-900 text-white py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-xl disabled:opacity-50"
+                className="flex-1 bg-white border border-slate-300 text-slate-700 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-50 transition-all shadow-xs disabled:opacity-50"
+              >
+                <Save size={15} /> Save Only
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePayment(true)}
+                disabled={loading}
+                className="flex-[1.6] bg-slate-900 text-white py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-xs disabled:opacity-50 active:scale-98"
               >
                 {loading ? (
-                  <Loader2 className="animate-spin" size={18} />
+                  <Loader2 className="animate-spin" size={15} />
                 ) : (
                   <>
-                    <Save size={18} /> Complete Payment & Direct Patient <CornerDownRight size={15} />
+                    <Printer size={15} /> Complete & Print Receipt
                   </>
                 )}
               </button>
@@ -496,6 +583,7 @@ export default function RecordPaymentModal({
           }
         }}
       />
-    </>
+    </>,
+    document.body
   );
 }

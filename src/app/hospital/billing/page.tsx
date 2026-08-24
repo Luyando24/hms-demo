@@ -1,17 +1,22 @@
-'use client'
+'use client';
 
 import { useState, useEffect } from "react";
-import { CreditCard, Search, Filter, Plus, FileText, CheckCircle2, AlertCircle, TrendingUp, DollarSign, ArrowUpRight, LogIn } from "lucide-react";
+import { CreditCard, Search, Filter, Plus, FileText, CheckCircle2, AlertCircle, TrendingUp, DollarSign, ArrowUpRight, LogIn, Printer, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 import RecordPaymentModal from "@/components/hospital/RecordPaymentModal";
 import GenerateInvoiceModal from "@/components/hospital/GenerateInvoiceModal";
 import { cancelInvoiceAction } from "@/app/hospital/actions";
 import { formatCurrencyAmount } from "@/utils/currency";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
+import { printInvoiceDocument, PrintableInvoiceData } from "@/utils/invoicePrintGenerator";
 
 export default function BillingDashboard() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
+  const [hospitalSettings, setHospitalSettings] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -25,8 +30,9 @@ export default function BillingDashboard() {
   }, []);
 
   const fetchCurrencyConfig = async () => {
-    const { data } = await supabase.from('system_settings').select('currency_symbol, currency_position').single();
+    const { data } = await supabase.from('system_settings').select('*').limit(1).maybeSingle();
     if (data) {
+      setHospitalSettings(data);
       setCurrencyConfig({
         symbol: data.currency_symbol || '$',
         position: (data.currency_position as 'prefix' | 'suffix') || 'prefix'
@@ -45,11 +51,79 @@ export default function BillingDashboard() {
     setLoading(false);
   };
 
+  const handlePrintInvoice = async (invoice: any) => {
+    setPrintingInvoiceId(invoice.id);
+    try {
+      const { data: items } = await supabase
+        .from('invoice_items')
+        .select('*')
+        .eq('invoice_id', invoice.id);
+
+      const printableData: PrintableInvoiceData = {
+        invoiceId: invoice.id,
+        createdAt: invoice.created_at || new Date().toISOString(),
+        status: invoice.status || 'UNPAID',
+        totalAmount: invoice.total_amount,
+        paidAmount: invoice.paid_amount || 0,
+        paymentMethod: invoice.payment_method,
+        hospital: {
+          name: hospitalSettings?.hospital_name || 'Hospital Medical Center',
+          brandTitle: hospitalSettings?.brand_title,
+          tagline: hospitalSettings?.tagline,
+          logoUrl: hospitalSettings?.logo_url,
+          address: hospitalSettings?.address,
+          phone: hospitalSettings?.phone,
+          email: hospitalSettings?.email,
+          currencySymbol: currencyConfig.symbol,
+          currencyPosition: currencyConfig.position,
+        },
+        patient: {
+          firstName: invoice.patients?.first_name || 'Patient',
+          lastName: invoice.patients?.last_name || '',
+          fileNumber: invoice.patients?.file_number,
+          phone: invoice.patients?.phone,
+          email: invoice.patients?.email,
+          gender: invoice.patients?.gender,
+          dob: invoice.patients?.dob,
+        },
+        items: (items && items.length > 0) ? items.map((i: any) => ({
+          description: i.description,
+          quantity: i.quantity,
+          unitPrice: i.unit_price,
+          totalPrice: i.total_price || (i.quantity * i.unit_price),
+        })) : [
+          {
+            description: 'General Medical Consultation / Service',
+            quantity: 1,
+            unitPrice: invoice.total_amount,
+            totalPrice: invoice.total_amount,
+          }
+        ],
+      };
+
+      printInvoiceDocument(printableData);
+    } catch (err) {
+      console.error('Error printing invoice:', err);
+    } finally {
+      setPrintingInvoiceId(null);
+    }
+  };
+
   const filteredInvoices = invoices.filter(inv => 
     inv.patients?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     inv.patients?.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     inv.id.includes(searchQuery)
   );
+
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedInvoices,
+  } = usePagination(filteredInvoices, { initialPageSize: 10 });
 
   const stats = {
     totalRevenue: invoices.reduce((acc, inv) => acc + (inv.paid_amount || 0), 0),
@@ -148,7 +222,7 @@ export default function BillingDashboard() {
                     <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-normal">Loading invoices...</td></tr>
                   ) : filteredInvoices.length === 0 ? (
                     <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-normal">No invoices found.</td></tr>
-                  ) : filteredInvoices.map((row) => (
+                  ) : paginatedInvoices.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-4 py-3">
                         <p className="font-bold text-slate-900">{row.patients?.first_name} {row.patients?.last_name}</p>
@@ -174,11 +248,25 @@ export default function BillingDashboard() {
 
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handlePrintInvoice(row)}
+                            disabled={printingInvoiceId === row.id}
+                            title="Export / Print Invoice"
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1 shadow-xs disabled:opacity-50"
+                          >
+                            {printingInvoiceId === row.id ? (
+                              <Loader2 size={12} className="animate-spin text-slate-600" />
+                            ) : (
+                              <Printer size={12} />
+                            )}
+                            Print
+                          </button>
+
                           {row.status !== 'PAID' && row.status !== 'CANCELLED' && (
                             <>
                               <button 
                                 onClick={() => { setSelectedInvoice(row); setIsPaymentModalOpen(true); }}
-                                className="bg-slate-900 text-white px-2.5 py-1 rounded-lg text-xs font-medium hover:bg-slate-800 transition-all flex items-center gap-1 shadow-xs"
+                                className="bg-slate-900 text-white px-2.5 py-1 rounded-lg text-xs font-medium hover:bg-slate-800 transition-all flex items-center gap-1 shadow-xs active:scale-98"
                               >
                                 <CreditCard size={12} />
                                 Pay
@@ -203,6 +291,15 @@ export default function BillingDashboard() {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                itemName="invoices"
+              />
             </div>
           </div>
         </div>

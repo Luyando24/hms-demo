@@ -30,6 +30,8 @@ import {
 } from './actions';
 import StatusModal from '@/components/hospital/StatusModal';
 import Link from 'next/link';
+import { Pagination } from '@/components/ui/Pagination';
+import { usePagination } from '@/hooks/usePagination';
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
@@ -132,6 +134,16 @@ export default function AppointmentsPage() {
       doctorName.includes(q)
     );
   });
+
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedAppointments,
+  } = usePagination(filteredAppointments, { initialPageSize: 10 });
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     setActionLoading(id);
@@ -360,7 +372,7 @@ export default function AppointmentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {filteredAppointments.map((apt) => {
+                {paginatedAppointments.map((apt) => {
                   const patient = apt.patients;
                   const doctor = apt.provider;
                   const aptDate = apt.appointment_date
@@ -450,10 +462,11 @@ export default function AppointmentsPage() {
                               {apt.status !== 'CANCELLED' && apt.status !== 'COMPLETED' && (
                                 <button
                                   onClick={() => handleCheckInOpd(apt)}
-                                  title="Check-in patient directly to OPD queue"
-                                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-all flex items-center gap-1 shadow-sm"
+                                  title="Check-in to OPD Queue"
+                                  className="bg-slate-900 hover:bg-slate-800 text-white p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs active:scale-98"
                                 >
-                                  <LogIn size={13} /> Check In OPD
+                                  <LogIn size={13} />
+                                  Check In
                                 </button>
                               )}
 
@@ -498,6 +511,15 @@ export default function AppointmentsPage() {
                 })}
               </tbody>
             </table>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              itemName="appointments"
+            />
           </div>
         )}
       </div>

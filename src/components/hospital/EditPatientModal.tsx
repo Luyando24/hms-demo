@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, User, Phone, Mail, MapPin, Calendar, Heart, Shield, Save } from 'lucide-react'
 import StatusModal from './StatusModal'
 import { updatePatientAction } from '@/app/hospital/actions'
@@ -13,13 +14,28 @@ interface EditPatientModalProps {
 }
 
 export default function EditPatientModal({ isOpen, onClose, onSuccess, patient }: EditPatientModalProps) {
+  const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null)
 
-  if (!isOpen || !patient) return null
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!isOpen || !mounted || !patient) return null
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setStatus({
+        type: 'error',
+        title: 'Offline Mode Active',
+        message: 'Your updates are preserved in the form. Please wait until your internet connection returns to save edits to the patient registry.'
+      })
+      return
+    }
+
     setLoading(true)
     
     const formData = new FormData(e.currentTarget)
@@ -55,10 +71,10 @@ export default function EditPatientModal({ isOpen, onClose, onSuccess, patient }
     setLoading(false)
   }
 
-  return (
+  return createPortal(
     <>
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col border border-slate-200">
           {/* Header */}
           <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <div>
@@ -88,10 +104,7 @@ export default function EditPatientModal({ isOpen, onClose, onSuccess, patient }
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 ml-1">Date of Birth</label>
-                  <div className="relative">
-                    <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input required name="dob" type="date" defaultValue={patient.dob} className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-bold" />
-                  </div>
+                  <input required name="dob" type="date" defaultValue={patient.dob ? new Date(patient.dob).toISOString().split('T')[0] : ''} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-bold" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 ml-1">First Name</label>
@@ -104,32 +117,23 @@ export default function EditPatientModal({ isOpen, onClose, onSuccess, patient }
               </div>
             </section>
 
-            {/* Contact Section */}
-            <section className="space-y-4 pt-4 border-t border-slate-100">
+            {/* Contact Details */}
+            <section className="space-y-4">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <Phone size={14} /> Contact Details
+                <Phone size={14} /> Contact Information
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 ml-1">Phone Number</label>
-                  <div className="relative">
-                    <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input name="phone" type="tel" defaultValue={patient.phone || ''} className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-medium" />
-                  </div>
+                  <input name="phone" defaultValue={patient.phone} type="tel" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-medium" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 ml-1">Email Address</label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input name="email" type="email" defaultValue={patient.email || ''} className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-medium" />
-                  </div>
+                  <input name="email" defaultValue={patient.email} type="email" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-medium" />
                 </div>
-                <div className="md:col-span-2 space-y-1.5">
+                <div className="space-y-1.5 md:col-span-2">
                   <label className="text-xs font-bold text-slate-700 ml-1">Home Address</label>
-                  <div className="relative">
-                    <MapPin size={16} className="absolute left-4 top-3 text-slate-400" />
-                    <textarea name="address" rows={2} defaultValue={patient.address || ''} className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none font-medium"></textarea>
-                  </div>
+                  <input name="address" defaultValue={patient.address} type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-medium" />
                 </div>
               </div>
             </section>
@@ -188,6 +192,7 @@ export default function EditPatientModal({ isOpen, onClose, onSuccess, patient }
           }
         }}
       />
-    </>
+    </>,
+    document.body
   )
 }

@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { Wrench, Monitor, MapPin, Search, Plus, Settings, AlertCircle, CheckCircle2, History, Info } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function AssetsDashboard() {
   const [assets, setAssets] = useState<any[]>([]);
@@ -31,6 +33,16 @@ export default function AssetsDashboard() {
     asset.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     asset.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const {
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalItems,
+    totalPages,
+    paginatedItems: paginatedAssets,
+  } = usePagination(filteredAssets, { initialPageSize: 6 });
 
   const stats = {
     total: assets.length,
@@ -104,7 +116,7 @@ export default function AssetsDashboard() {
             <div className="col-span-full py-12 text-center text-slate-400 font-bold uppercase tracking-widest">Scanning assets...</div>
           ) : filteredAssets.length === 0 ? (
             <div className="col-span-full py-12 text-center text-slate-400 font-bold uppercase tracking-widest">No assets found</div>
-          ) : filteredAssets.map((asset) => (
+          ) : paginatedAssets.map((asset) => (
             <div key={asset.id} className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group">
               <div className="flex justify-between items-start mb-4">
                 <div className={clsx(
@@ -152,6 +164,15 @@ export default function AssetsDashboard() {
             </div>
           ))}
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          itemName="assets"
+        />
       </div>
     </div>
   );
