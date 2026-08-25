@@ -60,7 +60,7 @@ export function Footer({ settings }: FooterProps = {}) {
           <h4 className="text-white font-bold mb-6 tracking-wide uppercase text-sm">About Us</h4>
           <ul className="space-y-4 text-sm">
             <li><Link href="#" className="hover:text-brand-400 transition-colors">Our History</Link></li>
-            <li><Link href="#doctors" className="hover:text-brand-400 transition-colors">Find a Doctor</Link></li>
+            <li><Link href="#lab-tests" className="hover:text-brand-400 transition-colors">Diagnostic Tests</Link></li>
             <li><Link href="#" className="hover:text-brand-400 transition-colors">Careers</Link></li>
             <li><Link href="#" className="hover:text-brand-400 transition-colors">News & Updates</Link></li>
             <li><Link href={getSubdomainUrl(null, '/login')} className="hover:text-brand-400 transition-colors">Staff & Admin Sign In</Link></li>

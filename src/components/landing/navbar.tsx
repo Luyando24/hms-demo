@@ -48,8 +48,8 @@ export function Navbar({ settings }: NavbarProps = {}) {
           <Link href="#services" className="text-sm font-bold uppercase tracking-widest text-slate-600 hover:text-brand-600 transition-colors">
             Services
           </Link>
-          <Link href="#doctors" className="text-sm font-bold uppercase tracking-widest text-slate-600 hover:text-brand-600 transition-colors">
-            Our Doctors
+          <Link href="#lab-tests" className="text-sm font-bold uppercase tracking-widest text-slate-600 hover:text-brand-600 transition-colors">
+            Lab Tests
           </Link>
           <Link href="#contact" className="text-sm font-bold uppercase tracking-widest text-slate-600 hover:text-brand-600 transition-colors">
             Contact
