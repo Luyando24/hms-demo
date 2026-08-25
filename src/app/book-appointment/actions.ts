@@ -22,7 +22,8 @@ const publicBookingSchema = z.object({
   department_id: z.string().uuid().or(z.literal('')).transform(val => val || null),
   appointment_date: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, 'Appointment date and time are required.'),
+    .min(1, 'Appointment date and time are required.')
+    .regex(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(:\d{2})?/, 'Appointment date and time are required in a valid format.'),
   reason: z.string().trim().min(3, 'Please specify the reason for your visit.').max(500),
 });
 

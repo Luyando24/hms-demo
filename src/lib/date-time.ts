@@ -39,8 +39,18 @@ function sameParts(left: LocalDateTimeParts, right: LocalDateTimeParts): boolean
 
 /** Converts a timezone-free datetime-local value into its UTC instant. */
 export function localDateTimeToUtc(value: string, timeZone: string): Date {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
-  if (!match) throw new Error('Enter a valid appointment date and time.');
+  if (!value || typeof value !== 'string') {
+    throw new Error('Enter a valid appointment date and time.');
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/.exec(value.trim());
+  if (!match) {
+    const parsed = new Date(value);
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+    throw new Error('Enter a valid appointment date and time.');
+  }
 
   const desired: LocalDateTimeParts = {
     year: Number(match[1]),
@@ -49,12 +59,15 @@ export function localDateTimeToUtc(value: string, timeZone: string): Date {
     hour: Number(match[4]),
     minute: Number(match[5]),
   };
+  const seconds = match[6] ? Number(match[6]) : 0;
+
   const wallClockAsUtc = Date.UTC(
     desired.year,
     desired.month - 1,
     desired.day,
     desired.hour,
     desired.minute,
+    seconds,
   );
   const validated = new Date(wallClockAsUtc);
   if (
@@ -77,6 +90,7 @@ export function localDateTimeToUtc(value: string, timeZone: string): Date {
       represented.day,
       represented.hour,
       represented.minute,
+      seconds,
     );
     const next = candidate + (wallClockAsUtc - representedAsUtc);
     if (next === candidate) break;

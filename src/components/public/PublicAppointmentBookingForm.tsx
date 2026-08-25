@@ -138,7 +138,7 @@ export function PublicAppointmentBookingForm({ departments, doctors, settings }:
       return;
     }
 
-    const appointmentDateTime = `${formData.date}T${formData.time}:00`;
+    const appointmentDateTime = `${formData.date}T${formData.time}`;
 
     setSubmitting(true);
     const res = await bookPublicAppointmentAction({

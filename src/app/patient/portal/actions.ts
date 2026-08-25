@@ -12,8 +12,11 @@ import { createAdminClient } from '@/utils/supabase/admin';
 
 const appointmentSchema = z.object({
   provider_id: z.string().uuid().or(z.literal('')),
-  appointment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
-  reason: z.string().trim().min(3).max(500),
+  appointment_date: z
+    .string()
+    .min(1, 'Appointment date and time are required.')
+    .regex(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(:\d{2})?/, 'Enter a valid date and time.'),
+  reason: z.string().trim().min(3, 'Reason must be at least 3 characters.').max(500),
 });
 
 const profileSchema = z.object({
@@ -76,11 +79,11 @@ export async function bookAppointmentAction(formData: FormData) {
     appointment_date: appointmentDate.toISOString(),
     reason: parsed.data.reason,
     status: 'SCHEDULED',
+    notification_email: patient.email,
   });
   if (error) {
     withMessage('/patient/portal/appointments', 'error', error.message);
   }
-    notification_email: patient.email,
 
   revalidatePath('/patient/portal');
   revalidatePath('/patient/portal/appointments');
