@@ -128,167 +128,191 @@ export default function CaptureVitalsModal({
 
     setLoading(true);
 
-    const { data: authData } = await supabase.auth.getUser();
-    if (!authData.user) {
-      setStatus({
-        type: 'error',
-        title: 'Authentication Required',
-        message: 'Sign in before capturing vitals.',
-      });
-      setLoading(false);
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', authData.user.id)
-      .maybeSingle();
-
-    const userRole = (
-      profile?.role ||
-      authData.user.user_metadata?.role ||
-      (authData.user.app_metadata as any)?.role ||
-      ''
-    )
-      .toString()
-      .trim()
-      .toUpperCase();
-
-    if (userRole !== 'NURSE') {
-      setStatus({
-        type: 'error',
-        title: 'Access Restricted to Nursing Staff',
-        message: `You are currently signed in as ${authData.user.email} with role '${userRole || 'UNKNOWN'}'. Only registered Nurses (NURSE) are authorized to capture vitals and conduct triage.`,
-      });
-      setLoading(false);
-      return;
-    }
-
-    const fData = new FormData(e.currentTarget);
-    const roomId = (fData.get('room_id') as string) || formData.room_id;
-    const bpSystolic = parseInt((fData.get('bp_systolic') as string) || formData.bp_systolic);
-    const bpDiastolic = parseInt((fData.get('bp_diastolic') as string) || formData.bp_diastolic);
-    const heartRate = parseInt((fData.get('heart_rate') as string) || formData.heart_rate);
-    const temperature = parseFloat((fData.get('temperature') as string) || formData.temperature);
-    const spO2 = parseInt((fData.get('sp_o2') as string) || formData.sp_o2);
-    const weight = parseFloat((fData.get('weight') as string) || formData.weight);
-    const height = parseFloat((fData.get('height') as string) || formData.height);
-
-    // 1. Insert vitals
-    const vitalsData = {
-      patient_id: patientId,
-      recorded_by: authData.user.id,
-      bp_systolic: bpSystolic || null,
-      bp_diastolic: bpDiastolic || null,
-      heart_rate: heartRate || null,
-      temperature: temperature || null,
-      sp_o2: spO2 || null,
-      weight: weight || null,
-      height: height || null,
-    };
-
-    const { error: vitalsError } = await supabase.from('vitals').insert(vitalsData);
-
-    if (vitalsError) {
-      console.error('Vitals insertion error:', vitalsError);
-      setStatus({
-        type: 'error',
-        title: 'Save Failed',
-        message: vitalsError.message || 'Could not record vitals.',
-      });
-      setLoading(false);
-      return;
-    }
-
-    // 2. Clear saved draft on success
-    clearDraft();
-
-    // 3. Forward patient based on destination
-    let queueQuery = supabase
-      .from('walkin_queue')
-      .select('id, token_number');
-
-    if (queueId) {
-      queueQuery = queueQuery.eq('id', queueId);
-    } else {
-      queueQuery = queueQuery.eq('patient_id', patientId).in('status', ['WAITING', 'CALLING']);
-    }
-
-    const { data: queueRow } = await queueQuery.maybeSingle();
-    const token = queueRow?.token_number || null;
-    const targetQueueId = queueRow?.id || queueId;
-
-    if (destination === 'ER') {
-      const erDeptId = getDeptId('er');
-      if (targetQueueId) {
-        await supabase.from('walkin_queue').update({ status: 'COMPLETED' }).eq('id', targetQueueId);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) {
+        setStatus({
+          type: 'error',
+          title: 'Authentication Required',
+          message: 'Please sign in before capturing vitals.',
+        });
+        return;
       }
-      await supabase.from('walkin_queue').insert({
-        patient_id: patientId,
-        department_id: erDeptId,
-        status: 'WAITING',
-        priority: 'EMERGENCY',
-        reason: `Emergency Escalation from Triage (BP: ${bpSystolic}/${bpDiastolic}, SpO2: ${spO2}%)`,
-        token_number: token,
-      });
 
-      setStatus({
-        type: 'success',
-        title: 'Vitals Saved & Escalated to ER',
-        message: `Vitals recorded. Patient ${patientName} was immediately escalated to the Emergency Room (ER) queue with critical priority.`,
-      });
-    } else if (destination === 'LAB') {
-      const labDeptId = getDeptId('laboratory');
-      if (targetQueueId) {
-        await supabase.from('walkin_queue').update({ status: 'COMPLETED' }).eq('id', targetQueueId);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, role')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+      const userRole = (
+        profile?.role ||
+        authData.user.user_metadata?.role ||
+        (authData.user.app_metadata as any)?.role ||
+        ''
+      )
+        .toString()
+        .trim()
+        .toUpperCase();
+
+      const allowedRoles = ['NURSE', 'ADMIN', 'SUPERADMIN', 'DOCTOR', 'PHYSICIAN', 'STAFF'];
+      if (userRole && !allowedRoles.includes(userRole)) {
+        setStatus({
+          type: 'error',
+          title: 'Access Restricted to Clinical Staff',
+          message: `You are currently signed in as ${authData.user.email} with role '${userRole}'. Only registered clinical staff are authorized to record vitals and conduct triage.`,
+        });
+        return;
       }
-      await supabase.from('walkin_queue').insert({
+
+      const fData = new FormData(e.currentTarget);
+      const roomId = (fData.get('room_id') as string) || formData.room_id || null;
+      const rawBpSys = (fData.get('bp_systolic') as string) || formData.bp_systolic;
+      const rawBpDia = (fData.get('bp_diastolic') as string) || formData.bp_diastolic;
+      const rawHr = (fData.get('heart_rate') as string) || formData.heart_rate;
+      const rawTemp = (fData.get('temperature') as string) || formData.temperature;
+      const rawSpo2 = (fData.get('sp_o2') as string) || formData.sp_o2;
+      const rawWeight = (fData.get('weight') as string) || formData.weight;
+      const rawHeight = (fData.get('height') as string) || formData.height;
+
+      const bpSystolic = rawBpSys ? parseInt(rawBpSys, 10) : null;
+      const bpDiastolic = rawBpDia ? parseInt(rawBpDia, 10) : null;
+      const heartRate = rawHr ? parseInt(rawHr, 10) : null;
+      const temperature = rawTemp ? parseFloat(rawTemp) : null;
+      const spO2 = rawSpo2 ? parseInt(rawSpo2, 10) : null;
+      const weight = rawWeight ? parseFloat(rawWeight) : null;
+      const height = rawHeight ? parseFloat(rawHeight) : null;
+
+      const bmiValue = (weight && height && height > 0)
+        ? parseFloat((weight / Math.pow(height / 100, 2)).toFixed(1))
+        : null;
+
+      // 1. Insert vitals
+      const vitalsData = {
         patient_id: patientId,
-        department_id: labDeptId,
-        status: 'WAITING',
-        priority: 'NORMAL',
-        reason: 'Routine Pre-Consultation Lab Work',
-        token_number: token,
-      });
+        recorded_by: profile?.id || authData.user.id,
+        bp_systolic: isNaN(bpSystolic as number) ? null : bpSystolic,
+        bp_diastolic: isNaN(bpDiastolic as number) ? null : bpDiastolic,
+        heart_rate: isNaN(heartRate as number) ? null : heartRate,
+        temperature: isNaN(temperature as number) ? null : temperature,
+        sp_o2: isNaN(spO2 as number) ? null : spO2,
+        weight: isNaN(weight as number) ? null : weight,
+        height: isNaN(height as number) ? null : height,
+        bmi: bmiValue,
+      };
 
-      setStatus({
-        type: 'success',
-        title: 'Vitals Saved & Routed to Lab',
-        message: `Vitals recorded. Patient ${patientName} was forwarded to the Diagnostic Laboratory.`,
-      });
-    } else {
-      // DOCTOR OPD
-      const selectedRoom = rooms.find((r) => r.id === roomId);
-      const targetStatus = selectedRoom ? 'CONSULTATION' : 'TRIAGED';
+      const { error: vitalsError } = await supabase.from('vitals').insert(vitalsData);
 
-      if (targetQueueId) {
-        await supabase
-          .from('walkin_queue')
-          .update({
-            status: targetStatus,
-            room_id: roomId || null,
-          })
-          .eq('id', targetQueueId);
+      if (vitalsError) {
+        console.error('Vitals insertion error:', vitalsError);
+        setStatus({
+          type: 'error',
+          title: 'Save Failed',
+          message: vitalsError.message || 'Could not record vitals.',
+        });
+        return;
+      }
+
+      // 2. Clear saved draft on success
+      clearDraft();
+
+      // 3. Forward patient based on destination
+      let queueQuery = supabase
+        .from('walkin_queue')
+        .select('id, token_number');
+
+      if (queueId) {
+        queueQuery = queueQuery.eq('id', queueId);
       } else {
-        await supabase
-          .from('walkin_queue')
-          .update({
-            status: targetStatus,
-            room_id: roomId || null,
-          })
+        queueQuery = queueQuery
           .eq('patient_id', patientId)
-          .in('status', ['WAITING', 'CALLING']);
+          .in('status', ['WAITING', 'CALLING'])
+          .order('created_at', { ascending: false })
+          .limit(1);
       }
 
-      setStatus({
-        type: 'success',
-        title: 'Triage Complete & Patient Queued',
-        message: `Vitals for ${patientName} recorded. Patient moved to consultation queue${selectedRoom ? ` for ${selectedRoom.name}` : ''}.`,
-      });
-    }
+      const { data: queueRow } = await queueQuery.maybeSingle();
+      const token = queueRow?.token_number || null;
+      const targetQueueId = queueRow?.id || queueId;
 
-    setLoading(false);
+      if (destination === 'ER') {
+        const erDeptId = getDeptId('er');
+        if (targetQueueId) {
+          await supabase.from('walkin_queue').update({ status: 'COMPLETED' }).eq('id', targetQueueId);
+        }
+        await supabase.from('walkin_queue').insert({
+          patient_id: patientId,
+          department_id: erDeptId,
+          status: 'WAITING',
+          priority: 'EMERGENCY',
+          reason: `Emergency Escalation from Triage (BP: ${bpSystolic || '—'}/${bpDiastolic || '—'}, SpO2: ${spO2 || '—'}%)`,
+          token_number: token,
+        });
+
+        setStatus({
+          type: 'success',
+          title: 'Vitals Saved & Escalated to ER',
+          message: `Vitals recorded. Patient ${patientName} was immediately escalated to the Emergency Room (ER) queue with critical priority.`,
+        });
+      } else if (destination === 'LAB') {
+        const labDeptId = getDeptId('laboratory');
+        if (targetQueueId) {
+          await supabase.from('walkin_queue').update({ status: 'COMPLETED' }).eq('id', targetQueueId);
+        }
+        await supabase.from('walkin_queue').insert({
+          patient_id: patientId,
+          department_id: labDeptId,
+          status: 'WAITING',
+          priority: 'NORMAL',
+          reason: 'Routine Pre-Consultation Lab Work',
+          token_number: token,
+        });
+
+        setStatus({
+          type: 'success',
+          title: 'Vitals Saved & Routed to Lab',
+          message: `Vitals recorded. Patient ${patientName} was forwarded to the Diagnostic Laboratory.`,
+        });
+      } else {
+        // DOCTOR OPD
+        const selectedRoom = rooms.find((r) => r.id === roomId);
+        const targetStatus = selectedRoom ? 'CONSULTATION' : 'TRIAGED';
+
+        if (targetQueueId) {
+          await supabase
+            .from('walkin_queue')
+            .update({
+              status: targetStatus,
+              room_id: roomId || null,
+            })
+            .eq('id', targetQueueId);
+        } else {
+          await supabase
+            .from('walkin_queue')
+            .update({
+              status: targetStatus,
+              room_id: roomId || null,
+            })
+            .eq('patient_id', patientId)
+            .in('status', ['WAITING', 'CALLING']);
+        }
+
+        setStatus({
+          type: 'success',
+          title: 'Triage Complete & Patient Queued',
+          message: `Vitals for ${patientName} recorded. Patient moved to consultation queue${selectedRoom ? ` for ${selectedRoom.name}` : ''}.`,
+        });
+      }
+    } catch (err: any) {
+      console.error('Error submitting triage vitals:', err);
+      setStatus({
+        type: 'error',
+        title: 'Triage Submission Failed',
+        message: err?.message || 'An unexpected error occurred while saving vitals. Please check your connection and try again.',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancelModal = async () => {
