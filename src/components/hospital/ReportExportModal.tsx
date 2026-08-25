@@ -14,7 +14,10 @@ import {
   ShieldCheck, 
   Sparkles,
   Building,
-  ArrowRight
+  ArrowRight,
+  Mail,
+  Send,
+  AlertCircle
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { 
@@ -26,6 +29,7 @@ import {
   formatValue 
 } from '@/utils/reportDocumentGenerator';
 import ReportDocumentPreview from './ReportDocumentPreview';
+import { sendFinancialReportEmailAction } from '@/app/hospital/finance/actions';
 
 interface ReportExportModalProps {
   isOpen: boolean;
@@ -49,7 +53,11 @@ export default function ReportExportModal({
   const [endDate, setEndDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
-  const [exportFormat, setExportFormat] = useState<'PDF' | 'CSV' | 'JSON'>('PDF');
+  const [exportFormat, setExportFormat] = useState<'PDF' | 'CSV' | 'JSON' | 'EMAIL'>('PDF');
+  const [recipientEmail, setRecipientEmail] = useState<string>('');
+  const [emailing, setEmailing] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'SETTINGS' | 'PREVIEW'>('SETTINGS');
   const [loading, setLoading] = useState(false);
   const [docData, setDocData] = useState<ReportDocumentData | null>(null);
@@ -74,20 +82,29 @@ export default function ReportExportModal({
 
   const fetchHospitalSettings = async () => {
     try {
-      const { data } = await supabase
-        .from('system_settings')
-        .select('hospital_name, address, phone, email, currency_symbol, currency_position')
-        .limit(1)
-        .maybeSingle();
+      const [{ data: settingsData }, { data: emailSettings }] = await Promise.all([
+        supabase
+          .from('system_settings')
+          .select('hospital_name, address, phone, email, currency_symbol, currency_position')
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('email_notification_settings')
+          .select('manager_report_email')
+          .limit(1)
+          .maybeSingle()
+      ]);
 
-      if (data) {
+      if (settingsData) {
+        const adminEmail = emailSettings?.manager_report_email || settingsData.email || 'admin@hospital.org';
+        setRecipientEmail(adminEmail);
         setHospitalInfo({
-          hospitalName: data.hospital_name || 'MediCloud Central Hospital',
-          address: data.address || 'Capital Healthcare District, Suite 400',
-          phone: data.phone || '+1 (800) 555-0199',
-          email: data.email || 'reports@medicloud.health',
-          currencySymbol: data.currency_symbol || currencyConfig.symbol,
-          currencyPosition: (data.currency_position as 'prefix' | 'suffix') || currencyConfig.position
+          hospitalName: settingsData.hospital_name || 'MediCloud Central Hospital',
+          address: settingsData.address || 'Capital Healthcare District, Suite 400',
+          phone: settingsData.phone || '+1 (800) 555-0199',
+          email: adminEmail,
+          currencySymbol: settingsData.currency_symbol || currencyConfig.symbol,
+          currencyPosition: (settingsData.currency_position as 'prefix' | 'suffix') || currencyConfig.position
         });
       }
     } catch (e) {
@@ -386,22 +403,44 @@ export default function ReportExportModal({
         ];
 
       } else {
-        const { data } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, role, staff_number, created_at')
-          .neq('role', 'PATIENT');
+        const [{ data: staffData }, { data: payrollData }] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('id, first_name, last_name, role, staff_number, created_at')
+            .neq('role', 'PATIENT'),
+          supabase
+            .from('payroll_records')
+            .select('staff_id, base_salary, allowances, deductions, net_salary')
+            .gte('created_at', startIso)
+            .lte('created_at', endIso)
+        ]);
 
-        rows = (data || []).map((s: any) => ({
-          Staff_ID: s.staff_number || String(s.id).substring(0, 8).toUpperCase(),
-          Staff_Name: `${s.first_name || ''} ${s.last_name || ''}`.trim(),
-          Assigned_Role: (s.role || 'STAFF').toUpperCase(),
-          Department: 'Clinical Services',
-          Status: 'ACTIVE',
-          Joined_Date: new Date(s.created_at).toLocaleDateString()
-        }));
+        const payrollMap = new Map();
+        (payrollData || []).forEach((p: any) => {
+          if (p.staff_id) payrollMap.set(p.staff_id, p);
+        });
+
+        let totalWorkforceCost = 0;
+
+        rows = (staffData || []).map((s: any) => {
+          const p = payrollMap.get(s.id);
+          const net = Number(p?.net_salary || 0);
+          totalWorkforceCost += net;
+
+          return {
+            Staff_ID: s.staff_number || String(s.id).substring(0, 8).toUpperCase(),
+            Staff_Name: `${s.first_name || ''} ${s.last_name || ''}`.trim(),
+            Assigned_Role: (s.role || 'STAFF').toUpperCase(),
+            Department: 'Clinical Services',
+            Monthly_Net_Pay: net > 0 ? formatValue(net, sym, pos) : 'Pending Disbursal',
+            Status: 'ACTIVE',
+            Joined_Date: new Date(s.created_at).toLocaleDateString()
+          };
+        });
 
         kpiCards = [
-          { label: 'Active Workforce Headcount', value: String(rows.length), subtext: 'Clinical & Admin' }
+          { label: 'Active Workforce Headcount', value: String(rows.length), subtext: 'Clinical & Admin' },
+          { label: 'Period Payroll Disbursal', value: formatValue(totalWorkforceCost, sym, pos), subtext: 'Total Human Capital Cost' }
         ];
       }
 
@@ -449,6 +488,39 @@ export default function ReportExportModal({
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
+  };
+
+  const handleSendEmail = async () => {
+    if (!recipientEmail) {
+      setEmailError('Please enter a valid administrator email address.');
+      return;
+    }
+
+    setEmailing(true);
+    setEmailSuccess(null);
+    setEmailError(null);
+
+    const { startIso, endIso, label } = getPeriodDates();
+
+    try {
+      const res = await sendFinancialReportEmailAction({
+        reportTitle: reportName,
+        periodLabel: label,
+        recipientEmail: recipientEmail.trim(),
+        startDate: startIso,
+        endDate: endIso,
+      });
+
+      if (res.success) {
+        setEmailSuccess(`Executive report dispatched successfully to ${res.recipientEmail}!`);
+      } else {
+        setEmailError(res.error || 'Failed to dispatch report to email.');
+      }
+    } catch (err: any) {
+      setEmailError(err.message || 'An error occurred during email transmission.');
+    } finally {
+      setEmailing(false);
+    }
   };
 
   return (
@@ -577,11 +649,11 @@ export default function ReportExportModal({
                   <span className="text-xs font-bold text-brand-600">Styled Executive Templates</span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <button
                     type="button"
                     onClick={() => setExportFormat('PDF')}
-                    className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                    className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
                       exportFormat === 'PDF' 
                         ? 'bg-brand-600 border-brand-600 text-white shadow-lg shadow-brand-500/20' 
                         : 'bg-white border-slate-200 text-slate-700 hover:border-brand-300'
@@ -590,7 +662,7 @@ export default function ReportExportModal({
                     <div>
                       <div className="font-black text-sm">PDF / Print</div>
                       <p className={`text-[10px] font-medium mt-1 ${exportFormat === 'PDF' ? 'text-brand-100' : 'text-slate-500'}`}>
-                        High-resolution executive print layout with branding & signature block.
+                        Print layout with branding & seal.
                       </p>
                     </div>
                     <Printer size={18} className="mt-3 align-self-end opacity-90" />
@@ -599,7 +671,7 @@ export default function ReportExportModal({
                   <button
                     type="button"
                     onClick={() => setExportFormat('CSV')}
-                    className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                    className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
                       exportFormat === 'CSV' 
                         ? 'bg-brand-600 border-brand-600 text-white shadow-lg shadow-brand-500/20' 
                         : 'bg-white border-slate-200 text-slate-700 hover:border-brand-300'
@@ -608,7 +680,7 @@ export default function ReportExportModal({
                     <div>
                       <div className="font-black text-sm">CSV Excel</div>
                       <p className={`text-[10px] font-medium mt-1 ${exportFormat === 'CSV' ? 'text-brand-100' : 'text-slate-500'}`}>
-                        Structured data spreadsheet with metadata header & totals.
+                        Structured data spreadsheet.
                       </p>
                     </div>
                     <FileSpreadsheet size={18} className="mt-3 align-self-end opacity-90" />
@@ -616,8 +688,26 @@ export default function ReportExportModal({
 
                   <button
                     type="button"
+                    onClick={() => setExportFormat('EMAIL')}
+                    className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                      exportFormat === 'EMAIL' 
+                        ? 'bg-brand-600 border-brand-600 text-white shadow-lg shadow-brand-500/20' 
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-brand-300'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-black text-sm">Email to Admin</div>
+                      <p className={`text-[10px] font-medium mt-1 ${exportFormat === 'EMAIL' ? 'text-brand-100' : 'text-slate-500'}`}>
+                        Auto report to admin email.
+                      </p>
+                    </div>
+                    <Mail size={18} className="mt-3 align-self-end opacity-90" />
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setExportFormat('JSON')}
-                    className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                    className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
                       exportFormat === 'JSON' 
                         ? 'bg-brand-600 border-brand-600 text-white shadow-lg shadow-brand-500/20' 
                         : 'bg-white border-slate-200 text-slate-700 hover:border-brand-300'
@@ -626,12 +716,45 @@ export default function ReportExportModal({
                     <div>
                       <div className="font-black text-sm">JSON Data</div>
                       <p className={`text-[10px] font-medium mt-1 ${exportFormat === 'JSON' ? 'text-brand-100' : 'text-slate-500'}`}>
-                        Raw API object payload for system integration.
+                        API object payload export.
                       </p>
                     </div>
                     <FileText size={18} className="mt-3 align-self-end opacity-90" />
                   </button>
                 </div>
+
+                {exportFormat === 'EMAIL' && (
+                  <div className="mt-4 p-4 bg-white border border-brand-200 rounded-2xl space-y-3 animate-in fade-in">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Administrator Destination Email</label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="admin@hospital.org"
+                        value={recipientEmail}
+                        onChange={(e) => setRecipientEmail(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 mt-1"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      ✉️ Dispatches an executive HTML financial statement with consolidated revenue, workforce costs, and operating margins via Resend.
+                    </p>
+                  </div>
+                )}
+
+                {emailSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                    <span>{emailSuccess}</span>
+                  </div>
+                )}
+
+                {emailError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                    <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                    <span>{emailError}</span>
+                  </div>
+                )}
               </div>
 
               {/* Data Summary Quick Badge */}
@@ -689,6 +812,25 @@ export default function ReportExportModal({
               >
                 <Download size={18} />
                 Download Formatted CSV
+              </button>
+            ) : exportFormat === 'EMAIL' ? (
+              <button 
+                type="button" 
+                onClick={handleSendEmail}
+                disabled={!docData || loading || emailing || !recipientEmail}
+                className="flex-1 sm:flex-none px-6 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-bold hover:bg-brand-700 shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              >
+                {emailing ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Dispatching Email...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={18} />
+                    <span>Dispatch Email to Admin</span>
+                  </>
+                )}
               </button>
             ) : (
               <button 
