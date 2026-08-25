@@ -20,21 +20,28 @@ import {
   Building,
   Calculator,
   DollarSign,
-  FileText
+  FileText,
+  Eye,
+  Mail,
+  Loader2,
+  Send,
 } from "lucide-react";
 import clsx from "clsx";
 import { createClient } from "@/utils/supabase/client";
 import AddStaffModal from "@/components/hospital/AddStaffModal";
 import ProcessPayrollModal from "@/components/hospital/ProcessPayrollModal";
+import ViewPayslipModal from "@/components/hospital/ViewPayslipModal";
 import StatusModal from "@/components/hospital/StatusModal";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { formatCurrencyAmount } from "@/utils/currency";
+import { sendPayslipEmailAction } from "@/app/hospital/hr/actions";
 
 interface StaffProfile {
   id: string;
   first_name: string;
   last_name: string;
+  email?: string;
   role: string;
   phone?: string;
   staff_number?: string;
@@ -45,6 +52,7 @@ function normalizeStaffProfile(profile: {
   id: string;
   first_name: string | null;
   last_name: string | null;
+  email?: string | null;
   role: string;
   phone: string | null;
   staff_number: string | null;
@@ -54,6 +62,7 @@ function normalizeStaffProfile(profile: {
     id: profile.id,
     first_name: profile.first_name || 'Unknown',
     last_name: profile.last_name || 'Staff',
+    email: profile.email || undefined,
     role: profile.role,
     phone: profile.phone || undefined,
     staff_number: profile.staff_number || undefined,
@@ -88,6 +97,8 @@ interface PayrollRecord {
 export default function HRDashboard() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false);
+  const [viewingPayslipId, setViewingPayslipId] = useState<string | null>(null);
+  const [emailingRecordId, setEmailingRecordId] = useState<string | null>(null);
   const [staff, setStaff] = useState<StaffProfile[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
@@ -226,6 +237,34 @@ export default function HRDashboard() {
     }
   };
 
+  const handleQuickEmailPayslip = async (recordId: string) => {
+    setEmailingRecordId(recordId);
+    try {
+      const res = await sendPayslipEmailAction(recordId);
+      if (res.success) {
+        setStatusModal({
+          type: 'success',
+          title: 'Payslip Emailed Successfully',
+          message: `Official salary payslip has been delivered to ${res.recipientEmail}.`,
+        });
+      } else {
+        setStatusModal({
+          type: 'error',
+          title: 'Email Delivery Failed',
+          message: res.error || 'Could not dispatch payslip email.',
+        });
+      }
+    } catch (err: any) {
+      setStatusModal({
+        type: 'error',
+        title: 'Email Dispatch Error',
+        message: err.message || 'An error occurred while connecting to email service.',
+      });
+    } finally {
+      setEmailingRecordId(null);
+    }
+  };
+
   const {
     currentPage: payrollPage,
     setCurrentPage: setPayrollPage,
@@ -348,45 +387,91 @@ export default function HRDashboard() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                   <tr>
-                    <th className="px-6 py-3">Staff Member</th>
-                    <th className="px-6 py-3">Pay Period</th>
-                    <th className="px-6 py-3">Net Salary</th>
-                    <th className="px-6 py-3 text-right">Status</th>
+                    <th className="px-5 py-3">Staff Member</th>
+                    <th className="px-5 py-3">Pay Period</th>
+                    <th className="px-5 py-3">Breakdown</th>
+                    <th className="px-5 py-3">Net Disbursed</th>
+                    <th className="px-5 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-slate-400 font-bold text-xs uppercase tracking-wider">
+                      <td colSpan={5} className="px-5 py-8 text-center text-slate-400 font-bold text-xs uppercase tracking-wider">
                         Loading payroll records...
                       </td>
                     </tr>
                   ) : payrollRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-slate-400 font-bold text-xs uppercase tracking-wider">
+                      <td colSpan={5} className="px-5 py-8 text-center text-slate-400 font-bold text-xs uppercase tracking-wider">
                         No payroll records processed yet. Click &quot;Process Payroll&quot; to disburse.
                       </td>
                     </tr>
                   ) : paginatedPayroll.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <p className="font-bold text-slate-900">
+                    <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-5 py-3.5">
+                        <p className="font-bold text-slate-900 text-sm">
                           {row.profiles ? `${row.profiles.first_name} ${row.profiles.last_name}` : 'Staff Member'}
                         </p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">
-                          {row.profiles?.staff_number || `ID: ${row.id.substring(0, 8)}`}
-                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] font-bold text-slate-400 font-mono">
+                            {row.profiles?.staff_number || `ID: ${row.id.substring(0, 8)}`}
+                          </span>
+                          {row.profiles?.email && (
+                            <span className="text-[10px] text-slate-400 truncate max-w-[150px]">
+                              • {row.profiles.email}
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-xs font-bold text-slate-700">
-                        {row.pay_period}
+                      <td className="px-5 py-3.5 text-xs font-bold text-slate-700">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 rounded-lg font-mono text-[11px]">
+                          {row.pay_period}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 font-black text-slate-900">
-                        {formatCurrencyAmount(row.net_salary, currencyConfig.symbol, currencyConfig.position)}
+                      <td className="px-5 py-3.5 text-xs">
+                        <div className="space-y-0.5">
+                          <span className="text-slate-600 block text-[11px]">Base: {formatCurrencyAmount(row.base_salary, currencyConfig.symbol, currencyConfig.position)}</span>
+                          {row.allowances > 0 && (
+                            <span className="text-emerald-600 block text-[10px] font-bold">+{formatCurrencyAmount(row.allowances, currencyConfig.symbol, currencyConfig.position)} Allowances</span>
+                          )}
+                          {row.deductions > 0 && (
+                            <span className="text-rose-600 block text-[10px] font-bold">-{formatCurrencyAmount(row.deductions, currencyConfig.symbol, currencyConfig.position)} Deductions</span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">
+                      <td className="px-5 py-3.5">
+                        <span className="text-sm font-black text-emerald-700 block">
+                          {formatCurrencyAmount(row.net_salary, currencyConfig.symbol, currencyConfig.position)}
+                        </span>
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 mt-1">
                           {row.status || 'PROCESSED'}
                         </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setViewingPayslipId(row.id)}
+                            className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+                            title="View & Print Official Payslip Document"
+                          >
+                            <Eye size={13} className="text-slate-600" />
+                            <span>Payslip</span>
+                          </button>
+                          <button
+                            onClick={() => handleQuickEmailPayslip(row.id)}
+                            disabled={emailingRecordId === row.id || !row.profiles?.email}
+                            className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 font-bold text-xs transition-colors flex items-center gap-1 border border-emerald-200/60 shadow-2xs"
+                            title={row.profiles?.email ? `Email payslip to ${row.profiles.email}` : 'No email registered on staff profile'}
+                          >
+                            {emailingRecordId === row.id ? (
+                              <Loader2 size={13} className="animate-spin text-emerald-600" />
+                            ) : (
+                              <Mail size={13} className="text-emerald-600" />
+                            )}
+                            <span>{emailingRecordId === row.id ? 'Sending...' : 'Email'}</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -534,6 +619,12 @@ export default function HRDashboard() {
         onSuccess={fetchHRData}
         currencySymbol={currencyConfig.symbol}
         currencyPosition={currencyConfig.position}
+      />
+
+      <ViewPayslipModal
+        isOpen={!!viewingPayslipId}
+        onClose={() => setViewingPayslipId(null)}
+        payrollRecordId={viewingPayslipId}
       />
 
       <StatusModal 
