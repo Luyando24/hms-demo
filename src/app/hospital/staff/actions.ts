@@ -184,21 +184,41 @@ export async function createStaffMember(input: unknown) {
 
     const staffId = created.user.id;
 
-    // 5. Ensure profile is properly updated with role, staff_number, and department_id
-    const { error: profileError } = await adminSupabase
+    // 5. Ensure profile is properly updated with role, staff_number, department_id, and optional room_id
+    const profilePayload: Record<string, any> = {
+      id: staffId,
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      email: formData.email,
+      staff_number: assignedStaffNumber,
+      role: formData.role,
+      department_id: departmentId,
+      phone: formData.phone || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (formData.roomId) {
+      profilePayload.room_id = formData.roomId;
+    }
+
+    let { error: profileError } = await adminSupabase
       .from('profiles')
-      .upsert({
-        id: staffId,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        email: formData.email,
-        staff_number: assignedStaffNumber,
-        role: formData.role,
-        department_id: departmentId,
-        room_id: formData.roomId || null,
-        phone: formData.phone || null,
-        updated_at: new Date().toISOString(),
-      });
+      .upsert(profilePayload as any);
+
+    // If upsert fails specifically due to missing room_id column in database schema cache, retry without room_id
+    if (
+      profileError &&
+      (profileError.message?.includes('room_id') ||
+        profileError.details?.includes('room_id') ||
+        profileError.code === 'PGRST204')
+    ) {
+      console.warn('Retrying profile upsert without room_id column due to schema cache mismatch:', profileError.message);
+      delete profilePayload.room_id;
+      const retryResult = await adminSupabase
+        .from('profiles')
+        .upsert(profilePayload as any);
+      profileError = retryResult.error;
+    }
 
     if (profileError) {
       // Clean up orphaned auth user if profile record creation fails

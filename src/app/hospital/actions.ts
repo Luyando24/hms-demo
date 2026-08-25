@@ -271,10 +271,41 @@ export async function updateStaffAction(id: string, input: unknown) {
     const staffData = staffUpdateSchema.parse(input);
     const adminSupabase = createAdminClient();
 
-    const { error: profileError } = await adminSupabase
+    const updatePayload: Record<string, any> = {
+      first_name: staffData.first_name,
+      last_name: staffData.last_name,
+      role: staffData.role,
+      staff_number: staffData.staff_number,
+      email: staffData.email,
+      phone: staffData.phone,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (staffData.room_id) {
+      updatePayload.room_id = staffData.room_id;
+    }
+
+    let { error: profileError } = await adminSupabase
       .from('profiles')
-      .update({ ...staffData, updated_at: new Date().toISOString() })
+      .update(updatePayload as any)
       .eq('id', staffId);
+
+    // If update fails specifically due to missing room_id column in database schema cache, retry without room_id
+    if (
+      profileError &&
+      (profileError.message?.includes('room_id') ||
+        profileError.details?.includes('room_id') ||
+        profileError.code === 'PGRST204')
+    ) {
+      console.warn('Retrying profile update without room_id column due to schema cache mismatch:', profileError.message);
+      delete updatePayload.room_id;
+      const retryResult = await adminSupabase
+        .from('profiles')
+        .update(updatePayload as any)
+        .eq('id', staffId);
+      profileError = retryResult.error;
+    }
+
     if (profileError) throw profileError;
 
     const { error: authError } = await adminSupabase.auth.admin.updateUserById(staffId, {
