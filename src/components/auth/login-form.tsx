@@ -110,20 +110,30 @@ function LoginContent({ audience, action }: LoginFormProps) {
     'idle' | 'acquired' | 'denied' | 'timeout' | 'error'
   >('idle');
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [isInsecureMobile, setIsInsecureMobile] = useState(false);
+  const [isInsecureOrigin, setIsInsecureOrigin] = useState(false);
 
   const requestLocation = useCallback(() => {
-    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
-      setLocationStatus('error');
-      setLocationError('Geolocation API is not supported on this browser.');
-      return;
+    const isHttp = typeof window !== 'undefined' && window.location.protocol === 'http:';
+    const isIpHost =
+      typeof window !== 'undefined' &&
+      window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1';
+    const isInsecure =
+      typeof window !== 'undefined' &&
+      (window.isSecureContext === false || (isHttp && isIpHost));
+
+    if (isInsecure) {
+      setIsInsecureOrigin(true);
     }
 
-    const isHttp = window.location.protocol === 'http:';
-    const isIpHost =
-      window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-    if (isHttp && isIpHost) {
-      setIsInsecureMobile(true);
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+      setLocationStatus('error');
+      setLocationError(
+        isInsecure
+          ? 'Geolocation is disabled over unencrypted HTTP on network IP addresses. Browsers require HTTPS or localhost.'
+          : 'Geolocation API is not supported on this browser.'
+      );
+      return;
     }
 
     setLocating(true);
@@ -153,15 +163,22 @@ function LoginContent({ audience, action }: LoginFormProps) {
             if (err.code === 1) {
               setLocationStatus('denied');
               setLocationError(
-                'Location access was blocked. On Safari iOS, please tap "Retry Location Check" below.'
+                isInsecure
+                  ? 'Location access was blocked because this page is served over HTTP on a network IP. Browsers restrict Geolocation to HTTPS or localhost.'
+                  : 'Location access was blocked. Please enable location permissions in your browser and OS privacy settings, then tap Retry.'
+              );
+            } else if (err.code === 2) {
+              setLocationStatus('error');
+              setLocationError(
+                'Unable to acquire device position. Please ensure Windows/OS Location Services are enabled and system Date & Time are synchronized.'
               );
             } else if (err.code === 3) {
               setLocationStatus('timeout');
-              setLocationError('GPS detection timed out. Tap "Retry Location Check" below.');
+              setLocationError('GPS detection timed out. Tap "Retry Location Check" below or proceed to credentials.');
             } else {
               setLocationStatus('error');
               setLocationError(
-                'Unable to acquire GPS position. Please check device Location Services.'
+                'Unable to acquire GPS position. Please check device Location Services and system Date & Time.'
               );
             }
           }
@@ -405,8 +422,83 @@ function LoginContent({ audience, action }: LoginFormProps) {
                 )}
               </button>
             </form>
+          ) : isWorkforce && step === 1 ? (
+            /* SCREEN 1: FIRST SCREEN LOCATION VERIFICATION ANIMATION */
+            <div className="py-4 space-y-6 text-center animate-in fade-in duration-300">
+              {locating ? (
+                <div className="space-y-5">
+                  <div className="relative w-20 h-20 mx-auto">
+                    <div className="absolute inset-0 rounded-3xl bg-brand-50 border border-brand-100 flex items-center justify-center">
+                      <Compass className="text-brand-600 animate-spin" size={38} />
+                    </div>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-slate-900">
+                      Verifying Geofence Perimeter
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium mt-1">
+                      Acquiring coordinates for workforce security...
+                    </p>
+                  </div>
+                </div>
+              ) : locationStatus === 'acquired' ? (
+                <div className="space-y-5">
+                  <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shadow-inner">
+                    <CheckCircle2 size={40} className="animate-bounce" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-emerald-950">Within Range</h2>
+                    <p className="text-xs text-emerald-700 font-medium mt-1">
+                      Proceeding to sign in...
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  <div className="w-20 h-20 mx-auto rounded-3xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-inner">
+                    <AlertCircle size={36} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <h2 className="text-lg font-black text-slate-900">
+                      Location Access Needed
+                    </h2>
+                    <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-medium text-left leading-relaxed">
+                      {locationError || 'Location permissions are required to access workforce systems.'}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={requestLocation}
+                    disabled={locating}
+                    className="w-full py-3.5 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20 disabled:opacity-70"
+                  >
+                    <RefreshCw className={locating ? 'animate-spin' : ''} size={18} />
+                    <span>Retry Location Check</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="block w-full text-center text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors pt-1"
+                  >
+                    Proceed to Login Credentials &rarr;
+                  </button>
+                </div>
+              )}
+
+              {isInsecureOrigin && (
+                <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-[11px] font-medium leading-relaxed text-left flex items-start gap-2">
+                  <Info size={14} className="text-blue-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Network Origin Note:</strong> Geolocation requires HTTPS or <code>localhost</code>. When accessing via a network IP, browsers block location by default.
+                  </span>
+                </div>
+              )}
+            </div>
           ) : (
-            /* STANDARD LOGIN FORM */
+            /* SCREEN 2: LOGIN CREDENTIALS FORM */
             (!isWorkforce || step === 2) && (
               <form action={action} className="space-y-5 animate-in fade-in duration-300">
                 {isWorkforce && (
@@ -422,21 +514,45 @@ function LoginContent({ audience, action }: LoginFormProps) {
                       value={coords.lng !== null ? String(coords.lng) : ''}
                     />
 
-                    {/* Clean Status Badge: Within Range */}
-                    <div className="flex items-center justify-between rounded-2xl bg-emerald-50/90 border border-emerald-200/80 px-4 py-3 text-[13px]">
-                      <div className="flex items-center gap-2.5">
-                        <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
-                        <span className="font-bold text-emerald-950">Within Range</span>
-                      </div>
+                    {coords.lat !== null && coords.lng !== null ? (
+                      /* Clean Status Badge: Within Range */
+                      <div className="flex items-center justify-between rounded-2xl bg-emerald-50/90 border border-emerald-200/80 px-4 py-3 text-[13px]">
+                        <div className="flex items-center gap-2.5">
+                          <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
+                          <span className="font-bold text-emerald-950">Within Range</span>
+                        </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setStep(1)}
-                        className="text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 transition-colors px-2.5 py-1 bg-emerald-100/80 hover:bg-emerald-200/80 rounded-xl"
-                      >
-                        <RefreshCw size={11} /> Re-verify
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => setStep(1)}
+                          className="text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 transition-colors px-2.5 py-1 bg-emerald-100/80 hover:bg-emerald-200/80 rounded-xl"
+                        >
+                          <RefreshCw size={11} /> Re-verify
+                        </button>
+                      </div>
+                    ) : (
+                      /* Status Badge: GPS Not Acquired */
+                      <div className="flex items-center justify-between rounded-2xl bg-amber-50/90 border border-amber-200/80 px-4 py-3 text-[13px]">
+                        <div className="flex items-center gap-2.5">
+                          <AlertCircle size={18} className="text-amber-600 shrink-0" />
+                          <div>
+                            <span className="font-bold text-amber-950 block text-xs">GPS Unverified</span>
+                            <span className="text-[11px] text-amber-800">Geofenced roles verified on sign-in</span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStep(1);
+                            requestLocation();
+                          }}
+                          className="text-xs font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1 transition-colors px-2.5 py-1 bg-amber-100/80 hover:bg-amber-200/80 rounded-xl"
+                        >
+                          <RefreshCw size={11} /> Retry GPS
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
 
