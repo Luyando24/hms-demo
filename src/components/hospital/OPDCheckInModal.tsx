@@ -20,6 +20,7 @@ import {
   Pill,
   Camera,
   Building,
+  DoorOpen,
   Calendar,
   FileText,
 } from 'lucide-react';
@@ -79,6 +80,8 @@ export default function OPDCheckInModal({
     initialDestination === 'TRIAGE' || initialDestination === 'DOCTOR',
   );
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
+  const [rooms, setRooms] = useState<Array<{ id: string; name: string; department_id?: string | null }>>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [currencyConfig, setCurrencyConfig] = useState<{
     symbol: string;
     position: 'prefix' | 'suffix';
@@ -102,6 +105,7 @@ export default function OPDCheckInModal({
       setSearchQuery('');
       setPatients([]);
       setSelectedPatient(null);
+      setSelectedRoomId('');
       const initialDest = initialDestination || 'TRIAGE';
       setDestination(initialDest);
       setCustomReason(defaultDepartmentReasons[initialDest]);
@@ -111,6 +115,7 @@ export default function OPDCheckInModal({
       if (initialPatient) {
         setSelectedPatient(initialPatient);
       }
+      setSelectedRoomId('');
       const initialDest = initialDestination || 'TRIAGE';
       setDestination(initialDest);
       setCustomReason(defaultDepartmentReasons[initialDest]);
@@ -136,16 +141,22 @@ export default function OPDCheckInModal({
   };
 
   const fetchDepartmentsAndSettings = async () => {
-    const [{ data: deptData }, { data: settingsData }] = await Promise.all([
+    const [{ data: deptData }, { data: settingsData }, { data: roomsData }] = await Promise.all([
       supabase.from('departments').select('id, name').order('name'),
       supabase
         .from('system_settings')
         .select('currency_symbol, currency_position, consultation_fee')
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from('rooms')
+        .select('id, name, department_id')
+        .eq('is_active', true)
+        .order('name', { ascending: true }),
     ]);
 
     if (deptData) setDepartments(deptData);
+    if (roomsData) setRooms(roomsData);
     if (settingsData) {
       if (settingsData.currency_symbol) {
         setCurrencyConfig({
@@ -253,6 +264,7 @@ export default function OPDCheckInModal({
     const { error: queueError } = await supabase.from('walkin_queue').insert({
       patient_id: selectedPatient.id,
       department_id: targetDeptId,
+      room_id: selectedRoomId || null,
       status: targetStatus,
       priority: targetPriority,
       reason: targetReason,
@@ -528,8 +540,27 @@ export default function OPDCheckInModal({
               />
             </div>
 
-            {/* Priority & Consultation Fee Toggle */}
+            {/* Facility Room & Priority */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <DoorOpen size={13} className="text-slate-500" />
+                  Assign Room (Admin Configured)
+                </label>
+                <select
+                  value={selectedRoomId}
+                  onChange={(e) => setSelectedRoomId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                >
+                  <option value="">Auto-Assign / Default Room</option>
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700">
                   Priority Level
@@ -547,7 +578,7 @@ export default function OPDCheckInModal({
               </div>
 
               {(destination === 'TRIAGE' || destination === 'DOCTOR') && (
-                <div className="flex items-center gap-2 pt-5">
+                <div className="sm:col-span-2 flex items-center gap-2 pt-1">
                   <input
                     type="checkbox"
                     id="gen-invoice"

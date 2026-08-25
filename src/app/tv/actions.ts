@@ -166,6 +166,7 @@ export async function fetchTvQueueData() {
     const { data: roomsData } = await adminSupabase
       .from('rooms')
       .select('id, name')
+      .eq('is_active', true)
       .order('name', { ascending: true });
 
     if (error) {

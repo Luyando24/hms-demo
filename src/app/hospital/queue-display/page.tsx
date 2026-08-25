@@ -166,6 +166,7 @@ export default function QueueDisplayPage() {
         const { data: roomsData } = await supabase
           .from('rooms')
           .select('id, name')
+          .eq('is_active', true)
           .order('name', { ascending: true });
         roomsList = roomsData;
       }

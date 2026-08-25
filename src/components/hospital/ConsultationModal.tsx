@@ -12,6 +12,7 @@ import {
   CornerDownRight,
   CreditCard,
   DollarSign,
+  DoorOpen,
   ExternalLink,
   FileText,
   Hospital,
@@ -54,6 +55,7 @@ interface ConsultationModalProps {
   patientId: string;
   patientName: string;
   queueId: string;
+  initialRoomId?: string;
 }
 
 interface MedicationDraft {
@@ -102,6 +104,7 @@ export default function ConsultationModal({
   patientId,
   patientName,
   queueId,
+  initialRoomId,
 }: ConsultationModalProps) {
   const [mounted, setMounted] = useState(false);
   const [supabase] = useState(() => createClient());
@@ -109,6 +112,8 @@ export default function ConsultationModal({
   const [vitals, setVitals] = useState<Vital | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
+  const [facilityRooms, setFacilityRooms] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<string>(initialRoomId || '');
   const [currentQueueToken, setCurrentQueueToken] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('notes');
   const [notes, setNotes] = useState(emptyNotes);
@@ -178,7 +183,7 @@ export default function ConsultationModal({
     let cancelled = false;
 
     async function loadConsultationReferences() {
-      const [vitalsResult, inventoryResult, deptsResult, queueResult, settingsResult] = await Promise.all([
+      const [vitalsResult, inventoryResult, deptsResult, queueResult, settingsResult, roomsResult] = await Promise.all([
         supabase
           .from('vitals')
           .select('*')
@@ -197,7 +202,7 @@ export default function ConsultationModal({
           .order('name'),
         supabase
           .from('walkin_queue')
-          .select('token_number')
+          .select('token_number, room_id')
           .eq('id', queueId)
           .maybeSingle(),
         supabase
@@ -205,13 +210,31 @@ export default function ConsultationModal({
           .select('currency_symbol, currency_position')
           .limit(1)
           .maybeSingle(),
+        supabase
+          .from('rooms')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name', { ascending: true }),
       ]);
 
       if (!cancelled) {
         setVitals(vitalsResult.data || null);
         setInventory(inventoryResult.data || []);
         setDepartments(deptsResult.data || []);
+        setFacilityRooms(roomsResult.data || []);
         setCurrentQueueToken(queueResult.data?.token_number || null);
+
+        const currentRoom = queueResult.data?.room_id || initialRoomId || '';
+        if (currentRoom) {
+          setSelectedRoomId(currentRoom);
+          if (queueId && queueResult.data?.room_id !== currentRoom) {
+            void supabase
+              .from('walkin_queue')
+              .update({ room_id: currentRoom, status: 'CONSULTATION' })
+              .eq('id', queueId);
+          }
+        }
+
         if (settingsResult.data) {
           setCurrencyConfig({
             symbol: settingsResult.data.currency_symbol || '$',
@@ -225,7 +248,21 @@ export default function ConsultationModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, patientId, queueId, supabase]);
+  }, [isOpen, patientId, queueId, initialRoomId, supabase]);
+
+  const handleRoomChange = async (newRoomId: string) => {
+    setSelectedRoomId(newRoomId);
+    if (queueId) {
+      try {
+        await supabase
+          .from('walkin_queue')
+          .update({ room_id: newRoomId || null, status: 'CONSULTATION' })
+          .eq('id', queueId);
+      } catch (e) {
+        console.warn('Could not update queue room_id:', e);
+      }
+    }
+  };
 
   // Smart Auto-Disposition Recommendation
   useEffect(() => {
@@ -468,6 +505,16 @@ export default function ConsultationModal({
 
     // 2. Perform Patient Forwarding & Department Queue Routing
     try {
+      if (queueId) {
+        await supabase
+          .from('walkin_queue')
+          .update({
+            status: 'COMPLETED',
+            room_id: selectedRoomId || null,
+          })
+          .eq('id', queueId);
+      }
+
       const tokenToForward = currentQueueToken || null;
 
       if (disposition === 'PHARMACY') {
@@ -727,14 +774,34 @@ export default function ConsultationModal({
                 <p className='text-xs text-slate-500 font-medium'>Outpatient clinical consultation & multi-department routing</p>
               </div>
             </div>
-            <button
-              type='button'
-              onClick={onClose}
-              className='rounded-xl p-2 text-slate-400 hover:bg-white hover:text-slate-600 border border-transparent hover:border-slate-200 transition-colors'
-              aria-label='Close consultation'
-            >
-              <X size={20} />
-            </button>
+            <div className='flex items-center gap-3'>
+              {facilityRooms.length > 0 && (
+                <div className='flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs'>
+                  <DoorOpen size={14} className='text-emerald-600' />
+                  <span className='text-[10px] font-bold uppercase tracking-wider text-slate-400'>Room:</span>
+                  <select
+                    value={selectedRoomId}
+                    onChange={(e) => void handleRoomChange(e.target.value)}
+                    className='text-xs font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer'
+                  >
+                    <option value=''>Auto-Assign / Default</option>
+                    {facilityRooms.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <button
+                type='button'
+                onClick={onClose}
+                className='rounded-xl p-2 text-slate-400 hover:bg-white hover:text-slate-600 border border-transparent hover:border-slate-200 transition-colors'
+                aria-label='Close consultation'
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           <div className='flex min-h-0 flex-1 overflow-hidden'>

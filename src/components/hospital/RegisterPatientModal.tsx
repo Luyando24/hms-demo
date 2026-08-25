@@ -21,6 +21,7 @@ import {
   Check,
   Send,
   CornerDownRight,
+  DoorOpen,
   ShieldCheck,
   WifiOff,
   Copy,
@@ -90,6 +91,8 @@ export default function RegisterPatientModal({
     'Professional Life',
     'Medland Direct',
   ]);
+  const [facilityRooms, setFacilityRooms] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [customInsuranceMode, setCustomInsuranceMode] = useState(false);
   const supabase = createClient();
 
@@ -97,20 +100,31 @@ export default function RegisterPatientModal({
     setMounted(true);
     async function loadInsuranceSettings() {
       try {
-        const { data } = await supabase
-          .from('system_settings')
-          .select('insurance_providers')
-          .limit(1)
-          .maybeSingle();
+        const [{ data: settingsData }, { data: roomsData }] = await Promise.all([
+          supabase
+            .from('system_settings')
+            .select('insurance_providers')
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('rooms')
+            .select('id, name')
+            .eq('is_active', true)
+            .order('name', { ascending: true }),
+        ]);
+
         if (
-          data?.insurance_providers &&
-          Array.isArray(data.insurance_providers) &&
-          data.insurance_providers.length > 0
+          settingsData?.insurance_providers &&
+          Array.isArray(settingsData.insurance_providers) &&
+          settingsData.insurance_providers.length > 0
         ) {
-          setAdminProviders(data.insurance_providers);
+          setAdminProviders(settingsData.insurance_providers);
+        }
+        if (roomsData) {
+          setFacilityRooms(roomsData);
         }
       } catch (e) {
-        console.error('Error fetching insurance providers:', e);
+        console.error('Error fetching registration references:', e);
       }
     }
     loadInsuranceSettings();
@@ -257,6 +271,7 @@ export default function RegisterPatientModal({
         await supabase.from('walkin_queue').insert({
           patient_id: createdPatientId,
           department_id: deptId,
+          room_id: (nextAction === 'TRIAGE' || nextAction === 'DOCTOR') ? (selectedRoomId || null) : null,
           status: queueStatus,
           priority: 'NORMAL',
           reason: queueReason,
@@ -927,6 +942,28 @@ First-Time Access Instructions:
                       );
                     })}
                   </div>
+
+                  {/* Room Assignment (Shown for Triage or Doctor Consultation) */}
+                  {(nextAction === 'TRIAGE' || nextAction === 'DOCTOR') && facilityRooms.length > 0 && (
+                    <div className="pt-3 border-t border-slate-100 space-y-1.5 animate-in fade-in">
+                      <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                        <DoorOpen size={13} className="text-slate-500" />
+                        Assign Facility Room (Admin Configured - Optional)
+                      </label>
+                      <select
+                        value={selectedRoomId}
+                        onChange={(e) => setSelectedRoomId(e.target.value)}
+                        className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
+                      >
+                        <option value="">Auto-Assign / Default Room</option>
+                        {facilityRooms.map((room) => (
+                          <option key={room.id} value={room.id}>
+                            {room.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

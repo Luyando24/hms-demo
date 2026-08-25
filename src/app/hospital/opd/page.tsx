@@ -37,6 +37,8 @@ interface DoctorItem {
 export default function OutpatientDashboard() {
   const [queue, setQueue] = useState<any[]>([]);
   const [doctors, setDoctors] = useState<DoctorItem[]>([]);
+  const [facilityRooms, setFacilityRooms] = useState<Array<{ id: string; name: string }>>([]);
+  const [activeRoomId, setActiveRoomId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -58,6 +60,13 @@ export default function OutpatientDashboard() {
   });
 
   const supabase = createClient();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedRoom = localStorage.getItem('hms_active_room_id');
+      if (savedRoom) setActiveRoomId(savedRoom);
+    }
+  }, []);
 
   useEffect(() => {
     fetchOpdData();
@@ -105,14 +114,28 @@ export default function OutpatientDashboard() {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      // 1. Fetch Walkin Queue Items
-      const { data: queueData } = await supabase
-        .from('walkin_queue')
-        .select('*, patients(*), rooms(*)')
-        .order('created_at', { ascending: false });
+      // 1. Fetch Walkin Queue Items and Active Rooms
+      const [{ data: queueData }, { data: roomsData }, { data: docsData }] = await Promise.all([
+        supabase
+          .from('walkin_queue')
+          .select('*, patients(*), rooms(*)')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('rooms')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name', { ascending: true }),
+        supabase
+          .from('profiles')
+          .select('id, first_name, last_name, role')
+          .eq('role', 'DOCTOR')
+          .limit(6),
+      ]);
       
       const qList = queueData || [];
       setQueue(qList);
+      if (roomsData) setFacilityRooms(roomsData);
+      if (docsData) setDoctors(docsData);
 
       // 2. Compute OPD Metrics from DB
       const todayQueue = qList.filter(i => new Date(i.created_at || 0) >= todayStart);
@@ -122,15 +145,6 @@ export default function OutpatientDashboard() {
         waitingTriage: qList.filter(i => i.status === 'WAITING').length,
         completedToday: qList.filter(i => i.status === 'COMPLETED').length,
       });
-
-      // 3. Fetch Doctors for Availability List
-      const { data: docsData } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, role')
-        .eq('role', 'DOCTOR')
-        .limit(6);
-
-      setDoctors(docsData || []);
 
     } catch (err) {
       console.error('Error fetching OPD queue:', err);
@@ -166,14 +180,38 @@ export default function OutpatientDashboard() {
     setSelectedQueueItem(item);
     setIsVitalsModalOpen(true);
 
+    const assignedRoomId = activeRoomId || item.room_id || null;
     try {
-      if (item.status !== 'CALLING') {
+      if (item.status !== 'CALLING' || (!item.room_id && assignedRoomId)) {
         await supabase
           .from('walkin_queue')
-          .update({ status: 'CALLING' })
+          .update({
+            status: 'CALLING',
+            room_id: assignedRoomId,
+          })
           .eq('id', item.id);
         void fetchOpdData();
       }
+    } catch (err) {
+      console.warn('Could not update queue status to CALLING:', err);
+    }
+  };
+
+  const handleStartConsult = async (item: any) => {
+    setSelectedPatient(item.patients);
+    setSelectedQueueItem(item);
+    setIsConsultationModalOpen(true);
+
+    const assignedRoomId = activeRoomId || item.room_id || null;
+    try {
+      await supabase
+        .from('walkin_queue')
+        .update({
+          status: 'CALLING',
+          room_id: assignedRoomId,
+        })
+        .eq('id', item.id);
+      void fetchOpdData();
     } catch (err) {
       console.warn('Could not update queue status to CALLING:', err);
     }
@@ -188,6 +226,31 @@ export default function OutpatientDashboard() {
           <p className="text-xs text-slate-500 font-normal mt-0.5">Daily consultation queue, patient triage, and physician workflows.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Active Room Selector for Clinicians */}
+          {facilityRooms.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-xs shadow-xs">
+              <DoorOpen size={14} className="text-emerald-600 shrink-0" />
+              <span className="text-slate-400 font-bold uppercase text-[10px]">Room:</span>
+              <select
+                value={activeRoomId}
+                onChange={(e) => {
+                  setActiveRoomId(e.target.value);
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('hms_active_room_id', e.target.value);
+                  }
+                }}
+                className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer text-xs"
+              >
+                <option value="">Select Room (Admin Configured)...</option>
+                {facilityRooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button 
             onClick={fetchOpdData}
             className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
@@ -386,7 +449,7 @@ export default function OutpatientDashboard() {
                       {/* Doctor Consultation is available for Doctors and Admins */}
                       {(item.status === 'TRIAGED' || item.status === 'CONSULTATION' || (item.status === 'WAITING' && currentUserRole !== 'NURSE')) && item.patients && (
                         <button 
-                          onClick={() => { setSelectedPatient(item.patients); setSelectedQueueItem(item); setIsConsultationModalOpen(true); }}
+                          onClick={() => void handleStartConsult(item)}
                           className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
                         >
                           <Stethoscope size={13} />
@@ -482,6 +545,7 @@ export default function OutpatientDashboard() {
           patientId={selectedPatient.id} 
           patientName={`${selectedPatient.first_name} ${selectedPatient.last_name}`}
           queueId={selectedQueueItem.id}
+          initialRoomId={activeRoomId || selectedQueueItem.room_id}
         />
       )}
 
