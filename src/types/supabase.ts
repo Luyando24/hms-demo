@@ -1807,6 +1807,7 @@ export type Database = {
           last_name: string | null
           phone: string | null
           role: string
+          room_id: string | null
           staff_number: string | null
           updated_at: string | null
         }
@@ -1820,6 +1821,7 @@ export type Database = {
           last_name?: string | null
           phone?: string | null
           role?: string
+          room_id?: string | null
           staff_number?: string | null
           updated_at?: string | null
         }
@@ -1833,6 +1835,7 @@ export type Database = {
           last_name?: string | null
           phone?: string | null
           role?: string
+          room_id?: string | null
           staff_number?: string | null
           updated_at?: string | null
         }
@@ -1842,6 +1845,13 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]

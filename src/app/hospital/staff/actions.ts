@@ -27,6 +27,7 @@ const staffSchema = z
     department: z.string().trim().max(150).optional().nullable(),
     staffNumber: z.string().trim().max(60).optional().nullable(),
     phone: z.string().trim().max(40).optional().nullable(),
+    roomId: z.string().trim().max(60).optional().nullable(),
   })
   .strict();
 
@@ -194,6 +195,7 @@ export async function createStaffMember(input: unknown) {
         staff_number: assignedStaffNumber,
         role: formData.role,
         department_id: departmentId,
+        room_id: formData.roomId || null,
         phone: formData.phone || null,
         updated_at: new Date().toISOString(),
       });

@@ -11,6 +11,7 @@ import {
   Stethoscope, 
   MoreVertical, 
   CheckCircle2,
+  Check,
   Loader2,
   DoorOpen,
   RefreshCw,
@@ -446,8 +447,16 @@ export default function OutpatientDashboard() {
                         </button>
                       )}
 
-                      {/* Doctor Consultation is available for Doctors and Admins */}
-                      {(item.status === 'TRIAGED' || item.status === 'CONSULTATION' || (item.status === 'WAITING' && currentUserRole !== 'NURSE')) && item.patients && (
+                      {/* When Triaged or In Consult and viewed by a Nurse, display status badge (Never Start Consult) */}
+                      {(item.status === 'TRIAGED' || item.status === 'CONSULTATION') && currentUserRole === 'NURSE' && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2.5 py-1 rounded-lg">
+                          <Check size={12} className="text-indigo-600" />
+                          Triaged & Forwarded
+                        </span>
+                      )}
+
+                      {/* Doctor Consultation is strictly for Doctors and Admins (NEVER Nurses) */}
+                      {currentUserRole !== 'NURSE' && (item.status === 'TRIAGED' || item.status === 'CONSULTATION' || item.status === 'WAITING') && item.patients && (
                         <button 
                           onClick={() => void handleStartConsult(item)}
                           className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"

@@ -14,6 +14,7 @@ import {
   Filter,
   RefreshCw,
   KeyRound,
+  DoorOpen,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
@@ -63,7 +64,7 @@ export default function StaffDirectory() {
     // CRITICAL: Filter out PATIENT profiles so ONLY staff are listed
     let query = supabase
       .from('profiles')
-      .select('*', { count: 'exact' })
+      .select('*, rooms(id, name)', { count: 'exact' })
       .neq('role', 'PATIENT');
 
     if (roleFilter !== 'ALL') {
@@ -170,6 +171,7 @@ export default function StaffDirectory() {
               <tr>
                 <th className="px-4 py-2.5">Employee</th>
                 <th className="px-4 py-2.5">Role & Staff ID</th>
+                <th className="px-4 py-2.5">Assigned Room / Station</th>
                 <th className="px-4 py-2.5">Contact Info</th>
                 <th className="px-4 py-2.5">Join Date</th>
                 <th className="px-4 py-2.5 text-right">Actions</th>
@@ -179,14 +181,14 @@ export default function StaffDirectory() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    <td colSpan={5} className="px-4 py-4">
+                    <td colSpan={6} className="px-4 py-4">
                       <div className="h-4 bg-slate-100 rounded w-3/4 mx-auto" />
                     </td>
                   </tr>
                 ))
               ) : staff.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center">
+                  <td colSpan={6} className="px-4 py-12 text-center">
                     <Users className="mx-auto text-slate-300 mb-2" size={32} />
                     <p className="text-xs font-medium text-slate-400">No medical or operational staff found</p>
                   </td>
@@ -231,6 +233,18 @@ export default function StaffDirectory() {
                           {staffIdDisplay}
                         </p>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {member.rooms?.name ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[11px] font-bold">
+                          <DoorOpen size={11} className="text-emerald-600 shrink-0" />
+                          {member.rooms.name}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 font-medium italic">
+                          General Pool
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="space-y-0.5 text-xs text-slate-600">

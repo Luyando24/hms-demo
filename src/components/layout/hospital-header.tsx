@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, ChevronDown, HeartPulse, Menu, LogOut, User as UserIcon, Settings, LogIn } from "lucide-react";
+import { Bell, ChevronDown, HeartPulse, Menu, LogOut, User as UserIcon, Settings, LogIn, DoorOpen } from "lucide-react";
 import { GlobalSearch } from "./GlobalSearch";
 import { useMobileNav } from "./mobile-nav-context";
 import { useState, useEffect } from "react";
@@ -20,14 +20,41 @@ export function HospitalHeader() {
   const [brandTitle, setBrandTitle] = useState<string>("");
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [tagline, setTagline] = useState<string>("");
+  const [facilityRooms, setFacilityRooms] = useState<Array<{ id: string; name: string }>>([]);
+  const [activeStaffRoomId, setActiveStaffRoomId] = useState<string>("");
   const supabase = createClient();
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved =
+        localStorage.getItem("hms_staff_active_room_id") ||
+        localStorage.getItem("hms_active_room_id");
+      if (saved) setActiveStaffRoomId(saved);
+    }
+
+    const handleRoomSync = (e: any) => {
+      if (e.detail?.roomId !== undefined) {
+        setActiveStaffRoomId(e.detail.roomId || "");
+      }
+    };
+
+    window.addEventListener("hms-staff-room-changed", handleRoomSync);
+    return () => {
+      window.removeEventListener("hms-staff-room-changed", handleRoomSync);
+    };
+  }, []);
+
+  useEffect(() => {
     const fetchUserAndSettings = async () => {
-      const [{ data: authData }, { data: settings }] = await Promise.all([
+      const [{ data: authData }, { data: settings }, { data: roomsData }] = await Promise.all([
         supabase.auth.getUser(),
         supabase.from("system_settings").select("hospital_name, brand_title, logo_url, tagline").limit(1).maybeSingle(),
+        supabase.from("rooms").select("id, name").eq("is_active", true).order("name", { ascending: true }),
       ]);
+
+      if (roomsData) {
+        setFacilityRooms(roomsData);
+      }
 
       if (settings?.hospital_name) {
         setHospitalName(settings.hospital_name);
@@ -52,10 +79,39 @@ export function HospitalHeader() {
           ...profile,
           email: authData.user.email
         });
+
+        if (profile?.room_id && !localStorage.getItem("hms_staff_active_room_id")) {
+          setActiveStaffRoomId(profile.room_id);
+          localStorage.setItem("hms_staff_active_room_id", profile.room_id);
+          localStorage.setItem("hms_active_room_id", profile.room_id);
+        }
       }
     };
     fetchUserAndSettings();
   }, []);
+
+  const handleStaffRoomChange = async (newRoomId: string) => {
+    setActiveStaffRoomId(newRoomId);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("hms_staff_active_room_id", newRoomId);
+      localStorage.setItem("hms_active_room_id", newRoomId);
+      window.dispatchEvent(
+        new CustomEvent("hms-staff-room-changed", {
+          detail: { roomId: newRoomId },
+        }),
+      );
+    }
+    if (user?.id) {
+      try {
+        await supabase
+          .from("profiles")
+          .update({ room_id: newRoomId || null } as any)
+          .eq("id", user.id);
+      } catch (err) {
+        console.warn("Could not persist profile room_id:", err);
+      }
+    }
+  };
 
   return (
     <>
@@ -95,7 +151,28 @@ export function HospitalHeader() {
         </div>
 
         {/* Right Controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* Active Staff Facility Room Selector */}
+          {facilityRooms.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-xl text-xs shadow-2xs hover:bg-slate-100/80 transition-all">
+              <DoorOpen size={14} className="text-emerald-600 shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 hidden xl:inline">My Room:</span>
+              <select
+                value={activeStaffRoomId}
+                onChange={(e) => void handleStaffRoomChange(e.target.value)}
+                className="bg-transparent font-bold text-slate-800 text-xs focus:outline-none cursor-pointer max-w-[130px] sm:max-w-[170px] truncate"
+                title="Assigned facility room for referrals & queue routing"
+              >
+                <option value="">All / General Pool</option>
+                {facilityRooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Quick Actions */}
           <button 
             onClick={() => setIsCheckInOpen(true)}

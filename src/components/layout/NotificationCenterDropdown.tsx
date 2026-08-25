@@ -120,20 +120,24 @@ export function NotificationCenterDropdown() {
       // 1. Fetch recent walk-in queue items
       const { data: recentQueue } = await supabase
         .from('walkin_queue')
-        .select('id, created_at, patients(first_name, last_name)')
-        .eq('status', 'WAITING')
+        .select('id, created_at, status, rooms(name), patients(first_name, last_name)')
+        .in('status', ['WAITING', 'TRIAGED', 'CONSULTATION'])
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(4);
 
       if (recentQueue) {
         recentQueue.forEach((q: any) => {
           const name = q.patients ? `${q.patients.first_name || ''} ${q.patients.last_name || ''}`.trim() : 'Patient';
+          const isTriaged = q.status === 'TRIAGED' || q.status === 'CONSULTATION';
+          const roomSuffix = q.rooms?.name ? ` in ${q.rooms.name}` : '';
           items.push({
             id: `q-${q.id}`,
-            title: 'OPD Queue Check-in',
-            message: `${name} is waiting in OPD.`,
+            title: isTriaged ? 'Patient Ready for Doctor' : 'OPD Queue Check-in',
+            message: isTriaged
+              ? `${name} triaged and ready for consultation${roomSuffix}.`
+              : `${name} is waiting in OPD queue.`,
             timestamp: new Date(q.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            type: 'info',
+            type: isTriaged ? 'warning' : 'info',
             category: 'queue',
             read: false,
           });

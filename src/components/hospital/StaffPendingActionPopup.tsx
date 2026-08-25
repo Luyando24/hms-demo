@@ -53,16 +53,35 @@ export default function StaffPendingActionPopup() {
   const [snoozedUntil, setSnoozedUntil] = useState<number | null>(null);
   const [isVoiceOn, setIsVoiceOn] = useState<boolean>(true);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [activeStaffRoomId, setActiveStaffRoomId] = useState<string | null>(null);
 
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
   const lastActionIdRef = useRef<string | null>(null);
 
-  // Sync sound preference and load active user role
+  // Sync sound preference and load active user role & assigned room
   useEffect(() => {
     setIsVoiceOn(isVoiceEnabled());
     void fetchUserRole();
+
+    if (typeof window !== 'undefined') {
+      const savedRoom =
+        localStorage.getItem('hms_staff_active_room_id') ||
+        localStorage.getItem('hms_active_room_id');
+      if (savedRoom) setActiveStaffRoomId(savedRoom);
+    }
+
+    const handleRoomSync = (e: any) => {
+      if (e.detail?.roomId !== undefined) {
+        setActiveStaffRoomId(e.detail.roomId || null);
+      }
+    };
+
+    window.addEventListener('hms-staff-room-changed', handleRoomSync);
+    return () => {
+      window.removeEventListener('hms-staff-room-changed', handleRoomSync);
+    };
   }, []);
 
   const fetchUserRole = async () => {
@@ -70,11 +89,30 @@ export default function StaffPendingActionPopup() {
     if (authData.user) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, room_id')
         .eq('id', authData.user.id)
         .maybeSingle();
-      if (profile?.role) {
-        setCurrentUserRole(profile.role);
+
+      const role = (
+        profile?.role ||
+        authData.user.user_metadata?.role ||
+        (authData.user.app_metadata as any)?.role ||
+        ''
+      )
+        .toString()
+        .trim()
+        .toUpperCase();
+
+      if (role) {
+        setCurrentUserRole(role);
+      }
+
+      if (profile?.room_id && !localStorage.getItem('hms_staff_active_room_id')) {
+        setActiveStaffRoomId(profile.room_id);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('hms_staff_active_room_id', profile.room_id);
+          localStorage.setItem('hms_active_room_id', profile.room_id);
+        }
       }
     }
   };
@@ -86,48 +124,49 @@ export default function StaffPendingActionPopup() {
     path: string | null,
   ): boolean => {
     if (!role) return false;
+    const normRole = role.toUpperCase();
 
     // ADMIN: contextual alerts based on current dashboard page or critical emergency
-    if (role === 'ADMIN') {
+    if (normRole === 'ADMIN' || normRole === 'SUPERADMIN') {
       if (actionType === 'EMERGENCY') return true;
       if (actionType === 'LAB' && path?.includes('/laboratory')) return true;
       if (actionType === 'PRESCRIPTION' && path?.includes('/inventory')) return true;
       if (actionType === 'RADIOLOGY' && path?.includes('/radiology')) return true;
       if (actionType === 'TRIAGE' && path?.includes('/opd')) return true;
-      if (actionType === 'DOCTOR' && path?.includes('/opd')) return true;
+      if (actionType === 'DOCTOR') return true;
       if (actionType === 'BILLING' && (path?.includes('/billing') || path?.includes('/finance')))
         return true;
       return false;
     }
 
     // Role-specific routing:
-    // DOCTORS only receive Doctor consultation / follow-up review alerts
-    if (role === 'DOCTOR') {
+    // DOCTORS receive Doctor consultation & follow-up review alerts
+    if (normRole === 'DOCTOR' || normRole === 'PHYSICIAN') {
       return actionType === 'DOCTOR' || actionType === 'EMERGENCY';
     }
 
-    // LAB TECHS only receive Laboratory investigation referrals
-    if (role === 'LAB_TECH') {
+    // LAB TECHS receive Laboratory investigation referrals
+    if (normRole === 'LAB_TECH' || normRole === 'LABORATORY') {
       return actionType === 'LAB';
     }
 
-    // PHARMACISTS only receive Pharmacy dispensing referrals
-    if (role === 'PHARMACIST') {
+    // PHARMACISTS receive Pharmacy dispensing referrals
+    if (normRole === 'PHARMACIST' || normRole === 'PHARMACY') {
       return actionType === 'PRESCRIPTION';
     }
 
-    // RADIOLOGISTS only receive Radiology & Imaging scan referrals
-    if (role === 'RADIOLOGIST') {
+    // RADIOLOGISTS receive Radiology & Imaging scan referrals
+    if (normRole === 'RADIOLOGIST' || normRole === 'RADIOLOGY') {
       return actionType === 'RADIOLOGY';
     }
 
-    // NURSES only receive Triage & Vitals capture referrals
-    if (role === 'NURSE') {
+    // NURSES receive Triage & Vitals capture referrals
+    if (normRole === 'NURSE') {
       return actionType === 'TRIAGE' || actionType === 'EMERGENCY';
     }
 
     // ACCOUNTANTS & RECEPTIONISTS receive Billing referrals
-    if (role === 'ACCOUNTANT' || role === 'RECEPTIONIST') {
+    if (normRole === 'ACCOUNTANT' || normRole === 'RECEPTIONIST') {
       return actionType === 'BILLING';
     }
 
@@ -147,10 +186,10 @@ export default function StaffPendingActionPopup() {
       // 1. Check Walk-in Queue for Triage, ER, or Doctor
       const { data: queueData } = await supabase
         .from('walkin_queue')
-        .select('*, patients(first_name, last_name, file_number), departments(name), rooms(name)')
-        .in('status', ['WAITING', 'TRIAGED'])
+        .select('*, patients(first_name, last_name, file_number), departments(name), rooms(id, name)')
+        .in('status', ['WAITING', 'TRIAGED', 'CONSULTATION', 'CALLING'])
         .order('created_at', { ascending: false })
-        .limit(6);
+        .limit(15);
 
       if (queueData && queueData.length > 0) {
         queueData.forEach((q: any) => {
@@ -192,22 +231,33 @@ export default function StaffPendingActionPopup() {
               actionLabel: 'Capture Vitals Now',
               timestamp: q.created_at || new Date().toISOString(),
             });
-          } else if (q.status === 'TRIAGED' || q.status === 'CONSULTATION') {
-            actions.push({
-              id: `queue-${q.id}`,
-              type: 'DOCTOR',
-              title: 'Patient Ready: Doctor OPD Consultation',
-              patientName: pName,
-              patientFileNo: fileNo,
-              tokenNumber: token,
-              detail: `Vitals recorded. Patient waiting in queue for Doctor consultation ${
-                q.rooms?.name ? `(${q.rooms.name})` : ''
-              }.`,
-              priority: q.priority === 'URGENT' ? 'URGENT' : 'NORMAL',
-              targetPath: '/hospital/opd',
-              actionLabel: 'Start Consultation',
-              timestamp: q.created_at || new Date().toISOString(),
-            });
+          } else if (q.status === 'TRIAGED' || q.status === 'CONSULTATION' || (q.status === 'CALLING' && q.room_id)) {
+            // Room-targeted referral check for Doctors
+            const hasAssignedRoom = !!q.room_id;
+            const matchesMyRoom = activeStaffRoomId && q.room_id === activeStaffRoomId;
+            const roomName = q.rooms?.name;
+
+            // If patient is directed to a specific room, only show to doctors in that room or unassigned doctors
+            if (!hasAssignedRoom || !activeStaffRoomId || matchesMyRoom) {
+              const isDirectMyRoom = matchesMyRoom && roomName;
+              actions.push({
+                id: `queue-${q.id}`,
+                type: 'DOCTOR',
+                title: isDirectMyRoom
+                  ? `📍 Direct Referral: Patient Ready in ${roomName}`
+                  : `Patient Ready: Doctor Consultation ${roomName ? `(${roomName})` : ''}`,
+                patientName: pName,
+                patientFileNo: fileNo,
+                tokenNumber: token,
+                detail: isDirectMyRoom
+                  ? `Triage nurse completed vitals. Patient is in queue waiting for you in ${roomName}.`
+                  : `Vitals recorded by triage nurse. Patient waiting in consultation queue${roomName ? ` for ${roomName}` : ''}.`,
+                priority: isDirectMyRoom || q.priority === 'URGENT' ? 'URGENT' : 'NORMAL',
+                targetPath: '/hospital/opd',
+                actionLabel: 'Start Consultation',
+                timestamp: q.created_at || new Date().toISOString(),
+              });
+            }
           }
         });
       }
@@ -309,10 +359,9 @@ export default function StaffPendingActionPopup() {
       if (undismissed.length > 0) {
         const topAction = undismissed[0];
 
-        // Trigger sound notification on new arrival
+        // Trigger sound notification only on brand-new arrival
         if (topAction.id !== lastActionIdRef.current) {
           lastActionIdRef.current = topAction.id;
-          setActiveAction(topAction);
 
           if (topAction.priority === 'EMERGENCY' || topAction.priority === 'URGENT') {
             playChime('warning');
@@ -322,6 +371,9 @@ export default function StaffPendingActionPopup() {
             playVoiceNotification(topAction.title, undefined, 'info');
           }
         }
+
+        // Always activate the modal for undismissed actions
+        setActiveAction(topAction);
       } else {
         setActiveAction(null);
       }
@@ -331,9 +383,12 @@ export default function StaffPendingActionPopup() {
   };
 
   useEffect(() => {
-    if (currentUserRole) {
+    void checkForPendingActions();
+
+    // Polling interval every 4 seconds for reliable instant notifications
+    const interval = setInterval(() => {
       void checkForPendingActions();
-    }
+    }, 4000);
 
     // Subscribe to realtime database changes across relevant tables
     const channel = supabase
@@ -361,9 +416,10 @@ export default function StaffPendingActionPopup() {
       .subscribe();
 
     return () => {
+      clearInterval(interval);
       void supabase.removeChannel(channel);
     };
-  }, [dismissedIds, snoozedUntil, currentUserRole, pathname]);
+  }, [dismissedIds, snoozedUntil, currentUserRole, activeStaffRoomId, pathname]);
 
   const handleDismiss = () => {
     if (activeAction) {

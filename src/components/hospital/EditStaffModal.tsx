@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState } from 'react';
-import { X, User, Mail, Shield, Loader2, Save, Hash, Phone, KeyRound } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, User, Mail, Shield, Loader2, Save, Hash, Phone, KeyRound, DoorOpen } from 'lucide-react';
 import { updateStaffAction } from '@/app/hospital/actions';
+import { createClient } from '@/utils/supabase/client';
 import ChangeStaffPasswordModal from './ChangeStaffPasswordModal';
 import StatusModal from './StatusModal';
 
@@ -17,6 +18,8 @@ export default function EditStaffModal({ isOpen, onClose, onSuccess, staffMember
   const [loading, setLoading] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
+  const [facilityRooms, setFacilityRooms] = useState<Array<{ id: string; name: string }>>([]);
+  const supabase = createClient();
   
   const [formData, setFormData] = useState({
     firstName: staffMember?.first_name || '',
@@ -24,8 +27,23 @@ export default function EditStaffModal({ isOpen, onClose, onSuccess, staffMember
     role: staffMember?.role || 'STAFF',
     staffNumber: staffMember?.staff_number || '',
     email: staffMember?.email || '',
-    phone: staffMember?.phone || ''
+    phone: staffMember?.phone || '',
+    roomId: staffMember?.room_id || '',
   });
+
+  useEffect(() => {
+    async function loadRooms() {
+      const { data } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+      if (data) setFacilityRooms(data);
+    }
+    if (isOpen) {
+      void loadRooms();
+    }
+  }, [isOpen, supabase]);
 
   if (!isOpen || !staffMember) return null;
 
@@ -40,7 +58,8 @@ export default function EditStaffModal({ isOpen, onClose, onSuccess, staffMember
         role: formData.role,
         staff_number: formData.staffNumber,
         email: formData.email,
-        phone: formData.phone
+        phone: formData.phone,
+        room_id: formData.roomId || null,
       });
 
       if (result.error) {
@@ -141,6 +160,30 @@ export default function EditStaffModal({ isOpen, onClose, onSuccess, staffMember
                   </div>
                 </div>
               </div>
+
+              {/* Assigned Facility Room */}
+              {facilityRooms.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 ml-1 uppercase tracking-wider flex items-center gap-1.5">
+                    <DoorOpen size={14} className="text-emerald-600" /> Assigned Facility Room / Suite (Optional)
+                  </label>
+                  <div className="relative group">
+                    <DoorOpen className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={16} />
+                    <select 
+                      value={formData.roomId}
+                      onChange={e => setFormData({...formData, roomId: e.target.value})}
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-bold appearance-none"
+                    >
+                      <option value="">Unassigned (General Pool / Multi-Room)</option>
+                      {facilityRooms.map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">

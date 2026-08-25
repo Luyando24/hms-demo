@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   User, 
@@ -16,9 +16,11 @@ import {
   Check, 
   KeyRound,
   Building,
+  DoorOpen,
   Sparkles
 } from 'lucide-react';
 import { createStaffMember } from '@/app/hospital/staff/actions';
+import { createClient } from '@/utils/supabase/client';
 import StatusModal from './StatusModal';
 import { SearchableCombobox } from '../ui/SearchableCombobox';
 
@@ -44,6 +46,8 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
   const [stepError, setStepError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<CreatedStaffCredentials | null>(null);
+  const [facilityRooms, setFacilityRooms] = useState<Array<{ id: string; name: string }>>([]);
+  const supabase = createClient();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -51,8 +55,23 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
     lastName: '',
     role: '',
     department: 'General Outpatient (OPD)',
-    staffNumber: ''
+    staffNumber: '',
+    roomId: '',
   });
+
+  useEffect(() => {
+    async function loadRooms() {
+      const { data } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+      if (data) setFacilityRooms(data);
+    }
+    if (isOpen) {
+      void loadRooms();
+    }
+  }, [isOpen, supabase]);
 
   if (!isOpen) return null;
 
@@ -144,7 +163,8 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffMo
         lastName: formData.lastName.trim(),
         role: formData.role,
         department: formData.department.trim(),
-        staffNumber: formData.staffNumber.trim() || undefined
+        staffNumber: formData.staffNumber.trim() || undefined,
+        roomId: formData.roomId || undefined,
       });
 
       if (!result.success) {
@@ -497,6 +517,30 @@ Initial Password: ${createdCredentials.tempPassword || 'Set via invite link'}`;
                       />
                     </div>
                   </div>
+
+                  {/* Assigned Facility Room */}
+                  {facilityRooms.length > 0 && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 ml-1 uppercase tracking-wider flex items-center gap-1.5">
+                        <DoorOpen size={14} className="text-emerald-600" /> Assigned Room / Suite (Optional)
+                      </label>
+                      <div className="relative group">
+                        <DoorOpen className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={16} />
+                        <select 
+                          value={formData.roomId}
+                          onChange={e => setFormData({...formData, roomId: e.target.value})}
+                          className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white transition-all appearance-none"
+                        >
+                          <option value="">Unassigned (General Pool / Multi-Room)</option>
+                          {facilityRooms.map(r => (
+                            <option key={r.id} value={r.id}>
+                              {r.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

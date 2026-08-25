@@ -56,6 +56,7 @@ const staffUpdateSchema = z
     staff_number: z.string().trim().min(1).max(60),
     email: z.string().trim().email().max(254),
     phone: optionalText(40),
+    room_id: optionalText(60),
   })
   .strict();
 
