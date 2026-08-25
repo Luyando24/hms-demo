@@ -337,10 +337,6 @@ export default function HospitalDashboard() {
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
             Refresh
           </button>
-          <span className="flex items-center gap-2 text-sm font-bold px-3.5 py-2 bg-emerald-100 text-emerald-800 rounded-xl">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            System Active
-          </span>
         </div>
       </div>
 

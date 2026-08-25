@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react';
-import { Settings as SettingsIcon, DollarSign, Building, Save, Loader2, ShieldAlert, CreditCard, Shield, Plus, X, Mail, MapPin, Navigation, Crosshair, Tv, Radio } from 'lucide-react';
+import Link from 'next/link';
+import { Settings as SettingsIcon, DollarSign, Building, Save, Loader2, ShieldAlert, CreditCard, Shield, Plus, X, Mail, MapPin, Navigation, Crosshair, Tv, Radio, Trash2, ArrowRight, Sparkles, Database } from 'lucide-react';
 import clsx from 'clsx';
 import { createClient } from '@/utils/supabase/client';
 import { SUPPORTED_CURRENCIES, formatCurrencyAmount } from '@/utils/currency';
@@ -28,7 +29,7 @@ export default function SystemSettingsPage() {
   const [detectingGps, setDetectingGps] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'financial' | 'payments' | 'insurance' | 'notifications' | 'geofence' | 'tv_broadcast'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'financial' | 'payments' | 'insurance' | 'notifications' | 'geofence' | 'tv_broadcast' | 'data_management'>('general');
   const [isTvModalOpen, setIsTvModalOpen] = useState(false);
 
   const [form, setForm] = useState({
@@ -240,6 +241,7 @@ export default function SystemSettingsPage() {
     { id: 'geofence', label: 'Geo-Fence & Security', icon: MapPin },
     { id: 'notifications', label: 'Email & Notifications', icon: Mail },
     { id: 'tv_broadcast', label: 'TV Broadcast', icon: Tv },
+    { id: 'data_management', label: 'Data Purge & Wipe', icon: Trash2 },
   ] as const;
 
   return (
@@ -901,6 +903,75 @@ export default function SystemSettingsPage() {
               <p className="text-xs text-slate-500 leading-relaxed font-medium">
                 Open <code>/tv</code> on any TV browser and enter the unique 6-digit activation code (e.g. <code>TV-849201</code>). Codes can be revoked at any time by Administrators.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DATA PURGE & CLIENT HANDOVER TAB */}
+      {activeTab === 'data_management' && (
+        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xs space-y-8 animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100 text-rose-700 uppercase tracking-wide">
+                <ShieldAlert size={13} />
+                Admin Danger Zone
+              </div>
+              <h3 className="text-xl font-black text-slate-900">Permanent Data Purge & Wipe</h3>
+              <p className="text-xs text-slate-500 font-medium">
+                Categorically delete test records or perform a complete database reset before handing the system over to the client.
+              </p>
+            </div>
+
+            <Link
+              href="/hospital/admin/data-management"
+              className="inline-flex items-center gap-2 px-5 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-md shadow-rose-600/20 transition-all shrink-0"
+            >
+              <Trash2 size={16} />
+              Open Data Management Console
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3">
+              <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                <Database size={18} className="text-rose-600" />
+                Categorical Data Deletion
+              </h4>
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                Delete specific transactional datasets independently without affecting other functional areas. Supported categories:
+              </p>
+              <ul className="text-xs text-slate-600 font-bold space-y-1.5 list-disc list-inside">
+                <li>Patient Registry & Medical Records</li>
+                <li>Appointments & Walk-in Queues</li>
+                <li>Clinical SOAP Notes, Vitals, Labs & Radiology</li>
+                <li>Billing Invoices, Cashier Payments & Claims</li>
+                <li>Inpatient Ward Admissions & Treatment Sheets</li>
+                <li>Blood Bank Inventory & Donor Logs</li>
+                <li>Pharmacy Inventory & Stock Movements</li>
+                <li>HR Payroll Disbursements & Shift Rosters</li>
+              </ul>
+            </div>
+
+            <div className="p-6 bg-linear-to-br from-rose-950 to-slate-900 border border-rose-800/40 rounded-2xl text-white space-y-3 flex flex-col justify-between">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-300 uppercase tracking-wide">
+                  <Sparkles size={12} />
+                  Client Handover Master Action
+                </div>
+                <h4 className="text-base font-black text-white">Full System Reset</h4>
+                <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                  Atomically purge all demo transactional data while safely preserving core configuration (system settings, departments, wards, rooms, and admin accounts).
+                </p>
+              </div>
+
+              <Link
+                href="/hospital/admin/data-management"
+                className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black text-center shadow-lg shadow-rose-600/30 transition-all block"
+              >
+                Launch Data Management
+              </Link>
             </div>
           </div>
         </div>

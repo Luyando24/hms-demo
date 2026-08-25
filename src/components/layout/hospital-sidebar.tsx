@@ -19,7 +19,8 @@ import {
   Building,
   DoorOpen,
   Tv,
-  Calendar
+  Calendar,
+  Trash2
 } from "lucide-react";
 import clsx from "clsx";
 import { useMobileNav } from "./mobile-nav-context";
@@ -74,6 +75,7 @@ const navGroups = [
       { name: "Rooms & Facilities", href: "/hospital/admin/rooms", icon: DoorOpen },
       { name: "HR & Staffing", href: "/hospital/hr", icon: Users },
       { name: "Reports & Analytics", href: "/hospital/reports", icon: LayoutDashboard },
+      { name: "Data Purge & Wipe", href: "/hospital/admin/data-management", icon: Trash2 },
     ]
   }
 ];

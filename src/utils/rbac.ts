@@ -53,6 +53,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/staff',
     '/hospital/admin/departments',
     '/hospital/admin/rooms',
+    '/hospital/admin/data-management',
     '/hospital/hr',
     '/hospital/reports',
     '/hospital/settings',
