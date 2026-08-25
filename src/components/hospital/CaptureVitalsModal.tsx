@@ -165,23 +165,14 @@ export default function CaptureVitalsModal({
         return;
       }
 
-      const fData = new FormData(e.currentTarget);
-      const roomId = (fData.get('room_id') as string) || formData.room_id || null;
-      const rawBpSys = (fData.get('bp_systolic') as string) || formData.bp_systolic;
-      const rawBpDia = (fData.get('bp_diastolic') as string) || formData.bp_diastolic;
-      const rawHr = (fData.get('heart_rate') as string) || formData.heart_rate;
-      const rawTemp = (fData.get('temperature') as string) || formData.temperature;
-      const rawSpo2 = (fData.get('sp_o2') as string) || formData.sp_o2;
-      const rawWeight = (fData.get('weight') as string) || formData.weight;
-      const rawHeight = (fData.get('height') as string) || formData.height;
-
-      const bpSystolic = rawBpSys ? parseInt(rawBpSys, 10) : null;
-      const bpDiastolic = rawBpDia ? parseInt(rawBpDia, 10) : null;
-      const heartRate = rawHr ? parseInt(rawHr, 10) : null;
-      const temperature = rawTemp ? parseFloat(rawTemp) : null;
-      const spO2 = rawSpo2 ? parseInt(rawSpo2, 10) : null;
-      const weight = rawWeight ? parseFloat(rawWeight) : null;
-      const height = rawHeight ? parseFloat(rawHeight) : null;
+      const roomId = formData.room_id || null;
+      const bpSystolic = formData.bp_systolic ? parseInt(formData.bp_systolic, 10) : null;
+      const bpDiastolic = formData.bp_diastolic ? parseInt(formData.bp_diastolic, 10) : null;
+      const heartRate = formData.heart_rate ? parseInt(formData.heart_rate, 10) : null;
+      const temperature = formData.temperature ? parseFloat(formData.temperature) : null;
+      const spO2 = formData.sp_o2 ? parseInt(formData.sp_o2, 10) : null;
+      const weight = formData.weight ? parseFloat(formData.weight) : null;
+      const height = formData.height ? parseFloat(formData.height) : null;
 
       const bmiValue = (weight && height && height > 0)
         ? parseFloat((weight / Math.pow(height / 100, 2)).toFixed(1))
@@ -557,6 +548,8 @@ export default function CaptureVitalsModal({
                 </label>
                 <select
                   name="room_id"
+                  value={formData.room_id}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, room_id: e.target.value }))}
                   className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                 >
                   <option value="">Select a doctor room (Optional)...</option>
