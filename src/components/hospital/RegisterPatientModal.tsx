@@ -23,6 +23,10 @@ import {
   CornerDownRight,
   ShieldCheck,
   WifiOff,
+  Copy,
+  CheckCheck,
+  Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import StatusModal from './StatusModal';
 import { registerPatientAction } from '@/app/hospital/actions';
@@ -53,13 +57,16 @@ export default function RegisterPatientModal({
     message: string;
   } | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [createdPatientCredentials, setCreatedPatientCredentials] = useState<{
+    patientName: string;
+    fileNumber: string;
+    email: string;
+    portalUrl: string;
+    tokenNumber?: string;
+    destText?: string;
+  } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  const supabase = createClient();
-
-  // Controlled Form State with Auto-save Draft Recovery
   const [formData, setFormData] = useState({
     file_number: '',
     first_name: '',
@@ -75,13 +82,59 @@ export default function RegisterPatientModal({
     insurance_policy_number: '',
   });
 
+  const [adminProviders, setAdminProviders] = useState<string[]>([
+    'NHIMA',
+    'Prudential',
+    'Sanlam',
+    'Madison Health',
+    'Professional Life',
+    'Medland Direct',
+  ]);
+  const [customInsuranceMode, setCustomInsuranceMode] = useState(false);
+  const supabase = createClient();
+
+  useEffect(() => {
+    setMounted(true);
+    async function loadInsuranceSettings() {
+      try {
+        const { data } = await supabase
+          .from('system_settings')
+          .select('insurance_providers')
+          .limit(1)
+          .maybeSingle();
+        if (
+          data?.insurance_providers &&
+          Array.isArray(data.insurance_providers) &&
+          data.insurance_providers.length > 0
+        ) {
+          setAdminProviders(data.insurance_providers);
+        }
+      } catch (e) {
+        console.error('Error fetching insurance providers:', e);
+      }
+    }
+    loadInsuranceSettings();
+  }, []);
+
+  const handleRestorePatient = (saved: any) => {
+    if (!saved) return;
+    setFormData((prev) => ({
+      ...prev,
+      ...saved,
+      gender: saved.gender ? String(saved.gender).toUpperCase() : prev.gender,
+    }));
+    if (saved.insurance_provider && !['Self-Pay', 'NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct'].includes(saved.insurance_provider)) {
+      setCustomInsuranceMode(true);
+    }
+  };
+
   const {
     hasDraft,
     draftTimestamp,
     restoreDraft,
     clearDraft,
     lastSavedAt,
-  } = useFormDraft('patient_registration', formData, setFormData, {
+  } = useFormDraft('patient_registration', formData, handleRestorePatient as any, {
     debounceMs: 300,
     isEnabled: isOpen,
   });
@@ -93,7 +146,8 @@ export default function RegisterPatientModal({
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const val = e.target.name === 'gender' ? e.target.value.toUpperCase() : e.target.value;
+    setFormData((prev) => ({ ...prev, [e.target.name]: val }));
     setStepError(null);
   };
 
@@ -148,7 +202,7 @@ export default function RegisterPatientModal({
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
       dob: formData.dob,
-      gender: formData.gender,
+      gender: (formData.gender || '').toUpperCase(),
       phone: formData.phone.trim(),
       email: formData.email.trim(),
       address: formData.address.trim(),
@@ -180,7 +234,7 @@ export default function RegisterPatientModal({
       if (nextAction !== 'NONE') {
         const { data: depts } = await supabase.from('departments').select('id, name');
         const getDept = (k: string) =>
-          depts?.find((d) => d.name.toLowerCase().includes(k.toLowerCase()))?.id || null;
+          depts?.find((d: any) => d.name.toLowerCase().includes(k.toLowerCase()))?.id || null;
 
         let deptId: string | null = null;
         let queueStatus = 'WAITING';
@@ -234,19 +288,63 @@ export default function RegisterPatientModal({
           ? `directed to Billing / Cashier (Token #${tokenNumber})`
           : 'registered in hospital census';
 
-      setStatus({
-        type: 'success',
-        title: 'Patient Registered & Routed',
-        message: `${patientPayload.first_name} ${patientPayload.last_name} (${result.fileNumber}) was successfully registered and ${destText}.`,
+      const patientName = `${patientPayload.first_name} ${patientPayload.last_name}`;
+      const portalUrl =
+        result.portalUrl ||
+        (typeof window !== 'undefined'
+          ? `${window.location.origin}/patient/login`
+          : '/patient/login');
+
+      setCreatedPatientCredentials({
+        patientName,
+        fileNumber: result.fileNumber || '',
+        email: result.email || '',
+        portalUrl,
+        tokenNumber: nextAction !== 'NONE' ? tokenNumber : undefined,
+        destText: nextAction !== 'NONE' ? destText : undefined,
       });
     } catch (err: any) {
-      setStatus({
-        type: 'success',
-        title: 'Patient Registered',
-        message: `${patientPayload.first_name} ${patientPayload.last_name} has been added to census records.`,
+      const patientName = `${patientPayload.first_name} ${patientPayload.last_name}`;
+      const portalUrl =
+        result.portalUrl ||
+        (typeof window !== 'undefined'
+          ? `${window.location.origin}/patient/login`
+          : '/patient/login');
+
+      setCreatedPatientCredentials({
+        patientName,
+        fileNumber: result.fileNumber || '',
+        email: result.email || '',
+        portalUrl,
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const copyAllCredentials = (creds: {
+    patientName: string;
+    fileNumber: string;
+    email: string;
+    portalUrl: string;
+  }) => {
+    const textToCopy = `🏥 HMS Patient Portal Access Credentials
+------------------------------------------------
+Patient Name: ${creds.patientName}
+File Number: ${creds.fileNumber}
+Login ID / Email: ${creds.email} (or use File Number: ${creds.fileNumber})
+Portal Login URL: ${creds.portalUrl}
+
+First-Time Access Instructions:
+1. Open the portal URL: ${creds.portalUrl}
+2. Click "First Time / Set Password".
+3. Enter your File Number (${creds.fileNumber}) and Date of Birth to set your password and access your health records.
+------------------------------------------------`;
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(textToCopy);
+      setCopiedField('all');
+      setTimeout(() => setCopiedField(null), 3000);
     }
   };
 
@@ -276,6 +374,188 @@ export default function RegisterPatientModal({
       icon: User,
     },
   ];
+
+  if (createdPatientCredentials) {
+    return createPortal(
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200 border border-slate-200">
+          {/* Header */}
+          <div className="p-5 bg-emerald-600 text-white flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
+                <CheckCircle2 size={22} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold">Patient Registered Successfully</h2>
+                <p className="text-xs text-emerald-100 font-medium">
+                  {createdPatientCredentials.destText
+                    ? `Routed & ${createdPatientCredentials.destText}`
+                    : 'Saved to hospital census'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setCreatedPatientCredentials(null);
+                onClose();
+                onSuccess?.();
+              }}
+              className="p-1.5 hover:bg-white/20 rounded-lg transition-colors text-white/80 hover:text-white"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Patient Name
+                </span>
+                <p className="text-sm font-bold text-slate-900">
+                  {createdPatientCredentials.patientName}
+                </p>
+              </div>
+              {createdPatientCredentials.tokenNumber && (
+                <div className="px-3 py-1 bg-brand-50 border border-brand-200 rounded-xl text-center">
+                  <span className="text-[9px] uppercase font-bold text-brand-600">Token</span>
+                  <p className="text-sm font-black text-brand-900">
+                    #{createdPatientCredentials.tokenNumber}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-brand-600" />
+                  Portal Access Credentials
+                </span>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  Active
+                </span>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                {/* File Number */}
+                <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200/70">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 block">
+                      FILE NUMBER (MRN)
+                    </span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {createdPatientCredentials.fileNumber}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(createdPatientCredentials.fileNumber);
+                      setCopiedField('file');
+                      setTimeout(() => setCopiedField(null), 2000);
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors flex items-center gap-1"
+                  >
+                    {copiedField === 'file' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                    {copiedField === 'file' ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+
+                {/* Email / Login ID */}
+                <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200/70">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 block">
+                      LOGIN EMAIL / ID
+                    </span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {createdPatientCredentials.email}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(createdPatientCredentials.email);
+                      setCopiedField('email');
+                      setTimeout(() => setCopiedField(null), 2000);
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors flex items-center gap-1"
+                  >
+                    {copiedField === 'email' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                    {copiedField === 'email' ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+
+                {/* Portal Login URL */}
+                <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200/70">
+                  <div className="max-w-[280px] truncate">
+                    <span className="text-[10px] font-bold text-slate-400 block">
+                      PATIENT PORTAL URL
+                    </span>
+                    <span className="font-mono text-slate-800 text-[11px] truncate block">
+                      {createdPatientCredentials.portalUrl}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(createdPatientCredentials.portalUrl);
+                      setCopiedField('url');
+                      setTimeout(() => setCopiedField(null), 2000);
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors flex items-center gap-1 shrink-0 ml-2"
+                  >
+                    {copiedField === 'url' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                    {copiedField === 'url' ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 bg-blue-50 border border-blue-200/70 rounded-xl text-[11px] text-blue-900 leading-relaxed">
+                <strong>First-time Patient Login:</strong> The patient can navigate to the portal URL, select <em>"First Time / Set Password"</em>, and use their File Number & Date of Birth to set up their password.
+              </div>
+            </div>
+
+            {/* Master Copy Button */}
+            <button
+              type="button"
+              onClick={() => copyAllCredentials(createdPatientCredentials)}
+              className="w-full py-3.5 px-4 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-lg shadow-brand-600/20 transition-all flex items-center justify-center gap-2 active:scale-98"
+            >
+              {copiedField === 'all' ? (
+                <>
+                  <CheckCheck size={16} className="text-white" />
+                  <span>✓ All Details Copied to Clipboard!</span>
+                </>
+              ) : (
+                <>
+                  <Copy size={16} />
+                  <span>📋 Copy All Login Details (File #, URL & Email)</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setCreatedPatientCredentials(null);
+                onClose();
+                onSuccess?.();
+              }}
+              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+            >
+              Done & Close
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
   return createPortal(
     <>
@@ -450,9 +730,8 @@ export default function RegisterPatientModal({
                       className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     >
                       <option value="">Select Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
+                      <option value="MALE">Male</option>
+                      <option value="FEMALE">Female</option>
                     </select>
                   </div>
                 </div>
@@ -489,13 +768,13 @@ export default function RegisterPatientModal({
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-xs font-semibold text-slate-700">Residential Address</label>
-                    <input
+                    <label className="text-xs font-semibold text-slate-700">Home Address</label>
+                    <textarea
                       name="address"
-                      type="text"
+                      rows={2}
                       value={formData.address}
                       onChange={handleChange}
-                      placeholder="Plot / Street / City"
+                      placeholder="Residential address details"
                       className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     />
                   </div>
@@ -506,7 +785,7 @@ export default function RegisterPatientModal({
                       type="text"
                       value={formData.emergency_contact_name}
                       onChange={handleChange}
-                      placeholder="Next of Kin / Relative"
+                      placeholder="Contact name"
                       className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
                     />
                   </div>
@@ -531,29 +810,73 @@ export default function RegisterPatientModal({
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
                   <ShieldCheck size={14} /> Step 3: Insurance & Rapid Queue Routing
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700">Insurance Provider</label>
-                    <input
+                
+                {/* Insurance Provider Selector */}
+                <div className="p-3.5 bg-slate-50/70 border border-slate-200 rounded-2xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800">
+                      Insurance Provider / Payment Method
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setCustomInsuranceMode(!customInsuranceMode)}
+                      className="text-[11px] font-bold text-brand-600 hover:text-brand-700 hover:underline"
+                    >
+                      {customInsuranceMode ? '📋 Choose from List' : '✏️ Type Custom Provider'}
+                    </button>
+                  </div>
+
+                  {!customInsuranceMode ? (
+                    <select
                       name="insurance_provider"
-                      type="text"
                       value={formData.insurance_provider}
-                      onChange={handleChange}
-                      placeholder="e.g. NHIMA, Madison, Self-Pay"
-                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700">Insurance Policy Number</label>
-                    <input
-                      name="insurance_policy_number"
-                      type="text"
-                      value={formData.insurance_policy_number}
-                      onChange={handleChange}
-                      placeholder="Policy / Card ID"
-                      className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
-                    />
-                  </div>
+                      onChange={(e) => {
+                        if (e.target.value === '__CUSTOM__') {
+                          setCustomInsuranceMode(true);
+                          setFormData((prev) => ({ ...prev, insurance_provider: '' }));
+                        } else {
+                          handleChange(e);
+                        }
+                      }}
+                      className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
+                    >
+                      <option value="">Select Insurance Provider (or Self-Pay)</option>
+                      <option value="Self-Pay">Self-Pay / Cash</option>
+                      <optgroup label="Registered Insurance Providers">
+                        {adminProviders.map((provider) => (
+                          <option key={provider} value={provider}>
+                            {provider}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <option value="__CUSTOM__">+ Other / Enter Custom Provider...</option>
+                    </select>
+                  ) : (
+                    <div className="space-y-2">
+                      <input
+                        name="insurance_provider"
+                        type="text"
+                        autoFocus
+                        value={formData.insurance_provider}
+                        onChange={handleChange}
+                        placeholder="Type insurance provider name (e.g. Cigna, Bupa, Aetna)"
+                        className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
+                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-500 font-medium">Quick Select:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, insurance_provider: 'Self-Pay' }));
+                            setCustomInsuranceMode(false);
+                          }}
+                          className="text-[10px] font-bold text-slate-700 bg-slate-200/80 hover:bg-slate-300 px-2 py-0.5 rounded-md transition-colors"
+                        >
+                          Self-Pay
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-2 border-t border-slate-100">

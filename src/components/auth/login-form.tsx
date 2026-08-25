@@ -18,7 +18,11 @@ import {
   ShieldCheck,
   Shield,
   Info,
+  KeyRound,
+  Calendar,
+  Sparkles,
 } from "lucide-react";
+import { setupPatientFirstTimePasswordAction } from "@/app/patient/login/actions";
 
 type LoginAction = (formData: FormData) => void | Promise<void>;
 
@@ -180,6 +184,29 @@ function LoginContent({ audience, action }: LoginFormProps) {
     return () => window.clearTimeout(timeoutId);
   }, [isWorkforce, requestLocation]);
 
+  const [patientMode, setPatientMode] = useState<'signin' | 'first_time'>('signin');
+  const [firstTimeLoading, setFirstTimeLoading] = useState(false);
+  const [firstTimeError, setFirstTimeError] = useState<string | null>(null);
+  const [firstTimeSuccess, setFirstTimeSuccess] = useState<string | null>(null);
+
+  const handleFirstTimeSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFirstTimeLoading(true);
+    setFirstTimeError(null);
+    setFirstTimeSuccess(null);
+
+    const formData = new FormData(e.currentTarget);
+    const res = await setupPatientFirstTimePasswordAction(formData);
+
+    if (!res.success) {
+      setFirstTimeError(res.error || 'Failed to set password.');
+      setFirstTimeLoading(false);
+    } else if (res.redirectTo) {
+      setFirstTimeSuccess('Password set successfully! Redirecting to your patient portal...');
+      window.location.href = res.redirectTo;
+    }
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#f8f9fa] p-4 font-sans">
       {/* Header */}
@@ -198,6 +225,41 @@ function LoginContent({ audience, action }: LoginFormProps) {
 
       {/* Main Card */}
       <div className="w-full max-w-[480px] overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_12px_40px_rgb(0,0,0,0.06)]">
+        {/* Patient Tab Switcher */}
+        {audience === 'patient' && (
+          <div className="grid grid-cols-2 p-2 bg-slate-100/80 border-b border-slate-200/80 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setPatientMode('signin');
+                setFirstTimeError(null);
+              }}
+              className={`py-2.5 rounded-2xl transition-all ${
+                patientMode === 'signin'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPatientMode('first_time');
+                setFirstTimeError(null);
+              }}
+              className={`py-2.5 rounded-2xl transition-all flex items-center justify-center gap-1.5 ${
+                patientMode === 'first_time'
+                  ? 'bg-white text-brand-700 shadow-xs'
+                  : 'text-slate-500 hover:text-brand-600'
+              }`}
+            >
+              <Sparkles size={13} className="text-brand-500" />
+              First Time / Set Password
+            </button>
+          </div>
+        )}
+
         <div className="p-8 sm:p-10">
           {/* Server Error Alert */}
           {serverError && (
@@ -213,181 +275,230 @@ function LoginContent({ audience, action }: LoginFormProps) {
             </div>
           )}
 
-          {/* SCREEN 1: FIRST SCREEN LOCATION VERIFICATION ANIMATION */}
-          {isWorkforce && step === 1 && (
-            <div className="py-4 space-y-6 text-center animate-in fade-in duration-300">
-              {locating ? (
-                <div className="space-y-5">
-                  <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400/40 opacity-75" />
-                    <div className="relative w-20 h-20 rounded-3xl bg-brand-50 border border-brand-200 text-brand-600 flex items-center justify-center shadow-inner">
-                      <Compass className="animate-spin text-brand-600" size={36} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <h2 className="text-lg font-black text-slate-900">
-                      Verifying Location...
-                    </h2>
-                    <p className="text-xs text-slate-500 font-medium max-w-xs mx-auto leading-relaxed">
-                      Checking physical proximity to hospital geo-fence perimeter.
-                    </p>
-                  </div>
-
-                  <div className="w-full max-w-xs mx-auto bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-brand-600 h-full w-3/4 animate-pulse rounded-full" />
-                  </div>
-                </div>
-              ) : locationStatus === 'acquired' ? (
-                <div className="space-y-4">
-                  <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shadow-inner">
-                    <CheckCircle2 size={40} className="animate-bounce" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-black text-emerald-950">Within Range</h2>
-                    <p className="text-xs text-emerald-700 font-medium mt-1">
-                      Proceeding to sign in...
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  <div className="w-20 h-20 mx-auto rounded-3xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-inner">
-                    <AlertCircle size={36} />
-                  </div>
-
-                  <div className="space-y-2">
-                    <h2 className="text-lg font-black text-slate-900">
-                      Location Access Needed
-                    </h2>
-                    <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-medium text-left leading-relaxed">
-                      {locationError || 'Location permissions are required to access workforce systems.'}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={requestLocation}
-                    disabled={locating}
-                    className="w-full py-3.5 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20 disabled:opacity-70"
-                  >
-                    <RefreshCw className={locating ? "animate-spin" : ""} size={18} />
-                    <span>Retry Location Check</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    className="block w-full text-center text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors pt-1"
-                  >
-                    Proceed to Login Credentials &rarr;
-                  </button>
-                </div>
-              )}
-
-              {isInsecureMobile && (
-                <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-[11px] font-medium leading-relaxed text-left flex items-start gap-2">
-                  <Info size={14} className="text-blue-600 shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Safari iOS Note:</strong> Geolocation requires HTTPS or <code>localhost</code>.
-                  </span>
-                </div>
-              )}
+          {/* First Time Setup Error / Success */}
+          {firstTimeError && (
+            <div
+              role="alert"
+              className="mb-6 flex items-start gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-rose-700 animate-in fade-in"
+            >
+              <AlertCircle size={20} className="shrink-0 mt-0.5" />
+              <div className="text-[13px] font-medium leading-relaxed">
+                <p className="font-bold">Setup Notice</p>
+                <p>{firstTimeError}</p>
+              </div>
             </div>
           )}
 
-          {/* SCREEN 2: LOGIN CREDENTIALS FORM */}
-          {(!isWorkforce || step === 2) && (
-            <form action={action} className="space-y-5 animate-in fade-in duration-300">
-              {isWorkforce && (
-                <>
-                  <input
-                    type="hidden"
-                    name="latitude"
-                    value={coords.lat !== null ? String(coords.lat) : ''}
-                  />
-                  <input
-                    type="hidden"
-                    name="longitude"
-                    value={coords.lng !== null ? String(coords.lng) : ''}
-                  />
+          {firstTimeSuccess && (
+            <div
+              role="alert"
+              className="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 animate-in fade-in"
+            >
+              <CheckCircle2 size={20} className="shrink-0 mt-0.5 text-emerald-600" />
+              <div className="text-[13px] font-medium leading-relaxed">
+                <p className="font-bold">Success</p>
+                <p>{firstTimeSuccess}</p>
+              </div>
+            </div>
+          )}
 
-                  {/* Clean Status Badge: Within Range */}
-                  <div className="flex items-center justify-between rounded-2xl bg-emerald-50/90 border border-emerald-200/80 px-4 py-3 text-[13px]">
-                    <div className="flex items-center gap-2.5">
-                      <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
-                      <span className="font-bold text-emerald-950">Within Range</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setStep(1)}
-                      className="text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 transition-colors px-2.5 py-1 bg-emerald-100/80 hover:bg-emerald-200/80 rounded-xl"
-                    >
-                      <RefreshCw size={11} /> Re-verify
-                    </button>
-                  </div>
-                </>
-              )}
+          {/* PATIENT FIRST TIME PASSWORD SETUP FORM */}
+          {audience === 'patient' && patientMode === 'first_time' ? (
+            <form onSubmit={handleFirstTimeSubmit} className="space-y-4 animate-in fade-in duration-300">
+              <div className="p-3 bg-brand-50/70 border border-brand-200/60 rounded-2xl text-xs text-brand-900 font-medium leading-relaxed">
+                Enter your registered <strong>File Number</strong> (e.g. <code>HMS-P-12345</code>) or <strong>Email</strong> and your <strong>Date of Birth</strong> to create your password.
+              </div>
 
               <div>
-                <label
-                  htmlFor={`${audience}-identifier`}
-                  className="mb-2 block text-[13px] font-bold text-slate-900"
-                >
-                  {pageContent.identifierLabel}
+                <label className="mb-1.5 block text-xs font-bold text-slate-900">
+                  Email or File Number *
                 </label>
                 <div className="relative">
-                  <IdentifierIcon
-                    size={18}
-                    aria-hidden="true"
+                  <User
+                    size={16}
                     className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                   />
                   <input
-                    id={`${audience}-identifier`}
                     name="identifier"
                     type="text"
                     required
-                    minLength={3}
-                    maxLength={254}
-                    autoComplete="username"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3.5 pl-10 pr-4 text-[14px] text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 font-bold"
-                    placeholder={pageContent.identifierPlaceholder}
+                    autoFocus
+                    placeholder="e.g. HMS-P-12345 or email@domain.com"
+                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3 pl-10 pr-4 text-xs font-bold text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
                   />
                 </div>
               </div>
 
               <div>
-                <label
-                  htmlFor={`${audience}-password`}
-                  className="mb-2 block text-[13px] font-bold text-slate-900"
-                >
-                  Password
+                <label className="mb-1.5 block text-xs font-bold text-slate-900">
+                  Date of Birth (Security Verification) *
                 </label>
                 <div className="relative">
-                  <Lock
-                    size={18}
-                    aria-hidden="true"
+                  <Calendar
+                    size={16}
                     className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                   />
                   <input
-                    id={`${audience}-password`}
+                    name="dob"
+                    type="date"
+                    required
+                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3 pl-10 pr-4 text-xs font-bold text-slate-900 outline-none transition-all focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-slate-900">
+                  Create New Password (min. 8 characters) *
+                </label>
+                <div className="relative">
+                  <Lock
+                    size={16}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
                     name="password"
                     type="password"
                     required
                     minLength={8}
-                    maxLength={256}
-                    autoComplete="current-password"
-                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3.5 pl-10 pr-4 text-[14px] tracking-widest text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 font-bold"
                     placeholder="••••••••"
+                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3 pl-10 pr-4 text-xs font-bold text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
                   />
                 </div>
               </div>
 
-              <SubmitButton />
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-slate-900">
+                  Confirm New Password *
+                </label>
+                <div className="relative">
+                  <KeyRound
+                    size={16}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    name="confirm_password"
+                    type="password"
+                    required
+                    minLength={8}
+                    placeholder="••••••••"
+                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3 pl-10 pr-4 text-xs font-bold text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={firstTimeLoading}
+                className="w-full py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-black shadow-lg shadow-brand-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+              >
+                {firstTimeLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Verifying & Setting Password...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} />
+                    <span>Set Password & Access Portal</span>
+                  </>
+                )}
+              </button>
             </form>
+          ) : (
+            /* STANDARD LOGIN FORM */
+            (!isWorkforce || step === 2) && (
+              <form action={action} className="space-y-5 animate-in fade-in duration-300">
+                {isWorkforce && (
+                  <>
+                    <input
+                      type="hidden"
+                      name="latitude"
+                      value={coords.lat !== null ? String(coords.lat) : ''}
+                    />
+                    <input
+                      type="hidden"
+                      name="longitude"
+                      value={coords.lng !== null ? String(coords.lng) : ''}
+                    />
+
+                    {/* Clean Status Badge: Within Range */}
+                    <div className="flex items-center justify-between rounded-2xl bg-emerald-50/90 border border-emerald-200/80 px-4 py-3 text-[13px]">
+                      <div className="flex items-center gap-2.5">
+                        <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
+                        <span className="font-bold text-emerald-950">Within Range</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setStep(1)}
+                        className="text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 transition-colors px-2.5 py-1 bg-emerald-100/80 hover:bg-emerald-200/80 rounded-xl"
+                      >
+                        <RefreshCw size={11} /> Re-verify
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <label
+                    htmlFor={`${audience}-identifier`}
+                    className="mb-2 block text-[13px] font-bold text-slate-900"
+                  >
+                    {pageContent.identifierLabel}
+                  </label>
+                  <div className="relative">
+                    <IdentifierIcon
+                      size={18}
+                      aria-hidden="true"
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      id={`${audience}-identifier`}
+                      name="identifier"
+                      type="text"
+                      required
+                      minLength={3}
+                      maxLength={254}
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3.5 pl-10 pr-4 text-[14px] text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 font-bold"
+                      placeholder={pageContent.identifierPlaceholder}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor={`${audience}-password`}
+                    className="mb-2 block text-[13px] font-bold text-slate-900"
+                  >
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Lock
+                      size={18}
+                      aria-hidden="true"
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      id={`${audience}-password`}
+                      name="password"
+                      type="password"
+                      required
+                      minLength={8}
+                      maxLength={256}
+                      autoComplete="current-password"
+                      className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3.5 pl-10 pr-4 text-[14px] tracking-widest text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 font-bold"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                </div>
+
+                <SubmitButton />
+              </form>
+            )
           )}
 
           {/* Switch audience link */}

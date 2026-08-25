@@ -80,11 +80,26 @@ export async function authenticateLogin(
       .eq(identifierColumn, identifier.toUpperCase())
       .maybeSingle();
 
-    if (profileError || !profile?.email) {
+    if (profile?.email) {
+      effectiveEmail = profile.email;
+    } else if (audience === 'patient') {
+      // Fallback: Check patients table directly by file_number
+      const { data: patient } = await adminSupabase
+        .from('patients')
+        .select('email, file_number')
+        .eq('file_number', identifier.toUpperCase())
+        .maybeSingle();
+
+      if (patient) {
+        effectiveEmail =
+          patient.email ||
+          `${patient.file_number.toLowerCase().replace(/[^a-z0-9]/g, '')}@patient.portal`;
+      } else {
+        return { ok: false, reason: 'invalid-credentials' };
+      }
+    } else {
       return { ok: false, reason: 'invalid-credentials' };
     }
-
-    effectiveEmail = profile.email;
   }
 
   const supabase = await createClient();
@@ -117,6 +132,22 @@ export async function authenticateLogin(
   if (profileError || !isRoleAllowedForAudience(role, audience)) {
     await supabase.auth.signOut();
     return { ok: false, reason: 'invalid-credentials' };
+  }
+
+  // Ensure patient record is linked to auth_user_id
+  if (role === 'PATIENT') {
+    const adminSupabase = createAdminClient();
+    if (!identifier.includes('@')) {
+      await adminSupabase
+        .from('patients')
+        .update({ auth_user_id: user.id })
+        .eq('file_number', identifier.toUpperCase());
+    } else {
+      await adminSupabase
+        .from('patients')
+        .update({ auth_user_id: user.id })
+        .ilike('email', identifier);
+    }
   }
 
   // Geofence check for staff and administrator sign-in.

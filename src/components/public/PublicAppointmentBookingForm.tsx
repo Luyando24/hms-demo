@@ -289,7 +289,6 @@ export function PublicAppointmentBookingForm({ departments, doctors, settings }:
               >
                 <option value="MALE">Male</option>
                 <option value="FEMALE">Female</option>
-                <option value="OTHER">Other / Prefer not to say</option>
               </select>
             </div>
           </div>

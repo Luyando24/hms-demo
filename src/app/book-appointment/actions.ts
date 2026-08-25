@@ -14,7 +14,10 @@ const publicBookingSchema = z.object({
   phone: z.string().trim().min(5, 'Valid phone number is required.').max(40),
   email: z.union([z.string().trim().email().max(254), z.literal('')]).transform(val => val || null),
   dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date of birth is required in YYYY-MM-DD format.'),
-  gender: z.enum(['MALE', 'FEMALE', 'OTHER']),
+  gender: z.preprocess(
+    val => (typeof val === 'string' ? val.trim().toUpperCase() : val),
+    z.enum(['MALE', 'FEMALE', 'OTHER']),
+  ),
   provider_id: z.string().uuid().or(z.literal('')).transform(val => val || null),
   department_id: z.string().uuid().or(z.literal('')).transform(val => val || null),
   appointment_date: z

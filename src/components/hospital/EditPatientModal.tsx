@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { X, User, Phone, Mail, MapPin, Calendar, Heart, Shield, Save } from 'lucide-react'
 import StatusModal from './StatusModal'
 import { updatePatientAction } from '@/app/hospital/actions'
+import { createClient } from '@/utils/supabase/client'
 
 interface EditPatientModalProps {
   isOpen: boolean;
@@ -17,10 +18,46 @@ export default function EditPatientModal({ isOpen, onClose, onSuccess, patient }
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null)
+  
+  const [adminProviders, setAdminProviders] = useState<string[]>([
+    'NHIMA',
+    'Prudential',
+    'Sanlam',
+    'Madison Health',
+    'Professional Life',
+    'Medland Direct',
+  ])
+  const [customInsuranceMode, setCustomInsuranceMode] = useState(false)
+  const [insuranceValue, setInsuranceValue] = useState('')
+
+  const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    if (patient?.insurance_provider) {
+      setInsuranceValue(patient.insurance_provider)
+      const known = ['Self-Pay', 'NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct']
+      if (!known.includes(patient.insurance_provider)) {
+        setCustomInsuranceMode(true)
+      }
+    }
+    
+    async function loadInsuranceSettings() {
+      try {
+        const { data } = await supabase
+          .from('system_settings')
+          .select('insurance_providers')
+          .limit(1)
+          .maybeSingle()
+        if (data?.insurance_providers && Array.isArray(data.insurance_providers) && data.insurance_providers.length > 0) {
+          setAdminProviders(data.insurance_providers)
+        }
+      } catch (e) {
+        console.error('Error loading insurance providers:', e)
+      }
+    }
+    loadInsuranceSettings()
+  }, [patient])
 
   if (!isOpen || !mounted || !patient) return null
 
@@ -49,8 +86,8 @@ export default function EditPatientModal({ isOpen, onClose, onSuccess, patient }
       address: formData.get('address') as string,
       emergency_contact_name: formData.get('emergency_contact_name') as string,
       emergency_contact_phone: formData.get('emergency_contact_phone') as string,
-      insurance_provider: formData.get('insurance_provider') as string,
-      insurance_policy_number: formData.get('insurance_policy_number') as string,
+      insurance_provider: insuranceValue.trim(),
+      insurance_policy_number: patient.insurance_policy_number || '',
     }
 
     const { success, error } = await updatePatientAction(patient.id, patientData)
@@ -95,23 +132,22 @@ export default function EditPatientModal({ isOpen, onClose, onSuccess, patient }
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 ml-1">Gender</label>
+                  <label className="text-xs font-bold text-slate-700 ml-1">Gender *</label>
                   <select required name="gender" defaultValue={patient.gender} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-bold">
                     <option value="MALE">Male</option>
                     <option value="FEMALE">Female</option>
-                    <option value="OTHER">Other</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 ml-1">Date of Birth</label>
+                  <label className="text-xs font-bold text-slate-700 ml-1">Date of Birth *</label>
                   <input required name="dob" type="date" defaultValue={patient.dob ? new Date(patient.dob).toISOString().split('T')[0] : ''} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-bold" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 ml-1">First Name</label>
+                  <label className="text-xs font-bold text-slate-700 ml-1">First Name *</label>
                   <input required name="first_name" type="text" defaultValue={patient.first_name} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-bold" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 ml-1">Last Name</label>
+                  <label className="text-xs font-bold text-slate-700 ml-1">Last Name *</label>
                   <input required name="last_name" type="text" defaultValue={patient.last_name} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-bold" />
                 </div>
               </div>
@@ -150,12 +186,69 @@ export default function EditPatientModal({ isOpen, onClose, onSuccess, patient }
                 </div>
               </section>
               <section className="space-y-4">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <Shield size={14} /> Insurance
-                </h3>
-                <div className="space-y-3">
-                  <input name="insurance_provider" type="text" defaultValue={patient.insurance_provider || ''} placeholder="Insurance Provider" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-medium" />
-                  <input name="insurance_policy_number" type="text" defaultValue={patient.insurance_policy_number || ''} placeholder="Policy Number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-medium" />
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Shield size={14} /> Insurance Provider
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setCustomInsuranceMode(!customInsuranceMode)}
+                    className="text-[11px] font-bold text-brand-600 hover:text-brand-700 hover:underline"
+                  >
+                    {customInsuranceMode ? '📋 Choose from List' : '✏️ Type Custom'}
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {!customInsuranceMode ? (
+                    <select
+                      value={insuranceValue}
+                      onChange={(e) => {
+                        if (e.target.value === '__CUSTOM__') {
+                          setCustomInsuranceMode(true)
+                          setInsuranceValue('')
+                        } else {
+                          setInsuranceValue(e.target.value)
+                        }
+                      }}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-medium"
+                    >
+                      <option value="">Select Insurance Provider (or Self-Pay)</option>
+                      <option value="Self-Pay">Self-Pay / Cash</option>
+                      <optgroup label="Registered Insurance Providers">
+                        {adminProviders.map((provider) => (
+                          <option key={provider} value={provider}>
+                            {provider}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <option value="__CUSTOM__">+ Other / Enter Custom Provider...</option>
+                    </select>
+                  ) : (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={insuranceValue}
+                        onChange={(e) => setInsuranceValue(e.target.value)}
+                        placeholder="Type insurance provider name"
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-medium"
+                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400">Quick Select:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInsuranceValue('Self-Pay')
+                            setCustomInsuranceMode(false)
+                          }}
+                          className="text-[11px] font-bold text-slate-700 bg-slate-200/80 hover:bg-slate-300 px-2 py-0.5 rounded-md"
+                        >
+                          Self-Pay
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
             </div>

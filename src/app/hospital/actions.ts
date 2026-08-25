@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { AuthorizationError, requireRole } from '@/lib/auth';
 import { createAdminClient } from '@/utils/supabase/admin';
+import { getSubdomainUrl } from '@/utils/subdomain';
 
 const uuidSchema = z.string().uuid();
 const optionalText = (maxLength: number) =>
@@ -21,7 +22,10 @@ const patientCreateSchema = z
     first_name: z.string().trim().min(1).max(100),
     last_name: z.string().trim().min(1).max(100),
     dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    gender: z.enum(['MALE', 'FEMALE', 'OTHER']),
+    gender: z.preprocess(
+      (val) => (typeof val === 'string' ? val.trim().toUpperCase() : val),
+      z.enum(['MALE', 'FEMALE', 'OTHER']),
+    ),
     phone: optionalText(40),
     email: optionalEmail,
     address: optionalText(500),
@@ -110,7 +114,7 @@ export async function registerPatientAction(input: unknown) {
     const { supabase } = await requireRole(['ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST']);
     const patientData = patientCreateSchema.parse(input);
     const fileNumber =
-      patientData.file_number || `HMS-P-${randomUUID().slice(0, 12).toUpperCase()}`;
+      patientData.file_number || `HMS-P-${randomUUID().slice(0, 8).toUpperCase()}`;
 
     const { data: patient, error: patientError } = await supabase
       .from('patients')
@@ -121,58 +125,88 @@ export async function registerPatientAction(input: unknown) {
     if (patientError) throw patientError;
 
     let warning: string | undefined;
-    if (patientData.email) {
-      const adminSupabase = createAdminClient();
-      const { data: invitation, error: inviteError } =
-        await adminSupabase.auth.admin.inviteUserByEmail(patientData.email, {
-          data: {
-            first_name: patientData.first_name,
-            last_name: patientData.last_name,
-          },
-        });
+    const portalEmail =
+      patientData.email ||
+      `${fileNumber.toLowerCase().replace(/[^a-z0-9]/g, '')}@patient.portal`;
 
-      if (inviteError || !invitation.user) {
-        warning =
-          'The clinical record was created, but the portal invitation could not be sent. ' +
-          (inviteError?.message || 'No auth user was returned.');
-      } else {
-        const authUserId = invitation.user.id;
-        const { error: authMetadataError } = await adminSupabase.auth.admin.updateUserById(
-          authUserId,
-          {
+    const adminSupabase = createAdminClient();
+
+    try {
+      // 1. Check if an auth user already exists for this email
+      const { data: listRes } = await adminSupabase.auth.admin.listUsers();
+      const existingUser = (listRes?.users || []).find(
+        (u) => u.email?.toLowerCase() === portalEmail.toLowerCase(),
+      );
+
+      let authUserId = existingUser?.id;
+
+      if (!authUserId) {
+        // Create new auth user
+        const { data: newUser, error: createError } =
+          await adminSupabase.auth.admin.createUser({
+            email: portalEmail,
+            email_confirm: true,
+            user_metadata: {
+              first_name: patientData.first_name,
+              last_name: patientData.last_name,
+              file_number: patient.file_number,
+            },
             app_metadata: {
               role: 'PATIENT',
               file_number: patient.file_number,
             },
-          },
-        );
+          });
 
-        const [{ error: profileError }, { error: linkError }] = await Promise.all([
-          adminSupabase
-            .from('profiles')
-            .update({
-              first_name: patientData.first_name,
-              last_name: patientData.last_name,
-              email: patientData.email,
-              file_number: patient.file_number,
-              role: 'PATIENT',
-            })
-            .eq('id', authUserId),
-          adminSupabase
-            .from('patients')
-            .update({ auth_user_id: authUserId })
-            .eq('id', patient.id),
-        ]);
-
-        if (authMetadataError || profileError || linkError) {
-          warning =
-            'The record was created and an invitation was sent, but the portal account link needs administrator review.';
+        if (createError) {
+          warning = `Patient clinical record created. Portal account notice: ${createError.message}`;
+        } else if (newUser?.user) {
+          authUserId = newUser.user.id;
         }
       }
+
+      if (authUserId) {
+        // Update user app_metadata with PATIENT role and file_number
+        await adminSupabase.auth.admin.updateUserById(authUserId, {
+          app_metadata: {
+            role: 'PATIENT',
+            file_number: patient.file_number,
+          },
+        });
+
+        // Upsert profile and link patient record
+        await Promise.all([
+          adminSupabase.from('profiles').upsert({
+            id: authUserId,
+            first_name: patientData.first_name,
+            last_name: patientData.last_name,
+            email: portalEmail,
+            file_number: patient.file_number,
+            role: 'PATIENT',
+          }),
+          adminSupabase
+            .from('patients')
+            .update({
+              auth_user_id: authUserId,
+              email: patientData.email || portalEmail,
+            })
+            .eq('id', patient.id),
+        ]);
+      }
+    } catch (authErr: any) {
+      console.warn('Patient auth provisioning note:', authErr);
     }
 
     revalidatePath('/hospital/patients');
-    return { success: true, patientId: patient.id, fileNumber: patient.file_number, warning };
+    return {
+      success: true,
+      patientId: patient.id,
+      fileNumber: patient.file_number,
+      patientName: `${patientData.first_name} ${patientData.last_name}`,
+      email: patientData.email || portalEmail,
+      hasProvidedEmail: Boolean(patientData.email),
+      portalUrl: getSubdomainUrl('patient', '/login'),
+      warning,
+    };
   } catch (error) {
     return { success: false, error: actionError(error) };
   }

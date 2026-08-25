@@ -161,6 +161,24 @@ export default function OutpatientDashboard() {
     paginatedItems: paginatedQueue,
   } = usePagination(filteredQueue, { initialPageSize: 10 });
 
+  const handleOpenCaptureVitals = async (item: any) => {
+    setSelectedPatient(item.patients);
+    setSelectedQueueItem(item);
+    setIsVitalsModalOpen(true);
+
+    try {
+      if (item.status !== 'CALLING') {
+        await supabase
+          .from('walkin_queue')
+          .update({ status: 'CALLING' })
+          .eq('id', item.id);
+        void fetchOpdData();
+      }
+    } catch (err) {
+      console.warn('Could not update queue status to CALLING:', err);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -355,9 +373,9 @@ export default function OutpatientDashboard() {
                   <td className="px-4 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       {/* Vitals Capture is restricted EXCLUSIVELY to Nurses */}
-                      {item.status === 'WAITING' && item.patients && currentUserRole === 'NURSE' && (
+                      {(item.status === 'WAITING' || item.status === 'CALLING') && item.patients && currentUserRole === 'NURSE' && (
                         <button 
-                          onClick={() => { setSelectedPatient(item.patients); setIsVitalsModalOpen(true); }}
+                          onClick={() => void handleOpenCaptureVitals(item)}
                           className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
                         >
                           <Activity size={13} />
@@ -450,9 +468,10 @@ export default function OutpatientDashboard() {
       {selectedPatient && (
         <CaptureVitalsModal 
           isOpen={isVitalsModalOpen} 
-          onClose={() => { setIsVitalsModalOpen(false); setSelectedPatient(null); fetchOpdData(); }} 
+          onClose={() => { setIsVitalsModalOpen(false); setSelectedPatient(null); setSelectedQueueItem(null); fetchOpdData(); }} 
           patientId={selectedPatient.id} 
-          patientName={`${selectedPatient.first_name} ${selectedPatient.last_name}`} 
+          patientName={`${selectedPatient.first_name} ${selectedPatient.last_name}`}
+          queueId={selectedQueueItem?.id}
         />
       )}
 

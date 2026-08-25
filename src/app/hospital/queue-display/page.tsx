@@ -221,7 +221,15 @@ export default function QueueDisplayPage() {
     const announcements = callingItems.map(item => {
       const patientName = item.patients ? `${item.patients.first_name} ${item.patients.last_name}` : 'Patient';
       const token = item.token_number ? `Token ${item.token_number}` : '';
-      const roomName = item.rooms?.name ? `Room ${item.rooms.name}` : 'Consultation Room';
+      const isTriage =
+        item.departments?.name?.toLowerCase().includes('nurs') ||
+        item.departments?.name?.toLowerCase().includes('triage') ||
+        (!item.rooms?.name && item.status === 'CALLING');
+      const roomName = item.rooms?.name
+        ? `Room ${item.rooms.name}`
+        : isTriage
+        ? 'Triage and Vitals Station'
+        : 'Consultation Room';
       return `${token} ${patientName}, please report to ${roomName}.`;
     });
 
@@ -482,7 +490,12 @@ export default function QueueDisplayPage() {
                         <div>
                           <span className="text-[10px] uppercase font-bold text-slate-400 block">Proceed to Room</span>
                           <span className="text-lg font-bold text-emerald-700 uppercase">
-                            {currentCallingItem.rooms?.name || 'General Consultation'}
+                            {currentCallingItem.rooms?.name ||
+                              (currentCallingItem.departments?.name?.toLowerCase().includes('nurs') ||
+                              currentCallingItem.departments?.name?.toLowerCase().includes('triage') ||
+                              currentCallingItem.status === 'CALLING'
+                                ? 'Triage & Vitals Station'
+                                : 'General Consultation')}
                           </span>
                         </div>
                       </div>

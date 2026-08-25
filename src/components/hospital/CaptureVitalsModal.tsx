@@ -32,11 +32,13 @@ export default function CaptureVitalsModal({
   onClose,
   patientId,
   patientName,
+  queueId,
 }: {
   isOpen: boolean;
   onClose: () => void;
   patientId: string;
   patientName: string;
+  queueId?: string;
 }) {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -203,17 +205,25 @@ export default function CaptureVitalsModal({
     clearDraft();
 
     // 3. Forward patient based on destination
-    const { data: queueRow } = await supabase
+    let queueQuery = supabase
       .from('walkin_queue')
-      .select('token_number')
-      .eq('patient_id', patientId)
-      .eq('status', 'WAITING')
-      .maybeSingle();
+      .select('id, token_number');
 
+    if (queueId) {
+      queueQuery = queueQuery.eq('id', queueId);
+    } else {
+      queueQuery = queueQuery.eq('patient_id', patientId).in('status', ['WAITING', 'CALLING']);
+    }
+
+    const { data: queueRow } = await queueQuery.maybeSingle();
     const token = queueRow?.token_number || null;
+    const targetQueueId = queueRow?.id || queueId;
 
     if (destination === 'ER') {
       const erDeptId = getDeptId('er');
+      if (targetQueueId) {
+        await supabase.from('walkin_queue').update({ status: 'COMPLETED' }).eq('id', targetQueueId);
+      }
       await supabase.from('walkin_queue').insert({
         patient_id: patientId,
         department_id: erDeptId,
@@ -230,6 +240,9 @@ export default function CaptureVitalsModal({
       });
     } else if (destination === 'LAB') {
       const labDeptId = getDeptId('laboratory');
+      if (targetQueueId) {
+        await supabase.from('walkin_queue').update({ status: 'COMPLETED' }).eq('id', targetQueueId);
+      }
       await supabase.from('walkin_queue').insert({
         patient_id: patientId,
         department_id: labDeptId,
@@ -247,14 +260,26 @@ export default function CaptureVitalsModal({
     } else {
       // DOCTOR OPD
       const selectedRoom = rooms.find((r) => r.id === roomId);
-      await supabase
-        .from('walkin_queue')
-        .update({
-          status: 'CONSULTATION',
-          room_id: roomId || null,
-        })
-        .eq('patient_id', patientId)
-        .eq('status', 'WAITING');
+      const targetStatus = selectedRoom ? 'CONSULTATION' : 'TRIAGED';
+
+      if (targetQueueId) {
+        await supabase
+          .from('walkin_queue')
+          .update({
+            status: targetStatus,
+            room_id: roomId || null,
+          })
+          .eq('id', targetQueueId);
+      } else {
+        await supabase
+          .from('walkin_queue')
+          .update({
+            status: targetStatus,
+            room_id: roomId || null,
+          })
+          .eq('patient_id', patientId)
+          .in('status', ['WAITING', 'CALLING']);
+      }
 
       setStatus({
         type: 'success',
@@ -264,6 +289,18 @@ export default function CaptureVitalsModal({
     }
 
     setLoading(false);
+  };
+
+  const handleCancelModal = async () => {
+    if (queueId) {
+      // Revert status to WAITING if still CALLING
+      await supabase
+        .from('walkin_queue')
+        .update({ status: 'WAITING' })
+        .eq('id', queueId)
+        .eq('status', 'CALLING');
+    }
+    onClose();
   };
 
   const destinationOptions = [
@@ -305,7 +342,7 @@ export default function CaptureVitalsModal({
               </div>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleCancelModal}
               className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
             >
               <X size={18} />
@@ -511,7 +548,7 @@ export default function CaptureVitalsModal({
             {/* Actions */}
             <div className="flex gap-2.5 pt-3 border-t border-slate-100 justify-end">
               <button
-                onClick={onClose}
+                onClick={handleCancelModal}
                 type="button"
                 className="px-4 py-2 border border-slate-200 bg-white text-slate-700 rounded-xl text-xs font-medium hover:bg-slate-50 transition-colors shadow-xs"
               >

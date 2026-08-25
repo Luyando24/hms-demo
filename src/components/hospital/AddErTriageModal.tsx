@@ -383,12 +383,11 @@ export default function AddErTriageModal({ isOpen, onClose, onSuccess }: AddErTr
                     <label className="text-xs font-bold text-slate-700">Gender</label>
                     <select
                       value={gender}
-                      onChange={(e) => setGender(e.target.value as 'MALE' | 'FEMALE' | 'OTHER')}
+                      onChange={(e) => setGender(e.target.value as 'MALE' | 'FEMALE')}
                       className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500/20"
                     >
                       <option value="MALE">Male</option>
                       <option value="FEMALE">Female</option>
-                      <option value="OTHER">Other / Unknown</option>
                     </select>
                   </div>
                 </div>
