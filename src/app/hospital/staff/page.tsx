@@ -25,6 +25,7 @@ import ChangeStaffPasswordModal from "@/components/hospital/ChangeStaffPasswordM
 import StatusModal from "@/components/hospital/StatusModal";
 import { Pagination } from "@/components/ui/Pagination";
 import { deleteStaffAction } from "@/app/hospital/actions";
+import { getStaffDirectoryAction } from "./actions";
 
 const PAGE_SIZE = 10;
 
@@ -57,64 +58,22 @@ export default function StaffDirectory() {
 
   const fetchStaff = async () => {
     setLoading(true);
-    
-    const from = (currentPage - 1) * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+    const res = await getStaffDirectoryAction({
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      roleFilter,
+      searchQuery,
+    });
 
-    const buildQuery = (selectClause: string) => {
-      let q = supabase
-        .from('profiles')
-        .select(selectClause, { count: 'exact' })
-        .neq('role', 'PATIENT');
-
-      if (roleFilter !== 'ALL') {
-        q = q.eq('role', roleFilter);
-      }
-
-      if (searchQuery.trim()) {
-        const term = searchQuery.trim();
-        q = q.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,staff_number.ilike.%${term}%,email.ilike.%${term}%`);
-      }
-
-      return q.order('created_at', { ascending: false }).range(from, to);
-    };
-
-    let { data, count, error } = await buildQuery('*, rooms(id, name)');
-
-    // Fallback if the relationship profiles -> rooms does not exist in schema cache
-    if (error) {
-      console.warn('Profiles query with rooms join failed, falling back to direct profiles query:', error.message);
-      const fallback = await buildQuery('*');
-      data = fallback.data;
-      count = fallback.count;
-      error = fallback.error;
-
-      // If we have data and some profiles have room_id, fetch room names separately to enrich the records
-      if (data && data.length > 0) {
-        const roomIds = Array.from(new Set(data.map((p: any) => p.room_id).filter(Boolean)));
-        if (roomIds.length > 0) {
-          const { data: roomsData } = await supabase
-            .from('rooms')
-            .select('id, name')
-            .in('id', roomIds);
-
-          if (roomsData) {
-            const roomMap = Object.fromEntries(roomsData.map((r: any) => [r.id, r]));
-            data = data.map((p: any) => ({
-              ...p,
-              rooms: p.room_id ? roomMap[p.room_id] || null : null,
-            }));
-          }
-        }
-      }
-    }
-
-    if (data) {
-      setStaff(data);
-      setTotalCount(count || 0);
+    if (res.success && res.data) {
+      setStaff(res.data);
+      setTotalCount(res.totalCount || 0);
     } else {
       setStaff([]);
       setTotalCount(0);
+      if (res.error) {
+        console.error('Failed to fetch staff directory:', res.error);
+      }
     }
     setLoading(false);
   };

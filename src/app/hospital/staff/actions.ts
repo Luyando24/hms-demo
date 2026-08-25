@@ -303,3 +303,79 @@ export async function changeStaffPasswordAction(input: {
   }
 }
 
+export async function getStaffDirectoryAction(params?: {
+  page?: number;
+  pageSize?: number;
+  roleFilter?: string;
+  searchQuery?: string;
+}) {
+  try {
+    const adminSupabase = createAdminClient();
+    const page = Math.max(1, params?.page || 1);
+    const pageSize = Math.max(1, params?.pageSize || 10);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    const roleFilter = params?.roleFilter || 'ALL';
+    const searchQuery = params?.searchQuery?.trim() || '';
+
+    let query = adminSupabase
+      .from('profiles')
+      .select('*', { count: 'exact' })
+      .or('role.neq.PATIENT,role.is.null');
+
+    if (roleFilter !== 'ALL') {
+      query = query.eq('role', roleFilter);
+    }
+
+    if (searchQuery) {
+      query = query.or(
+        `first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,staff_number.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`
+      );
+    }
+
+    const { data, count, error } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      console.error('Error in getStaffDirectoryAction:', error);
+      return { success: false, error: error.message, data: [], totalCount: 0 };
+    }
+
+    // Enrich with room details if room_id is present
+    let enrichedStaff = data || [];
+    const roomIds = Array.from(
+      new Set(enrichedStaff.map((p: any) => p.room_id).filter(Boolean))
+    );
+
+    if (roomIds.length > 0) {
+      const { data: roomsData } = await adminSupabase
+        .from('rooms')
+        .select('id, name')
+        .in('id', roomIds);
+
+      if (roomsData) {
+        const roomMap = Object.fromEntries(roomsData.map((r: any) => [r.id, r]));
+        enrichedStaff = enrichedStaff.map((p: any) => ({
+          ...p,
+          rooms: p.room_id ? roomMap[p.room_id] || null : null,
+        }));
+      }
+    }
+
+    return {
+      success: true,
+      data: enrichedStaff,
+      totalCount: count || 0,
+    };
+  } catch (err: any) {
+    console.error('Failed to get staff directory:', err);
+    return {
+      success: false,
+      error: err?.message || 'Failed to fetch staff directory.',
+      data: [],
+      totalCount: 0,
+    };
+  }
+}
+
