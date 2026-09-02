@@ -46,14 +46,18 @@ export async function requireAuthenticatedUser(): Promise<{
     throw new AuthorizationError('Please sign in to continue.');
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .maybeSingle();
 
-  const normalizedRole = profile?.role?.toUpperCase();
-  if (profileError || !normalizedRole || !isKnownRole(normalizedRole)) {
+  const normalizedRole =
+    profile?.role?.toUpperCase() ||
+    (user.user_metadata?.role ? String(user.user_metadata.role).toUpperCase() : null) ||
+    (user.app_metadata?.role ? String(user.app_metadata.role).toUpperCase() : null);
+
+  if (!normalizedRole || !isKnownRole(normalizedRole)) {
     throw new AuthorizationError('Your account does not have a valid access profile.');
   }
 

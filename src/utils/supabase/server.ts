@@ -19,7 +19,12 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              const cookieOptions = { ...options }
+              const cookieOptions = {
+                ...options,
+                maxAge: 60 * 60 * 24 * 365, // 1 year persistent session
+                sameSite: 'lax' as const,
+                path: '/',
+              }
               if (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1')) {
                 cookieOptions.domain = `.${rootDomainHost}`
               }

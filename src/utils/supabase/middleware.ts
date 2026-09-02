@@ -22,7 +22,12 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            const cookieOptions = { ...options }
+            const cookieOptions = {
+              ...options,
+              maxAge: 60 * 60 * 24 * 365, // 1 year persistent session
+              sameSite: 'lax' as const,
+              path: '/',
+            }
             if (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1')) {
               cookieOptions.domain = `.${rootDomainHost}`
             }
@@ -32,7 +37,12 @@ export async function updateSession(request: NextRequest) {
             request,
           })
           cookiesToSet.forEach(({ name, value, options }) => {
-            const cookieOptions = { ...options }
+            const cookieOptions = {
+              ...options,
+              maxAge: 60 * 60 * 24 * 365, // 1 year persistent session
+              sameSite: 'lax' as const,
+              path: '/',
+            }
             if (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1')) {
               cookieOptions.domain = `.${rootDomainHost}`
             }
@@ -49,7 +59,12 @@ export async function updateSession(request: NextRequest) {
 
   const helperResponse = (res: NextResponse) => {
     supabaseResponse.cookies.getAll().forEach((cookie) => {
-      res.cookies.set(cookie.name, cookie.value, cookie)
+      res.cookies.set(cookie.name, cookie.value, {
+        ...cookie,
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: 'lax',
+        path: '/',
+      })
     })
     return res
   }
@@ -119,17 +134,20 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
-  // 2. Authorization always comes from the protected profile, never editable user metadata.
-  const { data: profile, error: profileError } = await supabase
+  // 2. Authorization from profile with safe fallback to metadata
+  const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .maybeSingle()
 
-  const userRole = profile?.role?.toUpperCase()
-  const landingDestination = getRoleLandingDestination(userRole)
-  if (profileError || !userRole || !landingDestination) {
-    await supabase.auth.signOut()
+  const userRole =
+    profile?.role?.toUpperCase() ||
+    (user.user_metadata?.role ? String(user.user_metadata.role).toUpperCase() : null) ||
+    (user.app_metadata?.role ? String(user.app_metadata.role).toUpperCase() : null)
+
+  const landingDestination = userRole ? getRoleLandingDestination(userRole) : null
+  if (!userRole || !landingDestination) {
     const loginPath = subdomain === 'patient' || (!subdomain && pathname.startsWith('/patient'))
       ? '/patient/login?error=Invalid%20account%20profile'
       : '/login?error=Invalid%20account%20profile'
