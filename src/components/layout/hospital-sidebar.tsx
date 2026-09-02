@@ -25,9 +25,11 @@ import {
 import clsx from "clsx";
 import { useMobileNav } from "./mobile-nav-context";
 import { signOut } from "@/app/login/actions";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { isRouteAllowedForRole } from "@/utils/rbac";
+import { playVoiceNotification } from "@/utils/voiceNotification";
+import { toast } from "sonner";
 
 const navGroups = [
   {
@@ -84,14 +86,16 @@ export function HospitalSidebar() {
   const pathname = usePathname();
   const { isOpen, close } = useMobileNav();
   const [opdCount, setOpdCount] = useState(0);
+  const [appointmentsCount, setAppointmentsCount] = useState(0);
   const [userRole, setUserRole] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
     fetchUserRole();
     fetchOpdCount();
+    fetchAppointmentsCount();
 
-    const channel = supabase
+    const opdChannel = supabase
       .channel('opd-queue-sidebar')
       .on('postgres_changes', { 
         event: 'INSERT', 
@@ -118,8 +122,51 @@ export function HospitalSidebar() {
       })
       .subscribe();
 
+    const apptChannel = supabase
+      .channel('appointments-sidebar-channel')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'appointments',
+      }, (payload) => {
+        fetchAppointmentsCount();
+        const reason = payload.new && typeof payload.new === 'object' && 'reason' in payload.new
+          ? String((payload.new as { reason?: string }).reason || '')
+          : '';
+        playVoiceNotification(
+          "New Appointment",
+          reason ? `New appointment booked for: ${reason}` : "A new patient appointment has been scheduled.",
+          "appointment"
+        );
+        toast.info("New Appointment Scheduled", {
+          description: reason ? `Reason: ${reason}` : "A new patient appointment has been received.",
+          action: {
+            label: "View",
+            onClick: () => {
+              window.location.href = "/hospital/appointments";
+            }
+          }
+        });
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'appointments',
+      }, () => {
+        fetchAppointmentsCount();
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'appointments',
+      }, () => {
+        fetchAppointmentsCount();
+      })
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(opdChannel);
+      supabase.removeChannel(apptChannel);
     };
   }, []);
 
@@ -146,13 +193,17 @@ export function HospitalSidebar() {
     setOpdCount(count || 0);
   };
 
+  const fetchAppointmentsCount = async () => {
+    const { count } = await supabase
+      .from('appointments')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'SCHEDULED');
+    
+    setAppointmentsCount(count || 0);
+  };
+
   const announceArrival = () => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      const utterance = new SpeechSynthesisUtterance("New patient arrival for Outpatient Department");
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      window.speechSynthesis.speak(utterance);
-    }
+    playVoiceNotification("New patient arrival for Outpatient Department", undefined, "info");
   };
 
   return (
@@ -203,9 +254,19 @@ export function HospitalSidebar() {
                   >
                     <item.icon size={17} strokeWidth={isActive ? 2.2 : 1.8} className={isActive ? "text-white" : "text-slate-400"} />
                     <span className="flex-1">{item.name}</span>
+                    {item.name === "Appointments" && appointmentsCount > 0 && (
+                      <span className={clsx(
+                        "px-2 py-0.5 rounded-full text-[10px] font-black transition-all shadow-xs shrink-0 tracking-tight",
+                        isActive 
+                          ? "bg-amber-400 text-slate-950 ring-1 ring-white/30" 
+                          : "bg-amber-100 text-amber-900 border border-amber-300"
+                      )}>
+                        {appointmentsCount}
+                      </span>
+                    )}
                     {item.name === "Outpatient (OPD)" && opdCount > 0 && (
                       <span className={clsx(
-                        "px-2 py-0.5 rounded-full text-[10px] font-bold",
+                        "px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0",
                         isActive ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
                       )}>
                         {opdCount}

@@ -29,9 +29,9 @@ import {
   type AppointmentRecord 
 } from './actions';
 import StatusModal from '@/components/hospital/StatusModal';
-import Link from 'next/link';
 import { Pagination } from '@/components/ui/Pagination';
 import { usePagination } from '@/hooks/usePagination';
+import { createClient } from '@/utils/supabase/client';
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
@@ -76,6 +76,22 @@ export default function AppointmentsPage() {
   useEffect(() => {
     fetchAppointments();
     fetchDoctors();
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel('appointments-page-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'appointments',
+      }, () => {
+        fetchAppointments();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchAppointments, fetchDoctors]);
 
   // Compute Stat Metrics dynamically from database records

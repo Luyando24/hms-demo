@@ -45,12 +45,49 @@ function getAudioContext(): AudioContext | null {
   return audioCtx;
 }
 
-export function playChime(type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
+export function playChime(type: 'info' | 'success' | 'warning' | 'error' | 'appointment' = 'info'): void {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
 
     const now = ctx.currentTime;
+
+    if (type === 'appointment') {
+      // Pleasant 3-tone melodic hospital chime (C5 -> E5 -> G5)
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const osc3 = ctx.createOscillator();
+      const g1 = ctx.createGain();
+      const g2 = ctx.createGain();
+      const g3 = ctx.createGain();
+
+      osc1.type = 'sine';
+      osc2.type = 'sine';
+      osc3.type = 'sine';
+
+      osc1.frequency.setValueAtTime(523.25, now);       // C5
+      osc2.frequency.setValueAtTime(659.25, now + 0.1); // E5
+      osc3.frequency.setValueAtTime(783.99, now + 0.2); // G5
+
+      g1.gain.setValueAtTime(0.18, now);
+      g1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+      g2.gain.setValueAtTime(0.18, now + 0.1);
+      g2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+      g3.gain.setValueAtTime(0.22, now + 0.2);
+      g3.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+      osc1.connect(g1); g1.connect(ctx.destination);
+      osc2.connect(g2); g2.connect(ctx.destination);
+      osc3.connect(g3); g3.connect(ctx.destination);
+
+      osc1.start(now); osc1.stop(now + 0.5);
+      osc2.start(now + 0.1); osc2.stop(now + 0.6);
+      osc3.start(now + 0.2); osc3.stop(now + 0.85);
+      return;
+    }
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
@@ -120,7 +157,7 @@ function selectBestHumanVoice(voices: SpeechSynthesisVoice[], genderPref: string
   return topVoice || candidatePool[0] || voices[0] || null;
 }
 
-export function speakText(text: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
+export function speakText(text: string, type: 'info' | 'success' | 'warning' | 'error' | 'appointment' = 'info'): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   if (!isVoiceEnabled()) return;
 
@@ -175,7 +212,7 @@ export function speakText(text: string, type: 'info' | 'success' | 'warning' | '
 export function playVoiceNotification(
   title: string,
   message?: string,
-  type: 'info' | 'success' | 'warning' | 'error' = 'info'
+  type: 'info' | 'success' | 'warning' | 'error' | 'appointment' = 'info'
 ): void {
   if (typeof window === 'undefined') return;
   if (!isVoiceEnabled()) return;
