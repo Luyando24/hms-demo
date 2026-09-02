@@ -79,7 +79,6 @@ export async function bookAppointmentAction(formData: FormData) {
     appointment_date: appointmentDate.toISOString(),
     reason: parsed.data.reason,
     status: 'SCHEDULED',
-    notification_email: patient.email,
   });
   if (error) {
     withMessage('/patient/portal/appointments', 'error', error.message);

@@ -49,7 +49,7 @@ async function processAppointmentJob(
 
   const { data: appointment, error: appointmentError } = await admin
     .from("appointments")
-    .select("appointment_date, patient_id, provider_id, status, notification_email")
+    .select("appointment_date, patient_id, provider_id, status")
     .eq("id", job.entity_id)
     .maybeSingle();
   if (appointmentError) throw appointmentError;
@@ -88,8 +88,7 @@ async function processAppointmentJob(
   const [{ data: patient, error: patientError }, { data: provider }] =
     await Promise.all([patientRequest, providerRequest]);
   if (patientError) throw patientError;
-  const patientEmail = appointment.notification_email?.trim().toLowerCase() ||
-    patient?.email?.trim().toLowerCase() || null;
+  const patientEmail = patient?.email?.trim().toLowerCase() || null;
   const patientOnly = job.payload.patient_only === true;
   const includeManager = !patientOnly && [
     "appointment_confirmation",

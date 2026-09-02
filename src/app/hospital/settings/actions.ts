@@ -106,7 +106,7 @@ export async function getEmailNotificationSettingsAction() {
     ]);
 
     const queryError = settingsResult.error || deliveriesResult.error ||
-      healthResult.error || pendingResult.error || failedResult.error;
+      pendingResult.error || failedResult.error;
     if (queryError) throw queryError;
     if (!settingsResult.data) {
       throw new Error('Email notification settings have not been initialized.');

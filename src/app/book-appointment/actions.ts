@@ -111,7 +111,7 @@ export async function bookPublicAppointmentAction(input: unknown) {
     // 3. Check if an active appointment already exists for this patient and time slot
     const { data: existingAppt } = await admin
       .from('appointments')
-      .select('id, appointment_date, status, notification_email')
+      .select('id, appointment_date, status')
       .eq('patient_id', patientId)
       .eq('appointment_date', appointmentDate.toISOString())
       .neq('status', 'CANCELLED')
@@ -127,11 +127,10 @@ export async function bookPublicAppointmentAction(input: unknown) {
           patient_id: patientId,
           provider_id: data.provider_id,
           appointment_date: appointmentDate.toISOString(),
-          notification_email: data.email,
           reason: data.reason,
           status: 'SCHEDULED',
         })
-        .select('id, appointment_date, status, notification_email')
+        .select('id, appointment_date, status')
         .single();
 
       if (appointmentError) {
@@ -139,27 +138,11 @@ export async function bookPublicAppointmentAction(input: unknown) {
       }
       appointment = newAppt;
     } else {
-      if (data.email && data.email !== appointment.notification_email) {
-        const { data: updatedAppointment, error: updateError } = await admin
-          .from('appointments')
-          .update({ notification_email: data.email })
-          .eq('id', appointment.id)
-          .select('id, appointment_date, status, notification_email')
-          .single();
-        if (updateError) {
-          return { error: `Failed to update the appointment email: ${updateError.message}` };
-        }
-        appointment = updatedAppointment;
-      }
-
-      // Duplicate submissions reuse the appointment. The database helper queues
-      // at most one confirmation every five minutes, including when an email was
-      // first supplied after the original booking.
-      const { error: confirmationError } = await admin.rpc('enqueue_appointment_confirmation', {
-        target_appointment_id: appointment.id,
-      });
-      if (confirmationError) {
-        return { error: `Appointment exists, but its confirmation could not be queued: ${confirmationError.message}` };
+      if (data.email && patientId) {
+        await admin
+          .from('patients')
+          .update({ email: data.email })
+          .eq('id', patientId);
       }
     }
 
