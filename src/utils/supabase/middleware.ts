@@ -90,6 +90,7 @@ export async function updateSession(request: NextRequest) {
     isWorkforceLoginRoute ||
     isPatientLoginRoute ||
     isPwaAssetRoute ||
+    pathname.startsWith('/api') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/book-appointment') ||
     pathname.startsWith('/tv')
