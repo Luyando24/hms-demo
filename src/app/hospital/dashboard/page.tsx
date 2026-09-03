@@ -92,13 +92,44 @@ export default function HospitalDashboard() {
     setLoading(true);
 
     try {
-      // 1. Fetch Currency Settings
-      const { data: sysSettings } = await supabase
-        .from('system_settings')
-        .select('currency_symbol, currency_position')
-        .limit(1)
-        .maybeSingle();
-      
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+
+      // Execute ALL dashboard queries in a single parallel Promise.all batch!
+      const [
+        { data: sysSettings },
+        { count: erCount },
+        { count: criticalErCount },
+        { count: totalBedsCount },
+        { count: occupiedBedsCount },
+        { data: todayPayments },
+        { data: staffProfiles },
+        { data: rawWalkins },
+        { data: rawAdmissions },
+        { data: emergencyQueue },
+        { data: inventoryData },
+        { data: bloodData },
+        { data: recentAdmissions }
+      ] = await Promise.all([
+        supabase.from('system_settings').select('currency_symbol, currency_position').limit(1).maybeSingle(),
+        supabase.from('walkin_queue').select('*', { count: 'exact', head: true }).eq('status', 'WAITING'),
+        supabase.from('walkin_queue').select('*', { count: 'exact', head: true }).eq('status', 'WAITING').eq('priority', 'EMERGENCY'),
+        supabase.from('beds').select('*', { count: 'exact', head: true }),
+        supabase.from('admissions').select('*', { count: 'exact', head: true }).is('discharge_date', null),
+        supabase.from('payments').select('amount').gte('created_at', todayStart.toISOString()),
+        supabase.from('profiles').select('role'),
+        supabase.from('walkin_queue').select('created_at').gte('created_at', sevenDaysAgo.toISOString()),
+        supabase.from('admissions').select('admission_date').gte('admission_date', sevenDaysAgo.toISOString()),
+        supabase.from('walkin_queue').select('*, patients(*)').order('created_at', { ascending: false }).limit(5),
+        supabase.from('inventory_items').select('*').order('stock_level', { ascending: true }).limit(5),
+        supabase.from('blood_inventory').select('*').order('quantity_units', { ascending: true }).limit(3),
+        supabase.from('admissions').select('*, patients(*), beds(*)').order('admission_date', { ascending: false }).limit(4),
+      ]);
+
       if (sysSettings) {
         setCurrencyConfig({
           symbol: sysSettings.currency_symbol || '$',
@@ -106,47 +137,10 @@ export default function HospitalDashboard() {
         });
       }
 
-      // 2. Fetch ER Cases & Emergency Queue
-      const { count: erCount } = await supabase
-        .from('walkin_queue')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'WAITING');
-
-      const { count: criticalErCount } = await supabase
-        .from('walkin_queue')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'WAITING')
-        .eq('priority', 'EMERGENCY');
-
-      // 3. Fetch Bed Occupancy (Admissions vs Total Beds)
-      const { count: totalBedsCount } = await supabase
-        .from('beds')
-        .select('*', { count: 'exact', head: true });
-
-      const { count: occupiedBedsCount } = await supabase
-        .from('admissions')
-        .select('*', { count: 'exact', head: true })
-        .is('discharge_date', null);
-
       const totalBeds = totalBedsCount && totalBedsCount > 0 ? totalBedsCount : 30;
       const occupiedBeds = occupiedBedsCount || 0;
       const occupancyPct = Math.round((occupiedBeds / totalBeds) * 100);
-
-      // 4. Fetch Today's Revenue from Payments
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
-      const { data: todayPayments } = await supabase
-        .from('payments')
-        .select('amount')
-        .gte('created_at', todayStart.toISOString());
-
       const revenueSum = (todayPayments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
-      // 5. Fetch Staff Counts
-      const { data: staffProfiles } = await supabase
-        .from('profiles')
-        .select('role');
 
       const docs = (staffProfiles || []).filter(s => s.role === 'DOCTOR').length;
       const nurses = (staffProfiles || []).filter(s => s.role === 'NURSE').length;
@@ -164,24 +158,10 @@ export default function HospitalDashboard() {
         nurseCount: nurses
       });
 
-      // 6. Calculate Weekly Admissions & Queue Chart Data
+      // Calculate Weekly Admissions & Queue Chart Data
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const past7Days: WeeklyDayMetric[] = [];
       const now = new Date();
-
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-      sevenDaysAgo.setHours(0, 0, 0, 0);
-
-      const { data: rawWalkins } = await supabase
-        .from('walkin_queue')
-        .select('created_at')
-        .gte('created_at', sevenDaysAgo.toISOString());
-
-      const { data: rawAdmissions } = await supabase
-        .from('admissions')
-        .select('admission_date')
-        .gte('admission_date', sevenDaysAgo.toISOString());
 
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
@@ -213,15 +193,8 @@ export default function HospitalDashboard() {
       setMaxChartVal(Math.max(highestVal, 10));
       setPeakDay(highestDay);
 
-      // 7. Build Operational Alerts Stream
+      // Build Operational Alerts Stream
       const liveAlerts: AlertLog[] = [];
-
-      // Emergency Triage Queue Alerts
-      const { data: emergencyQueue } = await supabase
-        .from('walkin_queue')
-        .select('*, patients(*)')
-        .order('created_at', { ascending: false })
-        .limit(5);
 
       (emergencyQueue || []).forEach(item => {
         const patientName = item.patients ? `${item.patients.first_name} ${item.patients.last_name}` : 'Walk-in Patient';
@@ -236,13 +209,6 @@ export default function HospitalDashboard() {
           details: `Patient registered for clinical triage. Priority: ${item.priority || 'NORMAL'}. Chief Complaint: ${item.reason || 'Routine Consultation'}`
         });
       });
-
-      // Low Inventory Stock Alerts
-      const { data: inventoryData } = await supabase
-        .from('inventory_items')
-        .select('*')
-        .order('stock_level', { ascending: true })
-        .limit(5);
 
       (inventoryData || []).forEach(item => {
         const stockLevel = item.stock_level || 0;
@@ -259,13 +225,6 @@ export default function HospitalDashboard() {
         });
       });
 
-      // Blood Bank Supply Alerts
-      const { data: bloodData } = await supabase
-        .from('blood_inventory')
-        .select('*')
-        .order('quantity_units', { ascending: true })
-        .limit(3);
-
       (bloodData || []).forEach(item => {
         const quantityUnits = item.quantity_units || 0;
         const isLow = quantityUnits <= 5;
@@ -279,13 +238,6 @@ export default function HospitalDashboard() {
           details: `${quantityUnits} unit(s) available in blood bank storage.`
         });
       });
-
-      // Inpatient Admissions
-      const { data: recentAdmissions } = await supabase
-        .from('admissions')
-        .select('*, patients(*), beds(*)')
-        .order('admission_date', { ascending: false })
-        .limit(4);
 
       (recentAdmissions || []).forEach(item => {
         const pName = item.patients ? `${item.patients.first_name} ${item.patients.last_name}` : 'Patient';

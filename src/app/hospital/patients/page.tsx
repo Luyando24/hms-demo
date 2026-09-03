@@ -63,18 +63,17 @@ export default function PatientsPage() {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      // Added Today
-      const { count: todayCount } = await supabase
-        .from('patients')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', todayStart.toISOString());
-
-      // Insured Patients Count
-      const { count: insCount } = await supabase
-        .from('patients')
-        .select('*', { count: 'exact', head: true })
-        .not('insurance_provider', 'is', null)
-        .neq('insurance_provider', '');
+      const [{ count: todayCount }, { count: insCount }] = await Promise.all([
+        supabase
+          .from('patients')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', todayStart.toISOString()),
+        supabase
+          .from('patients')
+          .select('*', { count: 'exact', head: true })
+          .not('insurance_provider', 'is', null)
+          .neq('insurance_provider', '')
+      ]);
 
       setAddedTodayCount(todayCount || 0);
       setInsuredCount(insCount || 0);
