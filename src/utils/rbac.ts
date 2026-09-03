@@ -141,10 +141,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
 };
 
 export function isRouteAllowedForRole(role: string | undefined | null, pathname: string): boolean {
-  if (!role) return false;
-  const normalizedRole = role.toUpperCase();
-  const allowedRoutes = ROLE_PERMISSIONS[normalizedRole];
-  if (!allowedRoutes) return false;
+  const normalizedRole = (role ? role.toUpperCase() : 'STAFF') as UserRole;
+  const allowedRoutes = ROLE_PERMISSIONS[normalizedRole] || ROLE_PERMISSIONS.STAFF;
   return allowedRoutes.some(route => pathname === route || pathname.startsWith(route + '/'));
 }
 

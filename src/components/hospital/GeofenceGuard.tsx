@@ -44,7 +44,8 @@ export function GeofenceGuard() {
 
     const initGuard = async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData?.session?.user;
       if (!user) return;
 
       const { data: profile } = await supabase

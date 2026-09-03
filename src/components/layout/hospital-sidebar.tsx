@@ -88,7 +88,12 @@ export function HospitalSidebar() {
   const { isOpen, close } = useMobileNav();
   const [opdCount, setOpdCount] = useState(0);
   const [appointmentsCount, setAppointmentsCount] = useState(0);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("hms_user_role") || "STAFF";
+    }
+    return "STAFF";
+  });
   const supabase = createClient();
 
   useEffect(() => {
@@ -172,16 +177,20 @@ export function HospitalSidebar() {
   }, []);
 
   const fetchUserRole = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData?.session?.user;
     if (user) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (profile?.role) setUserRole(profile.role);
-      else if (user.user_metadata?.role) setUserRole(user.user_metadata.role);
+      const role = profile?.role || user.user_metadata?.role || 'STAFF';
+      setUserRole(role);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("hms_user_role", role);
+      }
     }
   };
 

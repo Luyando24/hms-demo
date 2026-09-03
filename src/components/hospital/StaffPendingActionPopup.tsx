@@ -85,22 +85,23 @@ export default function StaffPendingActionPopup() {
   }, []);
 
   const fetchUserRole = async () => {
-    const { data: authData } = await supabase.auth.getUser();
-    if (authData.user) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData?.session?.user;
+    if (user) {
       let userRole = '';
       let assignedRoomId: string | null = null;
 
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('role, room_id')
-        .eq('id', authData.user.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (error && error.message?.includes('room_id')) {
         const { data: fallbackProfile } = await supabase
           .from('profiles')
           .select('role')
-          .eq('id', authData.user.id)
+          .eq('id', user.id)
           .maybeSingle();
         userRole = fallbackProfile?.role || '';
       } else if (profile) {
@@ -110,8 +111,8 @@ export default function StaffPendingActionPopup() {
 
       const role = (
         userRole ||
-        authData.user.user_metadata?.role ||
-        (authData.user.app_metadata as any)?.role ||
+        user.user_metadata?.role ||
+        (user.app_metadata as any)?.role ||
         ''
       )
         .toString()

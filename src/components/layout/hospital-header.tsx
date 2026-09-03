@@ -15,7 +15,15 @@ export function HospitalHeader() {
   const { toggle } = useMobileNav();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("hms_user_profile");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return null;
+  });
   const [hospitalName, setHospitalName] = useState<string>("");
   const [brandTitle, setBrandTitle] = useState<string>("");
   const [logoUrl, setLogoUrl] = useState<string>("");
@@ -46,8 +54,8 @@ export function HospitalHeader() {
 
   useEffect(() => {
     const fetchUserAndSettings = async () => {
-      const [{ data: authData }, { data: settings }, { data: roomsData }] = await Promise.all([
-        supabase.auth.getUser(),
+      const [{ data: sessionData }, { data: settings }, { data: roomsData }] = await Promise.all([
+        supabase.auth.getSession(),
         supabase.from("system_settings").select("hospital_name, brand_title, logo_url, tagline").limit(1).maybeSingle(),
         supabase.from("rooms").select("id, name").eq("is_active", true).order("name", { ascending: true }),
       ]);
@@ -68,17 +76,27 @@ export function HospitalHeader() {
         setTagline(settings.tagline);
       }
 
-      if (authData?.user) {
+      const authUser = sessionData?.session?.user;
+      if (authUser) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', authData.user.id)
+          .eq('id', authUser.id)
           .maybeSingle();
         
-        setUser({
+        const fullUser = {
           ...profile,
-          email: authData.user.email
-        });
+          email: authUser.email,
+          role: profile?.role || authUser.user_metadata?.role || 'STAFF'
+        };
+
+        setUser(fullUser);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("hms_user_profile", JSON.stringify(fullUser));
+          if (fullUser.role) {
+            localStorage.setItem("hms_user_role", fullUser.role);
+          }
+        }
 
         if (profile?.room_id && !localStorage.getItem("hms_staff_active_room_id")) {
           setActiveStaffRoomId(profile.room_id);
