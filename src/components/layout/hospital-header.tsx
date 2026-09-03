@@ -11,11 +11,12 @@ import OPDCheckInModal from "../hospital/OPDCheckInModal";
 
 import { NotificationCenterDropdown } from "./NotificationCenterDropdown";
 
-export function HospitalHeader() {
+export function HospitalHeader({ initialUserProfile }: { initialUserProfile?: any }) {
   const { toggle } = useMobileNav();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [user, setUser] = useState<any>(() => {
+    if (initialUserProfile) return initialUserProfile;
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("hms_user_profile");

@@ -12,8 +12,12 @@ import { OfflineProtectionBanner } from "@/components/common/OfflineProtectionBa
 
 export function HospitalLayoutClient({
   children,
+  initialUserRole,
+  initialUserProfile,
 }: {
   children: React.ReactNode;
+  initialUserRole?: string | null;
+  initialUserProfile?: any;
 }) {
   const pathname = usePathname();
   const isQueueDisplay = pathname?.startsWith("/hospital/queue-display");
@@ -26,8 +30,8 @@ export function HospitalLayoutClient({
     <MobileNavProvider>
       <div className="min-h-screen bg-[#F8FAFC] pb-20 lg:pb-0">
         <OfflineProtectionBanner />
-        <HospitalHeader />
-        <HospitalSidebar />
+        <HospitalHeader initialUserProfile={initialUserProfile} />
+        <HospitalSidebar initialUserRole={initialUserRole} />
         <HospitalBottomNav />
         <QueueFloatingIndicator />
         <StaffPendingActionPopup />

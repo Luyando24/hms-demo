@@ -83,16 +83,17 @@ const navGroups = [
   }
 ];
 
-export function HospitalSidebar() {
+export function HospitalSidebar({ initialUserRole }: { initialUserRole?: string | null }) {
   const pathname = usePathname();
   const { isOpen, close } = useMobileNav();
   const [opdCount, setOpdCount] = useState(0);
   const [appointmentsCount, setAppointmentsCount] = useState(0);
   const [userRole, setUserRole] = useState<string | null>(() => {
+    if (initialUserRole) return initialUserRole;
     if (typeof window !== "undefined") {
-      return localStorage.getItem("hms_user_role") || "STAFF";
+      return localStorage.getItem("hms_user_role") || "ADMIN";
     }
-    return "STAFF";
+    return "ADMIN";
   });
   const supabase = createClient();
 

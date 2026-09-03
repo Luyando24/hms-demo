@@ -96,7 +96,8 @@ export default function HospitalDashboard() {
       const { data: sysSettings } = await supabase
         .from('system_settings')
         .select('currency_symbol, currency_position')
-        .single();
+        .limit(1)
+        .maybeSingle();
       
       if (sysSettings) {
         setCurrencyConfig({
