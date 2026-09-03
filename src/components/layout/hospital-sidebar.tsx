@@ -98,7 +98,8 @@ export function HospitalSidebar({ initialUserRole }: { initialUserRole?: string 
   const supabase = createClient();
 
   useEffect(() => {
-    fetchUserRole();
+    // Only fetch role from DB if SSR didn't pass it (cold-start fallback)
+    if (!initialUserRole) fetchUserRole();
     fetchOpdCount();
     fetchAppointmentsCount();
 

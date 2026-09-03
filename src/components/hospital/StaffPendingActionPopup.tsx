@@ -54,6 +54,7 @@ export default function StaffPendingActionPopup() {
   const [isVoiceOn, setIsVoiceOn] = useState<boolean>(true);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [activeStaffRoomId, setActiveStaffRoomId] = useState<string | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
 
   const pathname = usePathname();
   const router = useRouter();
@@ -130,6 +131,9 @@ export default function StaffPendingActionPopup() {
           localStorage.setItem('hms_active_room_id', assignedRoomId);
         }
       }
+
+      // Mark session as ready so polling interval can start
+      setSessionReady(true);
     }
   };
 
@@ -199,13 +203,42 @@ export default function StaffPendingActionPopup() {
 
       const actions: PendingActionItem[] = [];
 
-      // 1. Check Walk-in Queue for Triage, ER, or Doctor
-      const { data: queueData } = await supabase
-        .from('walkin_queue')
-        .select('*, patients(first_name, last_name, file_number), departments(name), rooms(id, name)')
-        .in('status', ['WAITING', 'TRIAGED', 'CONSULTATION', 'CALLING'])
-        .order('created_at', { ascending: false })
-        .limit(15);
+      // Execute all pending-action queries in parallel
+      const [
+        { data: queueData },
+        { data: labData },
+        { data: rxData },
+        { data: radData },
+      ] = await Promise.all([
+        // 1. Walk-in Queue for Triage, ER, or Doctor
+        supabase
+          .from('walkin_queue')
+          .select('*, patients(first_name, last_name, file_number), departments(name), rooms(id, name)')
+          .in('status', ['WAITING', 'TRIAGED', 'CONSULTATION', 'CALLING'])
+          .order('created_at', { ascending: false })
+          .limit(15),
+        // 2. Pending Lab Orders
+        supabase
+          .from('lab_orders')
+          .select('*, patients(first_name, last_name, file_number)')
+          .in('status', ['ORDERED', 'PENDING', 'REQUESTED'])
+          .order('created_at', { ascending: false })
+          .limit(4),
+        // 3. Pending Prescriptions
+        supabase
+          .from('prescriptions')
+          .select('*, patients(first_name, last_name, file_number)')
+          .eq('status', 'PENDING')
+          .order('created_at', { ascending: false })
+          .limit(4),
+        // 4. Pending Radiology Orders
+        supabase
+          .from('radiology_orders')
+          .select('*, patients(first_name, last_name, file_number)')
+          .eq('status', 'ORDERED')
+          .order('created_at', { ascending: false })
+          .limit(3),
+      ]);
 
       if (queueData && queueData.length > 0) {
         queueData.forEach((q: any) => {
@@ -279,88 +312,61 @@ export default function StaffPendingActionPopup() {
       }
 
       // 2. Check Pending Lab Orders (intended for LAB_TECH)
-      const { data: labData } = await supabase
-        .from('lab_orders')
-        .select('*, patients(first_name, last_name, file_number)')
-        .in('status', ['ORDERED', 'PENDING', 'REQUESTED'])
-        .order('created_at', { ascending: false })
-        .limit(4);
-
-      if (labData && labData.length > 0) {
-        labData.forEach((l: any) => {
-          const pName = l.patients
-            ? `${l.patients.first_name} ${l.patients.last_name}`
-            : 'Patient';
-          actions.push({
-            id: `lab-${l.id}`,
-            type: 'LAB',
-            title: 'Pending Referral: Diagnostic Lab Test',
-            patientName: pName,
-            patientFileNo: l.patients?.file_number || undefined,
-            detail: `New laboratory investigation ordered by doctor awaiting sample collection.`,
-            priority: l.priority === 'URGENT' || l.priority === 'CRITICAL' ? 'URGENT' : 'NORMAL',
-            targetPath: '/hospital/laboratory',
-            actionLabel: 'Open Lab Worklist',
-            timestamp: l.created_at || new Date().toISOString(),
-          });
+      (labData || []).forEach((l: any) => {
+        const pName = l.patients
+          ? `${l.patients.first_name} ${l.patients.last_name}`
+          : 'Patient';
+        actions.push({
+          id: `lab-${l.id}`,
+          type: 'LAB',
+          title: 'Pending Referral: Diagnostic Lab Test',
+          patientName: pName,
+          patientFileNo: l.patients?.file_number || undefined,
+          detail: `New laboratory investigation ordered by doctor awaiting sample collection.`,
+          priority: l.priority === 'URGENT' || l.priority === 'CRITICAL' ? 'URGENT' : 'NORMAL',
+          targetPath: '/hospital/laboratory',
+          actionLabel: 'Open Lab Worklist',
+          timestamp: l.created_at || new Date().toISOString(),
         });
-      }
+      });
 
       // 3. Check Pending Prescriptions (intended for PHARMACIST)
-      const { data: rxData } = await supabase
-        .from('prescriptions')
-        .select('*, patients(first_name, last_name, file_number)')
-        .eq('status', 'PENDING')
-        .order('created_at', { ascending: false })
-        .limit(4);
-
-      if (rxData && rxData.length > 0) {
-        rxData.forEach((rx: any) => {
-          const pName = rx.patients
-            ? `${rx.patients.first_name} ${rx.patients.last_name}`
-            : 'Patient';
-          actions.push({
-            id: `rx-${rx.id}`,
-            type: 'PRESCRIPTION',
-            title: 'Pending Referral: Pharmacy Dispensing',
-            patientName: pName,
-            patientFileNo: rx.patients?.file_number || undefined,
-            detail: `Doctor prescription awaiting pharmacist verification & medication dispensing.`,
-            priority: 'NORMAL',
-            targetPath: '/hospital/inventory',
-            actionLabel: 'Dispense Prescription',
-            timestamp: rx.created_at || new Date().toISOString(),
-          });
+      (rxData || []).forEach((rx: any) => {
+        const pName = rx.patients
+          ? `${rx.patients.first_name} ${rx.patients.last_name}`
+          : 'Patient';
+        actions.push({
+          id: `rx-${rx.id}`,
+          type: 'PRESCRIPTION',
+          title: 'Pending Referral: Pharmacy Dispensing',
+          patientName: pName,
+          patientFileNo: rx.patients?.file_number || undefined,
+          detail: `Doctor prescription awaiting pharmacist verification & medication dispensing.`,
+          priority: 'NORMAL',
+          targetPath: '/hospital/inventory',
+          actionLabel: 'Dispense Prescription',
+          timestamp: rx.created_at || new Date().toISOString(),
         });
-      }
+      });
 
       // 4. Check Pending Radiology Orders (intended for RADIOLOGIST)
-      const { data: radData } = await supabase
-        .from('radiology_orders')
-        .select('*, patients(first_name, last_name, file_number)')
-        .eq('status', 'ORDERED')
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      if (radData && radData.length > 0) {
-        radData.forEach((rad: any) => {
-          const pName = rad.patients
-            ? `${rad.patients.first_name} ${rad.patients.last_name}`
-            : 'Patient';
-          actions.push({
-            id: `rad-${rad.id}`,
-            type: 'RADIOLOGY',
-            title: `Pending Referral: Radiology (${rad.modality})`,
-            patientName: pName,
-            patientFileNo: rad.patients?.file_number || undefined,
-            detail: `Imaging scan for ${rad.body_part || 'Study'} requested by clinician.`,
-            priority: 'NORMAL',
-            targetPath: '/hospital/radiology',
-            actionLabel: 'Open Imaging Station',
-            timestamp: rad.created_at || new Date().toISOString(),
-          });
+      (radData || []).forEach((rad: any) => {
+        const pName = rad.patients
+          ? `${rad.patients.first_name} ${rad.patients.last_name}`
+          : 'Patient';
+        actions.push({
+          id: `rad-${rad.id}`,
+          type: 'RADIOLOGY',
+          title: `Pending Referral: Radiology (${rad.modality})`,
+          patientName: pName,
+          patientFileNo: rad.patients?.file_number || undefined,
+          detail: `Imaging scan for ${rad.body_part || 'Study'} requested by clinician.`,
+          priority: 'NORMAL',
+          targetPath: '/hospital/radiology',
+          actionLabel: 'Open Imaging Station',
+          timestamp: rad.created_at || new Date().toISOString(),
         });
-      }
+      });
 
       // 5. Filter strictly by the current user's role & permissions
       const roleTargetedActions = actions.filter((a) =>
@@ -399,12 +405,16 @@ export default function StaffPendingActionPopup() {
   };
 
   useEffect(() => {
+    // Don't start polling until session is confirmed — prevents flooding
+    // auth lock with DB queries before the token is established on cold PCs
+    if (!sessionReady) return;
+
     void checkForPendingActions();
 
-    // Polling interval every 4 seconds for reliable instant notifications
+    // Polling interval every 12 seconds (reduced from 4s to ease server load)
     const interval = setInterval(() => {
       void checkForPendingActions();
-    }, 4000);
+    }, 12000);
 
     // Subscribe to realtime database changes across relevant tables
     const channel = supabase
@@ -435,7 +445,7 @@ export default function StaffPendingActionPopup() {
       clearInterval(interval);
       void supabase.removeChannel(channel);
     };
-  }, [dismissedIds, snoozedUntil, currentUserRole, activeStaffRoomId, pathname]);
+  }, [sessionReady, dismissedIds, snoozedUntil, currentUserRole, activeStaffRoomId, pathname]);
 
   const handleDismiss = () => {
     if (activeAction) {
