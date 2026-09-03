@@ -1,7 +1,7 @@
-'use client'
+'use client';
 
 import { useState, useEffect } from "react";
-import { Box, Search, Filter, Plus, Package, AlertCircle, RefreshCw, ClipboardCheck, Trash2, Edit2, Loader2 } from "lucide-react";
+import { Box, Search, Filter, Plus, Package, AlertCircle, RefreshCw, ClipboardCheck, Trash2, Edit2, Loader2, Layers, Settings2, Sliders } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 import UpdateStockModal from "@/components/hospital/UpdateStockModal";
@@ -10,30 +10,25 @@ import DispenseMedicationModal from "@/components/hospital/DispenseMedicationMod
 import StatusModal from "@/components/hospital/StatusModal";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
-
-interface InventoryItem {
-  id: string;
-  name: string;
-  category?: string;
-  stock_level: number;
-  reorder_level?: number;
-  min_reorder_level?: number;
-  unit?: string;
-  unit_price?: number;
-}
+import { InventoryCategory, InventoryItem } from "@/types/inventory";
+import Link from "next/link";
 
 export default function InventoryDashboard() {
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [categories, setCategories] = useState<InventoryCategory[]>([]);
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
-  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  
+  // Modals state
+  const [selectedStockItem, setSelectedStockItem] = useState<InventoryItem | null>(null);
+  const [selectedEditItem, setSelectedEditItem] = useState<InventoryItem | null>(null);
   const [selectedPrescription, setSelectedPrescription] = useState<any | null>(null);
   const [isDispenseModalOpen, setIsDispenseModalOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
+  const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
 
   const [dispensedTodayCount, setDispensedTodayCount] = useState(0);
 
@@ -45,6 +40,7 @@ export default function InventoryDashboard() {
     // Subscribe to realtime inventory changes
     const channel = supabase.channel('inventory_live_channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, () => fetchItems())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_categories' }, () => fetchCategories())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'prescriptions' }, () => fetchPrescriptions())
       .subscribe();
     
@@ -55,13 +51,18 @@ export default function InventoryDashboard() {
 
   const fetchData = async () => {
     setLoading(true);
-    await Promise.all([fetchItems(), fetchPrescriptions()]);
+    await Promise.all([fetchItems(), fetchCategories(), fetchPrescriptions()]);
     setLoading(false);
   };
 
   const fetchItems = async () => {
     const { data } = await supabase.from('inventory_items').select('*').order('name');
     if (data) setItems(data as InventoryItem[]);
+  };
+
+  const fetchCategories = async () => {
+    const { data } = await supabase.from('inventory_categories').select('*').eq('is_active', true).order('name');
+    if (data) setCategories(data as InventoryCategory[]);
   };
 
   const fetchPrescriptions = async () => {
@@ -131,7 +132,7 @@ export default function InventoryDashboard() {
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.category?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesCategory = categoryFilter === 'ALL' || item.category === categoryFilter;
+    const matchesCategory = categoryFilter === 'ALL' || item.category?.toLowerCase() === categoryFilter.toLowerCase();
     return matchesSearch && matchesCategory;
   });
 
@@ -158,9 +159,16 @@ export default function InventoryDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Pharmacy & Inventory Management</h1>
-          <p className="text-xs text-slate-500 font-normal mt-0.5">Medical stock control, reorder alerts, and pharmacy dispensing desk.</p>
+          <p className="text-xs text-slate-500 font-normal mt-0.5">Medical stock control, reorder alerts, category classification, and dispensing desk.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/hospital/admin/inventory-categories"
+            className="bg-white border border-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
+          >
+            <Layers size={13} className="text-indigo-600" />
+            Categories & Units
+          </Link>
           <button 
             onClick={fetchData}
             className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
@@ -169,7 +177,7 @@ export default function InventoryDashboard() {
             Refresh
           </button>
           <button 
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => { setSelectedEditItem(null); setIsAddModalOpen(true); }}
             className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
           >
             <Plus size={14} />
@@ -183,7 +191,7 @@ export default function InventoryDashboard() {
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Total Items</p>
           <p className="text-2xl font-bold tracking-tight text-slate-900">{stats.totalItems}</p>
-          <p className="text-[10px] text-slate-400 font-normal mt-1">Configured pharmaceuticals</p>
+          <p className="text-[10px] text-slate-400 font-normal mt-1">Configured pharmaceuticals & supplies</p>
         </div>
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-2">
@@ -222,12 +230,12 @@ export default function InventoryDashboard() {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="bg-white border border-slate-200 text-xs font-semibold rounded-xl px-3 py-1.5 text-slate-700 focus:outline-none shadow-xs"
+                className="bg-white border border-slate-200 text-xs font-semibold rounded-xl px-3 py-1.5 text-slate-700 focus:outline-none shadow-xs max-w-[180px] truncate"
               >
                 <option value="ALL">All Categories</option>
-                <option value="Pharmacy">Pharmacy / Meds</option>
-                <option value="Supplies">Medical Supplies</option>
-                <option value="Reagents">Lab Reagents</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
               </select>
 
               <div className="relative">
@@ -237,7 +245,7 @@ export default function InventoryDashboard() {
                   placeholder="Search stock catalog..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 shadow-xs"
+                  className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 shadow-xs w-48 sm:w-56"
                 />
               </div>
             </div>
@@ -275,7 +283,11 @@ export default function InventoryDashboard() {
                         <p className="font-bold text-slate-900">{item.name}</p>
                         <p className="text-[10px] text-slate-400">{item.unit || 'units'}</p>
                       </td>
-                      <td className="px-4 py-3 text-slate-600 font-normal">{item.category || 'General'}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px]">
+                          {item.category || 'General'}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">
                         <span className={clsx(
                           "font-bold text-xs",
@@ -301,15 +313,22 @@ export default function InventoryDashboard() {
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button 
-                            onClick={() => { setSelectedItem(item); setIsUpdateModalOpen(true); }}
-                            className="p-1 text-slate-400 hover:text-slate-900 rounded-lg transition-colors"
-                            title="Update Stock"
+                            onClick={() => { setSelectedStockItem(item); setIsUpdateModalOpen(true); }}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Adjust Stock Quantity"
+                          >
+                            <Sliders size={13} />
+                          </button>
+                          <button 
+                            onClick={() => { setSelectedEditItem(item); setIsAddModalOpen(true); }}
+                            className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Edit Item Details (Category, Unit, Price)"
                           >
                             <Edit2 size={13} />
                           </button>
                           <button 
                             onClick={() => handleDeleteItem(item.id, item.name)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                             title="Delete Item"
                           >
                             <Trash2 size={13} />
@@ -397,18 +416,19 @@ export default function InventoryDashboard() {
         />
       )}
 
-      {selectedItem && (
+      {selectedStockItem && (
         <UpdateStockModal 
           isOpen={isUpdateModalOpen}
-          onClose={() => { setIsUpdateModalOpen(false); setSelectedItem(null); }}
-          item={selectedItem}
+          onClose={() => { setIsUpdateModalOpen(false); setSelectedStockItem(null); }}
+          item={selectedStockItem}
           onSuccess={fetchItems}
         />
       )}
 
       <AddItemModal 
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        initialItem={selectedEditItem}
+        onClose={() => { setIsAddModalOpen(false); setSelectedEditItem(null); }}
         onSuccess={fetchItems}
       />
 

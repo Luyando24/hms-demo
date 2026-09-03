@@ -20,7 +20,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { formatCurrencyAmount } from '@/utils/currency';
-import { printInvoiceDocument, PrintableInvoiceData } from '@/utils/invoicePrintGenerator';
+import { printReceiptDocument, PrintableReceiptData } from '@/utils/invoicePrintGenerator';
 import StatusModal from './StatusModal';
 import clsx from 'clsx';
 
@@ -212,12 +212,12 @@ export default function RecordPaymentModal({
           .eq('invoice_id', invoice.id);
 
         const newPaidAmount = (invoice.paid_amount || 0) + Number(amount);
-        const newStatus = newPaidAmount >= invoice.total_amount ? 'PAID' : 'PARTIAL';
+        const recNumber = finalReference || `REC-${invoice.id.slice(-6).toUpperCase()}`;
 
-        const printableData: PrintableInvoiceData = {
+        const printableReceipt: PrintableReceiptData = {
+          receiptNumber: recNumber,
           invoiceId: invoice.id,
           createdAt: new Date().toISOString(),
-          status: newStatus,
           totalAmount: invoice.total_amount,
           paidAmount: newPaidAmount,
           paymentMethod: method,
@@ -249,7 +249,7 @@ export default function RecordPaymentModal({
             totalPrice: i.total_price || (i.quantity * i.unit_price),
           })) : [
             {
-              description: 'General Medical Consultation / Service',
+              description: 'Medical Services / Consultation Bill',
               quantity: 1,
               unitPrice: invoice.total_amount,
               totalPrice: invoice.total_amount,
@@ -257,7 +257,7 @@ export default function RecordPaymentModal({
           ],
         };
 
-        printInvoiceDocument(printableData);
+        printReceiptDocument(printableReceipt);
       } catch (err) {
         console.error('Failed to trigger receipt print:', err);
       }

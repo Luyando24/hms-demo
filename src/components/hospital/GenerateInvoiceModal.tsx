@@ -23,6 +23,7 @@ export default function GenerateInvoiceModal({
 }: GenerateInvoiceModalProps) {
   const [mounted, setMounted] = useState(false);
   const [patients, setPatients] = useState<any[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState('');
   const [currencyConfig, setCurrencyConfig] = useState<{
@@ -32,7 +33,7 @@ export default function GenerateInvoiceModal({
   const [hospitalDetails, setHospitalDetails] = useState<any>(null);
 
   const [items, setItems] = useState<
-    Array<{ description: string; quantity: number; unit_price: number }>
+    Array<{ description: string; quantity: number | string; unit_price: number | string; stockInfo?: string }>
   >([{ description: 'General OPD Consultation', quantity: 1, unit_price: 150 }]);
   const [status, setStatus] = useState<{
     type: 'success' | 'error';
@@ -79,6 +80,14 @@ export default function GenerateInvoiceModal({
         });
 
       void supabase
+        .from('inventory_items')
+        .select('id, name, category, unit, unit_price, stock_level')
+        .order('name')
+        .then(({ data }) => {
+          if (data) setInventoryItems(data);
+        });
+
+      void supabase
         .from('system_settings')
         .select('*')
         .limit(1)
@@ -100,7 +109,7 @@ export default function GenerateInvoiceModal({
   if (!isOpen || !mounted) return null;
 
   const addItem = () => {
-    setItems((prev) => [...prev, { description: '', quantity: 1, unit_price: 0 }]);
+    setItems((prev) => [...prev, { description: '', quantity: 1, unit_price: '' }]);
   };
 
   const removeItem = (index: number) => {
@@ -115,8 +124,34 @@ export default function GenerateInvoiceModal({
     });
   };
 
+  const handleDescriptionChange = (index: number, val: string) => {
+    const matched = inventoryItems.find(
+      (inv) =>
+        inv.name?.toLowerCase() === val.trim().toLowerCase() ||
+        `${inv.name} (${inv.unit || 'unit'})`.toLowerCase() === val.trim().toLowerCase()
+    );
+
+    setItems((prev) => {
+      const next = [...prev];
+      if (matched) {
+        next[index] = {
+          ...next[index],
+          description: matched.name,
+          unit_price: matched.unit_price !== undefined && matched.unit_price !== null ? matched.unit_price : 0,
+          stockInfo: `In Stock: ${matched.stock_level || 0} ${matched.unit || 'units'}`,
+        };
+      } else {
+        next[index] = {
+          ...next[index],
+          description: val,
+        };
+      }
+      return next;
+    });
+  };
+
   const totalAmount = items.reduce(
-    (sum, item) => sum + item.quantity * item.unit_price,
+    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
     0,
   );
 
@@ -168,9 +203,9 @@ export default function GenerateInvoiceModal({
       const lineItems = items.map((i) => ({
         invoice_id: invoice.id,
         description: i.description,
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-        total_price: i.quantity * i.unit_price,
+        quantity: Number(i.quantity) || 1,
+        unit_price: Number(i.unit_price) || 0,
+        total_price: (Number(i.quantity) || 1) * (Number(i.unit_price) || 0),
       }));
 
       await supabase.from('invoice_items').insert(lineItems);
@@ -211,9 +246,9 @@ export default function GenerateInvoiceModal({
         },
         items: items.map((i) => ({
           description: i.description,
-          quantity: i.quantity,
-          unitPrice: i.unit_price,
-          totalPrice: i.quantity * i.unit_price,
+          quantity: Number(i.quantity) || 1,
+          unitPrice: Number(i.unit_price) || 0,
+          totalPrice: (Number(i.quantity) || 1) * (Number(i.unit_price) || 0),
         })),
       };
 
@@ -286,11 +321,25 @@ export default function GenerateInvoiceModal({
               </select>
             </div>
 
+            {/* Datalist for active Inventory items */}
+            <datalist id="inventory-medical-items">
+              {inventoryItems.map((inv) => (
+                <option
+                  key={inv.id}
+                  value={inv.name}
+                  label={`${inv.category || 'Pharmacy'} • ${formatCurrencyAmount(inv.unit_price || 0, currencyConfig.symbol, currencyConfig.position)} (Stock: ${inv.stock_level || 0} ${inv.unit || 'units'})`}
+                />
+              ))}
+            </datalist>
+
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                  Line Items
-                </h3>
+                <div>
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                    Line Items
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">Type or pick from active medical inventory for auto-pricing</p>
+                </div>
                 <button
                   type="button"
                   onClick={addItem}
@@ -301,41 +350,53 @@ export default function GenerateInvoiceModal({
               </div>
 
               {items.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-3">
-                  <input
-                    required
-                    placeholder="Description (e.g. Consultation, Lab Test)"
-                    value={item.description}
-                    onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                    className="flex-[3] px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) =>
-                      updateItem(idx, 'quantity', parseInt(e.target.value) || 1)
-                    }
-                    className="w-16 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={item.unit_price}
-                    onChange={(e) =>
-                      updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)
-                    }
-                    className="w-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-right focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                  />
-                  {items.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(idx)}
-                      className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                <div key={idx} className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    <input
+                      required
+                      list="inventory-medical-items"
+                      placeholder="Description / Medical Item (e.g. Paracetamol, Saline)"
+                      value={item.description}
+                      onChange={(e) => handleDescriptionChange(idx, e.target.value)}
+                      className="flex-[3] px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Qty"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        updateItem(idx, 'quantity', e.target.value)
+                      }
+                      className="w-16 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                    />
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Price"
+                        value={item.unit_price}
+                        onChange={(e) =>
+                          updateItem(idx, 'unit_price', e.target.value)
+                        }
+                        className="w-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-right focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                      />
+                    </div>
+                    {items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(idx)}
+                        className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                  {item.stockInfo && (
+                    <p className="text-[10px] text-emerald-600 font-bold ml-1">
+                      ✓ Linked to Inventory: {item.stockInfo}
+                    </p>
                   )}
                 </div>
               ))}

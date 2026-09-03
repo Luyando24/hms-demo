@@ -47,6 +47,10 @@ export default function ReportsDashboard() {
     labOrdersCount: 0,
     radiologyOrdersCount: 0,
     occupancyRate: 0,
+    inventoryValuation: 0,
+    inventoryItemsCount: 0,
+    lowStockCount: 0,
+    outOfStockCount: 0,
     departmentUtilization: [
       { name: 'Emergency (ER)', val: 0, color: 'bg-rose-500' },
       { name: 'Inpatient (IPD)', val: 0, color: 'bg-blue-500' },
@@ -68,6 +72,7 @@ export default function ReportsDashboard() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payroll_records' }, () => fetchAnalyticsData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admissions' }, () => fetchAnalyticsData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'patients' }, () => fetchAnalyticsData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, () => fetchAnalyticsData())
       .subscribe();
 
     return () => {
@@ -97,7 +102,7 @@ export default function ReportsDashboard() {
         startIso = new Date(now.getFullYear(), 0, 1).toISOString();
       }
 
-      const [invoicesRes, payrollRes, patientsRes, bedsRes, admissionsRes, labRes, radRes, walkinRes] = await Promise.all([
+      const [invoicesRes, payrollRes, patientsRes, bedsRes, admissionsRes, labRes, radRes, walkinRes, inventoryRes, incomesRes] = await Promise.all([
         supabase.from('invoices').select('total_amount, paid_amount, status').gte('created_at', startIso),
         supabase.from('payroll_records').select('net_salary').gte('created_at', startIso),
         supabase.from('patients').select('id', { count: 'exact', head: true }),
@@ -105,7 +110,9 @@ export default function ReportsDashboard() {
         supabase.from('admissions').select('id').eq('status', 'ADMITTED'),
         supabase.from('lab_orders').select('id', { count: 'exact', head: true }).gte('created_at', startIso),
         supabase.from('radiology_orders').select('id', { count: 'exact', head: true }).gte('created_at', startIso),
-        supabase.from('walkin_queue').select('id', { count: 'exact', head: true }).gte('check_in_time', startIso)
+        supabase.from('walkin_queue').select('id', { count: 'exact', head: true }).gte('check_in_time', startIso),
+        supabase.from('inventory_items').select('id, name, stock_level, unit_price, reorder_level'),
+        supabase.from('incomes').select('amount').gte('created_at', startIso),
       ]);
 
       // Revenue Metrics
@@ -115,6 +122,13 @@ export default function ReportsDashboard() {
         invoicesRes.data.forEach(inv => {
           totalRev += Number(inv.total_amount || 0);
           paidRev += Number(inv.paid_amount || 0);
+        });
+      }
+      if (incomesRes.data) {
+        incomesRes.data.forEach(inc => {
+          const amt = Number(inc.amount || 0);
+          totalRev += amt;
+          paidRev += amt;
         });
       }
 
@@ -133,6 +147,19 @@ export default function ReportsDashboard() {
       const occupiedBeds = bedsRes.data?.filter(b => b.status === 'OCCUPIED').length || 0;
       const rate = Math.round((occupiedBeds / totalBeds) * 100);
 
+      // Inventory Valuation & Health Metrics
+      let stockVal = 0;
+      let lowStock = 0;
+      let outStock = 0;
+      (inventoryRes.data || []).forEach((item) => {
+        const qty = Number(item.stock_level) || 0;
+        const price = Number(item.unit_price) || 0;
+        const reorder = Number(item.reorder_level) || 50;
+        stockVal += qty * price;
+        if (qty === 0) outStock++;
+        else if (qty <= reorder) lowStock++;
+      });
+
       const opdCount = walkinRes.count || 0;
       const radCount = radRes.count || 0;
       const labCount = labRes.count || 0;
@@ -148,6 +175,10 @@ export default function ReportsDashboard() {
         labOrdersCount: labCount,
         radiologyOrdersCount: radCount,
         occupancyRate: Math.min(100, Math.max(12, rate || 68)),
+        inventoryValuation: stockVal,
+        inventoryItemsCount: inventoryRes.data?.length || 0,
+        lowStockCount: lowStock,
+        outOfStockCount: outStock,
         departmentUtilization: [
           { name: 'Emergency (ER)', val: Math.min(100, Math.max(25, (opdCount * 8) % 100 || 85)), color: 'bg-rose-500' },
           { name: 'Inpatient (IPD)', val: Math.min(100, Math.max(30, rate || 72)), color: 'bg-blue-500' },
@@ -226,33 +257,43 @@ export default function ReportsDashboard() {
       </div>
 
       {/* Investor & Executive KPI Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative overflow-hidden">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Gross Revenue</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Total Gross Revenue</p>
           <p className="text-2xl font-black text-slate-900">
             {formatCurrencyAmount(analytics.totalRevenue, currencyConfig.symbol, currencyConfig.position)}
           </p>
           <p className="text-xs text-slate-500 font-bold mt-2">Gross Patient Billing</p>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative overflow-hidden">
-          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Collected Cash Flow</p>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+          <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-2">Collected Cash Flow</p>
           <p className="text-2xl font-black text-emerald-600">
             {formatCurrencyAmount(analytics.collectedRevenue, currencyConfig.symbol, currencyConfig.position)}
           </p>
           <p className="text-xs text-emerald-600 font-bold mt-2">Realized Collections</p>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative overflow-hidden">
-          <p className="text-xs font-bold text-brand-600 uppercase tracking-wider mb-2">Estimated EBITDA</p>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+          <p className="text-[11px] font-bold text-brand-600 uppercase tracking-wider mb-2">Estimated EBITDA</p>
           <p className="text-2xl font-black text-brand-600">
             {formatCurrencyAmount(analytics.ebitda, currencyConfig.symbol, currencyConfig.position)}
           </p>
           <p className="text-xs text-brand-600 font-bold mt-2">Net Operating Earnings</p>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative overflow-hidden">
-          <p className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-2">Bed Occupancy ROI</p>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+          <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-2">Medical Stock Asset</p>
+          <p className="text-2xl font-black text-indigo-600">
+            {formatCurrencyAmount(analytics.inventoryValuation, currencyConfig.symbol, currencyConfig.position)}
+          </p>
+          <p className="text-xs text-indigo-600 font-bold mt-2">
+            {analytics.inventoryItemsCount} SKUs {analytics.outOfStockCount > 0 ? `(${analytics.outOfStockCount} Out)` : ''}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+          <p className="text-[11px] font-bold text-purple-600 uppercase tracking-wider mb-2">Bed Occupancy ROI</p>
           <p className="text-2xl font-black text-purple-600">{analytics.occupancyRate}%</p>
           <p className="text-xs text-purple-600 font-bold mt-2">{analytics.activeInpatients} Inpatient Stays</p>
         </div>

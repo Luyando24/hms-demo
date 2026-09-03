@@ -17,7 +17,9 @@ import {
   UserPlus, 
   LogIn,
   MoreVertical,
-  Plus
+  Plus,
+  Eye,
+  FileText
 } from 'lucide-react';
 import clsx from 'clsx';
 import { 
@@ -29,6 +31,7 @@ import {
   type AppointmentRecord 
 } from './actions';
 import StatusModal from '@/components/hospital/StatusModal';
+import AppointmentDetailModal from '@/components/hospital/AppointmentDetailModal';
 import { Pagination } from '@/components/ui/Pagination';
 import { usePagination } from '@/hooks/usePagination';
 import { createClient } from '@/utils/supabase/client';
@@ -42,6 +45,7 @@ export default function AppointmentsPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
 
   // Modals & Assignments
+  const [selectedAppointmentForDetail, setSelectedAppointmentForDetail] = useState<AppointmentRecord | null>(null);
   const [assigningAppointment, setAssigningAppointment] = useState<AppointmentRecord | null>(null);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
 
@@ -379,10 +383,8 @@ export default function AppointmentsPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black uppercase tracking-wider text-slate-500">
-                  <th className="py-4 px-6">Patient</th>
-                  <th className="py-4 px-6">Date & Time</th>
-                  <th className="py-4 px-6">Assigned Doctor</th>
-                  <th className="py-4 px-6">Reason / Notes</th>
+                  <th className="py-4 px-6">Patient & Reason</th>
+                  <th className="py-4 px-6">Schedule & Doctor</th>
                   <th className="py-4 px-6">Status</th>
                   <th className="py-4 px-6 text-right">Actions</th>
                 </tr>
@@ -396,7 +398,6 @@ export default function AppointmentsPage() {
                         weekday: 'short',
                         month: 'short',
                         day: 'numeric',
-                        year: 'numeric',
                         hour: 'numeric',
                         minute: '2-digit',
                       })
@@ -405,63 +406,61 @@ export default function AppointmentsPage() {
                   const isBusy = actionLoading === apt.id;
 
                   return (
-                    <tr key={apt.id} className="hover:bg-slate-50/60 transition-colors">
-                      {/* Patient */}
+                    <tr 
+                      key={apt.id} 
+                      className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
+                      onClick={(e) => {
+                        // If clicked outside of buttons, open detail modal
+                        if ((e.target as HTMLElement).closest('button')) return;
+                        setSelectedAppointmentForDetail(apt);
+                      }}
+                    >
+                      {/* Patient & Reason */}
                       <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 font-black flex items-center justify-center text-xs shrink-0 border border-brand-200">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 font-black flex items-center justify-center text-xs shrink-0 border border-brand-200 mt-0.5 shadow-2xs">
                             {patient?.first_name?.[0] || 'P'}
                             {patient?.last_name?.[0] || ''}
                           </div>
                           <div>
-                            <span className="font-extrabold text-slate-900 block">
+                            <span className="font-extrabold text-slate-900 group-hover:text-brand-600 transition-colors block">
                               {patient ? `${patient.first_name} ${patient.last_name}` : 'Unknown Patient'}
                             </span>
-                            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mt-0.5">
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 font-medium mt-0.5">
                               {patient?.file_number && (
                                 <span className="bg-slate-100 px-2 py-0.5 rounded font-mono text-[10px] text-slate-600 font-bold">
                                   {patient.file_number}
                                 </span>
                               )}
-                              {patient?.phone && <span>{patient.phone}</span>}
+                              {patient?.phone && <span className="text-[11px] text-slate-500">{patient.phone}</span>}
                             </div>
+                            {apt.reason && (
+                              <p className="text-[11px] text-slate-600 mt-1 max-w-sm line-clamp-1">
+                                <span className="font-bold text-slate-400">Reason:</span> {apt.reason}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
 
-                      {/* Date & Time */}
-                      <td className="py-4 px-6 font-semibold text-slate-800 text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <Clock size={14} className="text-slate-400 shrink-0" />
-                          <span>{aptDate}</span>
-                        </div>
-                      </td>
-
-                      {/* Doctor */}
+                      {/* Schedule & Doctor */}
                       <td className="py-4 px-6">
-                        {doctor ? (
-                          <div className="flex items-center gap-2">
-                            <Stethoscope size={14} className="text-brand-600 shrink-0" />
-                            <span className="font-extrabold text-slate-900 text-xs">
-                              Dr. {doctor.first_name} {doctor.last_name}
-                            </span>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                            <Clock size={13} className="text-brand-600 shrink-0" />
+                            <span>{aptDate}</span>
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setAssigningAppointment(apt);
-                              setSelectedDoctorId(apt.provider_id || '');
-                            }}
-                            className="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-200 transition-all flex items-center gap-1.5"
-                          >
-                            <UserPlus size={13} /> Unassigned (Click to Assign)
-                          </button>
-                        )}
-                      </td>
-
-                      {/* Reason */}
-                      <td className="py-4 px-6 text-xs text-slate-600 max-w-xs truncate">
-                        {apt.reason || 'General Medical Consultation'}
+                          {doctor ? (
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                              <Stethoscope size={13} className="text-indigo-600 shrink-0" />
+                              <span className="truncate max-w-[200px]">Dr. {doctor.first_name} {doctor.last_name}</span>
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                              <UserPlus size={11} /> Unassigned Doctor
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Status */}
@@ -469,53 +468,30 @@ export default function AppointmentsPage() {
 
                       {/* Actions */}
                       <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                           {isBusy ? (
                             <Loader2 size={16} className="animate-spin text-brand-600" />
                           ) : (
                             <>
-                              {/* OPD Check-in button */}
+                              {/* View Details Button */}
+                              <button
+                                onClick={() => setSelectedAppointmentForDetail(apt)}
+                                title="View Appointment Details"
+                                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
+                              >
+                                <Eye size={13} className="text-slate-500" />
+                                <span>Details</span>
+                              </button>
+
+                              {/* Quick OPD Check-in button */}
                               {apt.status !== 'CANCELLED' && apt.status !== 'COMPLETED' && (
                                 <button
                                   onClick={() => handleCheckInOpd(apt)}
                                   title="Check-in to OPD Queue"
-                                  className="bg-slate-900 hover:bg-slate-800 text-white p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs active:scale-98"
+                                  className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs active:scale-98"
                                 >
                                   <LogIn size={13} />
                                   Check In
-                                </button>
-                              )}
-
-                              {/* Assign / Change Doctor */}
-                              <button
-                                onClick={() => {
-                                  setAssigningAppointment(apt);
-                                  setSelectedDoctorId(apt.provider_id || '');
-                                }}
-                                title="Reassign Specialist Doctor"
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all"
-                              >
-                                <Stethoscope size={16} />
-                              </button>
-
-                              {/* Status Toggle Dropdown / Buttons */}
-                              {apt.status === 'SCHEDULED' && (
-                                <button
-                                  onClick={() => handleUpdateStatus(apt.id, 'CONFIRMED')}
-                                  title="Confirm Appointment"
-                                  className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-all font-bold text-xs"
-                                >
-                                  Confirm
-                                </button>
-                              )}
-
-                              {apt.status !== 'CANCELLED' && (
-                                <button
-                                  onClick={() => handleUpdateStatus(apt.id, 'CANCELLED')}
-                                  title="Cancel Appointment"
-                                  className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-all font-bold text-xs"
-                                >
-                                  Cancel
                                 </button>
                               )}
                             </>
@@ -540,7 +516,62 @@ export default function AppointmentsPage() {
         )}
       </div>
 
-      {/* Assign Doctor Modal */}
+      {/* View Appointment Detail Modal */}
+      {selectedAppointmentForDetail && (
+        <AppointmentDetailModal
+          isOpen={!!selectedAppointmentForDetail}
+          onClose={() => setSelectedAppointmentForDetail(null)}
+          appointment={selectedAppointmentForDetail}
+          doctors={doctors}
+          onStatusChange={async (id, newStatus) => {
+            await handleUpdateStatus(id, newStatus);
+            setSelectedAppointmentForDetail((prev) => (prev ? { ...prev, status: newStatus } : null));
+          }}
+          onCheckInOpd={async (apt) => {
+            await handleCheckInOpd(apt);
+            setSelectedAppointmentForDetail((prev) => (prev ? { ...prev, status: 'CONFIRMED' } : null));
+          }}
+          onAssignDoctor={async (id, doctorId) => {
+            const res = await assignAppointmentDoctorAction(id, doctorId || null);
+            if (res.success) {
+              const assignedDoc = doctors.find((d) => d.id === doctorId) || null;
+              setAppointments((prev) =>
+                prev.map((a) =>
+                  a.id === id
+                    ? {
+                        ...a,
+                        provider_id: doctorId || null,
+                        provider: assignedDoc,
+                      }
+                    : a
+                )
+              );
+              setSelectedAppointmentForDetail((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      provider_id: doctorId || null,
+                      provider: assignedDoc,
+                    }
+                  : null
+              );
+              setStatusFeedback({
+                type: 'success',
+                title: 'Doctor Assigned',
+                message: 'Specialist doctor has been assigned to the appointment.',
+              });
+            } else {
+              setStatusFeedback({
+                type: 'error',
+                title: 'Assignment Failed',
+                message: res.error || 'Failed to assign doctor.',
+              });
+            }
+          }}
+        />
+      )}
+
+      {/* Assign Doctor Modal (Standalone) */}
       {assigningAppointment && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <form

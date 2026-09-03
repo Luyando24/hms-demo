@@ -200,27 +200,88 @@ export default function SystemSettingsPage() {
   }
 
   const handleDetectCurrentLocation = () => {
+    const isHttpNetwork = typeof window !== 'undefined' && 
+      window.location.protocol !== 'https:' && 
+      window.location.hostname !== 'localhost' && 
+      window.location.hostname !== '127.0.0.1';
+
     if (typeof window === 'undefined' || !('geolocation' in navigator)) {
-      alert('Geolocation is not supported by your browser.');
+      if (isHttpNetwork) {
+        alert(
+          'Geolocation is blocked by your browser because this site is accessed over unencrypted HTTP (e.g. ' +
+          window.location.host +
+          ').\n\nTo enable location detection on this computer:\n1. Open chrome://flags (or edge://flags)\n2. Search "Insecure origins treated as secure"\n3. Add "' +
+          window.location.origin +
+          '" and click Relaunch.\n\nAlternatively, enter the facility coordinates manually.'
+        );
+      } else {
+        alert('Geolocation is not supported by your browser.');
+      }
       return;
     }
 
     setDetectingGps(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setForm((prev) => ({
-          ...prev,
-          geofence_latitude: Number(pos.coords.latitude.toFixed(6)),
-          geofence_longitude: Number(pos.coords.longitude.toFixed(6)),
-        }));
-        setDetectingGps(false);
-      },
-      (err) => {
-        alert(`Failed to detect GPS location: ${err.message}`);
-        setDetectingGps(false);
-      },
-      { enableHighAccuracy: true }
-    );
+
+    const tryIpFallback = async (originalErr?: string) => {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.latitude && data.longitude) {
+            setForm((prev) => ({
+              ...prev,
+              geofence_latitude: Number(Number(data.latitude).toFixed(6)),
+              geofence_longitude: Number(Number(data.longitude).toFixed(6)),
+            }));
+            setDetectingGps(false);
+            alert(
+              `Estimated location detected via IP Network (${data.city || 'Local City'}, ${data.region || ''}, ${data.country_name || ''}).\n\nCoordinates: ${data.latitude}, ${data.longitude}.\n\n(Note: Hardware GPS/Wi-Fi positioning was unavailable on this PC, so approximate network coordinates were used. You can fine-tune them in the inputs).`
+            );
+            return;
+          }
+        }
+      } catch (ipErr) {
+        console.warn('IP fallback failed:', ipErr);
+      }
+
+      setDetectingGps(false);
+      alert(
+        `Failed to acquire hardware GPS position: ${originalErr || 'Position unavailable'}.\n\nCommon causes on Desktop PCs:\n1. Wired Ethernet desktop with no Wi-Fi card/beacons or GPS hardware.\n2. Windows "Default location" is not set in Windows Settings -> Privacy -> Location.\n3. Windows "Geolocation Service" (lfsvc) is stopped or disabled in services.msc.\n\nYou can type your facility's exact Latitude & Longitude coordinates directly into the inputs.`
+      );
+    };
+
+    const tryBrowserLocation = (highAccuracy: boolean) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setForm((prev) => ({
+            ...prev,
+            geofence_latitude: Number(pos.coords.latitude.toFixed(6)),
+            geofence_longitude: Number(pos.coords.longitude.toFixed(6)),
+          }));
+          setDetectingGps(false);
+        },
+        (err) => {
+          console.warn('GPS attempt failed (highAccuracy=' + highAccuracy + '):', err.code, err.message);
+          if (highAccuracy) {
+            // High accuracy GPS failed (indoors or no satellite fix), try low accuracy / Wi-Fi triangulation
+            tryBrowserLocation(false);
+          } else {
+            // Both hardware and Wi-Fi positioning failed, attempt IP fallback
+            if (err.code === 1) {
+              setDetectingGps(false);
+              alert(
+                'Location access was denied by your browser.\n\nPlease click the lock/tune icon in the browser address bar, set Location to "Allow", and ensure Windows Settings -> Privacy -> Location is turned ON.'
+              );
+            } else {
+              void tryIpFallback(err.message);
+            }
+          }
+        },
+        { enableHighAccuracy: highAccuracy, timeout: highAccuracy ? 5000 : 8000, maximumAge: 60000 }
+      );
+    };
+
+    tryBrowserLocation(true);
   };
 
   const handleToggleEnforcedRole = (role: string) => {

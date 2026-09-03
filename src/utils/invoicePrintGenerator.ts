@@ -568,3 +568,613 @@ export function printInvoiceDocument(data: PrintableInvoiceData): boolean {
   }
   return false;
 }
+
+export interface PrintableReceiptData {
+  receiptNumber: string;
+  invoiceId?: string;
+  paymentId?: string;
+  createdAt: string;
+  totalAmount: number;
+  paidAmount: number;
+  paymentMethod: string;
+  paymentReference?: string;
+  tenderedAmount?: number;
+  changeAmount?: number;
+  cashierName?: string;
+  hospital?: InvoiceHospitalDetails;
+  patient: InvoicePatientDetails;
+  items: InvoiceLineItem[];
+  notes?: string;
+}
+
+export function generateReceiptHtml(data: PrintableReceiptData): string {
+  const {
+    receiptNumber,
+    invoiceId,
+    createdAt,
+    totalAmount,
+    paidAmount,
+    paymentMethod,
+    paymentReference,
+    tenderedAmount,
+    changeAmount,
+    cashierName,
+    hospital,
+    patient,
+    items,
+    notes,
+  } = data;
+
+  const symbol = hospital?.currencySymbol || '$';
+  const position = hospital?.currencyPosition || 'prefix';
+  const balance = Math.max(0, totalAmount - (paidAmount || 0));
+
+  const hospitalName = hospital?.brandTitle || hospital?.name || 'Hospital Medical Center';
+  const hospitalTagline = hospital?.tagline || 'Excellence in Clinical & Healthcare Services';
+  const hospitalAddress = hospital?.address || 'Healthcare Way, Medical District';
+  const hospitalPhone = hospital?.phone || '+1 (555) 019-2834';
+  const hospitalEmail = hospital?.email || 'billing@hospital.org';
+
+  const dateFormatted = new Date(createdAt).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const timeFormatted = new Date(createdAt).toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Official Receipt #${receiptNumber} - ${patient.firstName} ${patient.lastName}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    @page {
+      size: A4 portrait;
+      margin: 15mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      line-height: 1.4;
+      font-size: 13px;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .sheet {
+      background: #ffffff;
+      width: 100%;
+      max-width: 800px;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
+      position: relative;
+    }
+
+    /* Print action bar */
+    .no-print {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding: 12px 18px;
+      background: #0f172a;
+      border-radius: 12px;
+      color: #ffffff;
+    }
+
+    .btn-print {
+      background: #059669;
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+
+    .btn-print:hover {
+      background: #047857;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 24px;
+      margin-bottom: 24px;
+    }
+
+    .brand {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .logo-img {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 1px solid #e2e8f0;
+    }
+
+    .logo-placeholder {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      color: white;
+      font-size: 24px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(5, 150, 105, 0.2);
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-tagline {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .hospital-meta {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    .receipt-badge-col {
+      text-align: right;
+    }
+
+    .receipt-title {
+      font-size: 22px;
+      font-weight: 900;
+      color: #059669;
+      letter-spacing: -0.5px;
+      text-transform: uppercase;
+    }
+
+    .receipt-number {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 4px;
+      background: #f1f5f9;
+      padding: 4px 10px;
+      border-radius: 6px;
+      display: inline-block;
+    }
+
+    .receipt-date {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      margin-top: 6px;
+    }
+
+    /* Cards Grid */
+    .details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .card-title {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    .patient-name {
+      font-size: 15px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .patient-detail {
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      margin-top: 3px;
+    }
+
+    .payment-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 11px;
+      margin-top: 6px;
+      text-transform: uppercase;
+    }
+
+    /* Table */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+    }
+
+    .items-table th {
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 10px 14px;
+      text-align: left;
+      border-top: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .items-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 12px;
+      color: #1e293b;
+    }
+
+    .items-table td.text-right, .items-table th.text-right {
+      text-align: right;
+    }
+
+    .item-desc {
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    /* Summary */
+    .summary-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      gap: 20px;
+    }
+
+    .payment-seal {
+      border: 2px dashed #059669;
+      background: #ecfdf5;
+      color: #065f46;
+      border-radius: 12px;
+      padding: 14px 18px;
+      max-width: 320px;
+      text-align: center;
+    }
+
+    .seal-title {
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #047857;
+    }
+
+    .seal-sub {
+      font-size: 10px;
+      font-weight: 600;
+      margin-top: 4px;
+      color: #065f46;
+    }
+
+    .summary-table {
+      width: 280px;
+      border-collapse: collapse;
+    }
+
+    .summary-table td {
+      padding: 6px 0;
+      font-size: 12px;
+    }
+
+    .summary-table td.label {
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    .summary-table td.val {
+      text-align: right;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .summary-table tr.total-row td {
+      border-top: 2px solid #e2e8f0;
+      padding-top: 10px;
+      font-size: 15px;
+      font-weight: 900;
+      color: #059669;
+    }
+
+    /* Signatures */
+    .signatures-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .signature-block {
+      border-top: 1px dashed #94a3b8;
+      padding-top: 8px;
+      text-align: center;
+    }
+
+    .signature-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+    }
+
+    .footer-note {
+      text-align: center;
+      margin-top: 30px;
+      padding-top: 16px;
+      border-top: 1px solid #f1f5f9;
+      font-size: 10px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
+    @media print {
+      body {
+        background: transparent;
+        padding: 0;
+      }
+      .sheet {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        max-width: 100%;
+      }
+      .no-print {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="no-print">
+      <div>
+        <strong>Official Hospital Payment Receipt</strong> • #${receiptNumber}
+      </div>
+      <button class="btn-print" onclick="window.print()">
+        🖨️ Print Receipt
+      </button>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+      <div class="brand">
+        ${hospital?.logoUrl ? `<img src="${hospital.logoUrl}" class="logo-img" alt="Logo" />` : `<div class="logo-placeholder">✚</div>`}
+        <div>
+          <div class="brand-title">${hospitalName}</div>
+          <div class="brand-tagline">${hospitalTagline}</div>
+          <div class="hospital-meta">
+            ${hospitalAddress}<br />
+            Tel: ${hospitalPhone} • Email: ${hospitalEmail}
+          </div>
+        </div>
+      </div>
+
+      <div class="receipt-badge-col">
+        <div class="receipt-title">Official Receipt</div>
+        <div class="receipt-number">REC #${receiptNumber}</div>
+        <div class="receipt-date">${dateFormatted} at ${timeFormatted}</div>
+        ${invoiceId ? `<div style="font-size:10px; color:#64748b; margin-top:2px;">Ref Invoice: #${invoiceId.slice(0, 8).toUpperCase()}</div>` : ''}
+      </div>
+    </div>
+
+    <!-- Details Grid -->
+    <div class="details-grid">
+      <div class="card">
+        <div class="card-title">Received From (Patient / Payer)</div>
+        <div class="patient-name">${patient.firstName} ${patient.lastName}</div>
+        ${patient.fileNumber ? `<div class="patient-detail">MRN / File: <strong>${patient.fileNumber}</strong></div>` : ''}
+        ${patient.phone ? `<div class="patient-detail">Phone: ${patient.phone}</div>` : ''}
+        ${patient.gender ? `<div class="patient-detail">Gender: ${patient.gender}</div>` : ''}
+      </div>
+
+      <div class="card">
+        <div class="card-title">Payment Settlement Details</div>
+        <div class="payment-badge">
+          ✓ ${paymentMethod || 'CASH PAYMENT'}
+        </div>
+        ${paymentReference ? `<div class="patient-detail" style="margin-top:6px;">Txn / Ref #: <strong>${paymentReference}</strong></div>` : ''}
+        ${cashierName ? `<div class="patient-detail">Cashier / Staff: <strong>${cashierName}</strong></div>` : ''}
+        <div class="patient-detail">Settlement Status: <span style="color:#059669; font-weight:800;">CONFIRMED & CLEARED</span></div>
+      </div>
+    </div>
+
+    <!-- Line Items Table -->
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width: 50%;">Service / Medical Item Description</th>
+          <th class="text-right" style="width: 15%;">Qty</th>
+          <th class="text-right" style="width: 15%;">Unit Price</th>
+          <th class="text-right" style="width: 20%;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(item => `
+          <tr>
+            <td>
+              <div class="item-desc">${item.description}</div>
+            </td>
+            <td class="text-right">${item.quantity}</td>
+            <td class="text-right">${formatCurrencyAmount(item.unitPrice, symbol, position)}</td>
+            <td class="text-right" style="font-weight:700;">${formatCurrencyAmount(item.totalPrice, symbol, position)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <!-- Summary & Official Seal -->
+    <div class="summary-section">
+      <div class="payment-seal">
+        <div class="seal-title">✓ Verified & Paid</div>
+        <div class="seal-sub">Payment received and officially processed into the hospital financial ledger.</div>
+      </div>
+
+      <table class="summary-table">
+        <tr>
+          <td class="label">Gross Bill Amount</td>
+          <td class="val">${formatCurrencyAmount(totalAmount, symbol, position)}</td>
+        </tr>
+        <tr class="total-row">
+          <td>Amount Received</td>
+          <td class="val">${formatCurrencyAmount(paidAmount, symbol, position)}</td>
+        </tr>
+        ${tenderedAmount && tenderedAmount > paidAmount ? `
+          <tr>
+            <td class="label">Tendered Cash</td>
+            <td class="val">${formatCurrencyAmount(tenderedAmount, symbol, position)}</td>
+          </tr>
+          <tr>
+            <td class="label">Change Returned</td>
+            <td class="val">${formatCurrencyAmount(changeAmount || (tenderedAmount - paidAmount), symbol, position)}</td>
+          </tr>
+        ` : ''}
+        <tr>
+          <td class="label">Outstanding Balance</td>
+          <td class="val" style="color: ${balance === 0 ? '#059669' : '#dc2626'}; font-weight:800;">
+            ${formatCurrencyAmount(balance, symbol, position)}
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    ${notes ? `
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-title">Receipt Notes / Remarks</div>
+        <div style="font-size: 11px; color: #475569;">${notes}</div>
+      </div>
+    ` : ''}
+
+    <div class="signatures-grid">
+      <div class="signature-block">
+        <div class="signature-title">Patient / Payer Signature</div>
+      </div>
+      <div class="signature-block">
+        <div class="signature-title">Authorized Cashier: ${cashierName || hospitalName}</div>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      Official Medical Receipt • Thank you for choosing ${hospitalName}.<br />
+      For receipt verifications, contact billing at ${hospitalEmail} or call ${hospitalPhone}.
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        window.print();
+      }, 300);
+    });
+  </script>
+</body>
+</html>`;
+}
+
+export function printReceiptDocument(data: PrintableReceiptData): boolean {
+  try {
+    const html = generateReceiptHtml(data);
+    const printWindow = window.open('', '_blank', 'width=900,height=850,resizable=yes,scrollbars=yes');
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      return true;
+    } else {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(html);
+        doc.close();
+        iframe.contentWindow?.focus();
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 60000);
+        }, 500);
+        return true;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to print receipt document:', err);
+  }
+  return false;
+}
+

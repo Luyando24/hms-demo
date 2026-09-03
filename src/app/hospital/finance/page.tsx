@@ -31,6 +31,7 @@ import clsx from 'clsx';
 import { Pagination } from '@/components/ui/Pagination';
 import { usePagination } from '@/hooks/usePagination';
 import RecordExpenseModal from '@/components/hospital/RecordExpenseModal';
+import RecordIncomeModal from '@/components/hospital/RecordIncomeModal';
 import ReportExportModal from '@/components/hospital/ReportExportModal';
 import StatusModal from '@/components/hospital/StatusModal';
 import { sendFinancialReportEmailAction } from './actions';
@@ -40,13 +41,16 @@ type TransactionType = 'ALL' | 'EXPENSE' | 'PAYROLL' | 'PROCUREMENT' | 'REVENUE'
 export default function FinanceDashboard() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [incomes, setIncomes] = useState<any[]>([]);
   const [payrollRecords, setPayrollRecords] = useState<any[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TransactionType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals & Actions
+  const [isRecordIncomeOpen, setIsRecordIncomeOpen] = useState(false);
   const [isRecordExpenseOpen, setIsRecordExpenseOpen] = useState(false);
   const [isReportExportOpen, setIsReportExportOpen] = useState(false);
   const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
@@ -63,13 +67,15 @@ export default function FinanceDashboard() {
     void fetchFinancialData();
     void fetchSettings();
 
-    // Subscribe to live financial channels
+    // Subscribe to live financial and inventory channels
     const channel = supabase
       .channel('finance_dashboard_live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => void fetchFinancialData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => void fetchFinancialData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incomes' }, () => void fetchFinancialData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payroll_records' }, () => void fetchFinancialData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, () => void fetchFinancialData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, () => void fetchFinancialData())
       .subscribe();
 
     return () => {
@@ -95,17 +101,21 @@ export default function FinanceDashboard() {
   const fetchFinancialData = async () => {
     setLoading(true);
     try {
-      const [invRes, expRes, payRes, poRes] = await Promise.all([
+      const [invRes, expRes, payRes, poRes, invItemRes, incRes] = await Promise.all([
         supabase.from('invoices').select('*, patients(first_name, last_name, file_number)').order('created_at', { ascending: false }),
         supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
         supabase.from('payroll_records').select('*, profiles(first_name, last_name, staff_number, role)').order('created_at', { ascending: false }),
         supabase.from('purchase_orders').select('*, suppliers(name)').order('created_at', { ascending: false }),
+        supabase.from('inventory_items').select('*').order('name', { ascending: true }),
+        supabase.from('incomes').select('*').order('income_date', { ascending: false }),
       ]);
 
       if (invRes.data) setInvoices(invRes.data);
       if (expRes.data) setExpenses(expRes.data);
       if (payRes.data) setPayrollRecords(payRes.data);
       if (poRes.data) setPurchaseOrders(poRes.data);
+      if (invItemRes.data) setInventoryItems(invItemRes.data);
+      if (incRes.data) setIncomes(incRes.data);
     } catch (err) {
       console.error('Error fetching synchronized financial data:', err);
     } finally {
@@ -116,8 +126,10 @@ export default function FinanceDashboard() {
   // Aggregated Multi-Module Metrics
   const totals = useMemo(() => {
     const totalInvoiced = invoices.reduce((acc, inv) => acc + Number(inv.total_amount || 0), 0);
-    const realizedRevenue = invoices.reduce((acc, inv) => acc + Number(inv.paid_amount || 0), 0);
-    const receivables = Math.max(0, totalInvoiced - realizedRevenue);
+    const patientRevenue = invoices.reduce((acc, inv) => acc + Number(inv.paid_amount || 0), 0);
+    const manualIncomes = incomes.reduce((acc, inc) => acc + parseFloat(inc.amount?.toString() || '0'), 0);
+    const realizedRevenue = patientRevenue + manualIncomes;
+    const receivables = Math.max(0, totalInvoiced - patientRevenue);
 
     const generalExpenses = expenses.reduce((acc, exp) => acc + parseFloat(exp.amount?.toString() || '0'), 0);
     const payrollOutflow = payrollRecords.reduce((acc, pay) => acc + Number(pay.net_salary || 0), 0);
@@ -125,6 +137,20 @@ export default function FinanceDashboard() {
 
     const totalOutflows = generalExpenses + payrollOutflow + procurementOutflow;
     const netEbitda = realizedRevenue - totalOutflows;
+
+    // Inventory Medical Price & Status Metrics
+    const inventoryValuation = inventoryItems.reduce(
+      (acc, item) => acc + (Number(item.stock_level || 0) * Number(item.unit_price || 0)),
+      0
+    );
+    const totalStockCount = inventoryItems.length;
+    const outOfStockCount = inventoryItems.filter((i) => (Number(i.stock_level) || 0) === 0).length;
+    const lowStockCount = inventoryItems.filter(
+      (i) => (Number(i.stock_level) || 0) > 0 && (Number(i.stock_level) || 0) <= (Number(i.reorder_level) || 50)
+    ).length;
+    const inStockCount = inventoryItems.filter(
+      (i) => (Number(i.stock_level) || 0) > (Number(i.reorder_level) || 50)
+    ).length;
 
     return {
       totalInvoiced,
@@ -135,8 +161,13 @@ export default function FinanceDashboard() {
       procurementOutflow,
       totalOutflows,
       netEbitda,
+      inventoryValuation,
+      totalStockCount,
+      outOfStockCount,
+      lowStockCount,
+      inStockCount,
     };
-  }, [invoices, expenses, payrollRecords, purchaseOrders]);
+  }, [invoices, expenses, incomes, payrollRecords, purchaseOrders, inventoryItems]);
 
   const pendingInvoicesCount = invoices.filter(
     (inv) => inv.status === 'UNPAID' || inv.status === 'PARTIAL',
@@ -221,6 +252,21 @@ export default function FinanceDashboard() {
       }
     });
 
+    // Direct Manual Incomes
+    incomes.forEach((inc) => {
+      list.push({
+        id: `inc-${inc.id}`,
+        type: 'REVENUE',
+        title: inc.title || 'Direct Inflow Receipt',
+        subtitle: `${inc.category || 'DIRECT_PAYMENT'} • Ref: ${inc.reference_number || 'N/A'}`,
+        date: inc.income_date || inc.created_at || new Date().toISOString(),
+        amount: Number(inc.amount || 0),
+        isOutflow: false,
+        paymentMethod: inc.payment_method || 'CASH',
+        statusBadge: 'INCOME',
+      });
+    });
+
     // Sort by date descending
     list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -233,7 +279,7 @@ export default function FinanceDashboard() {
         item.subtitle.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesTab && matchesSearch;
     });
-  }, [expenses, payrollRecords, purchaseOrders, invoices, activeTab, searchQuery]);
+  }, [expenses, incomes, payrollRecords, purchaseOrders, invoices, activeTab, searchQuery]);
 
   const {
     currentPage,
@@ -283,15 +329,9 @@ export default function FinanceDashboard() {
       {/* Header */}
       <div className="sticky top-20 z-40 bg-slate-100/90 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 lg:-mx-8 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
-            <span>Hospital Financial Management</span>
-            <span className="text-[10px] font-bold px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200 uppercase tracking-wider">
-              ✓ Multi-Module Synced
-            </span>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900">
+            Hospital Financial Management
           </h1>
-          <p className="text-slate-500 mt-1 font-medium">
-            Real-time synchronization across Patient Billings, Staff Payroll, Pharmacy Procurements, and General Operating Expenses.
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -323,8 +363,16 @@ export default function FinanceDashboard() {
           </button>
 
           <button
-            onClick={() => setIsRecordExpenseOpen(true)}
+            onClick={() => setIsRecordIncomeOpen(true)}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5"
+          >
+            <Plus size={16} />
+            <span>Record Income</span>
+          </button>
+
+          <button
+            onClick={() => setIsRecordExpenseOpen(true)}
+            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-rose-500/20 flex items-center gap-1.5"
           >
             <Plus size={16} />
             <span>Record Expense</span>
@@ -398,8 +446,8 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      {/* Outflow Breakdown Sub-Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Outflow & Asset Valuation Breakdown Sub-Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 bg-white rounded-2xl border border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -449,6 +497,30 @@ export default function FinanceDashboard() {
           <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-1 rounded-lg">
             {expenses.length} Vouchers
           </span>
+        </div>
+
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              <Package size={18} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Medical Stock Valuation</p>
+              <p className="text-sm font-black text-emerald-600">
+                {formatCurrencyAmount(totals.inventoryValuation, currencyConfig.symbol, currencyConfig.position)}
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg inline-block">
+              {totals.totalStockCount} SKUs
+            </span>
+            {totals.outOfStockCount > 0 && (
+              <p className="text-[9px] text-rose-500 font-bold mt-1">
+                {totals.outOfStockCount} Out of Stock
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -610,6 +682,22 @@ export default function FinanceDashboard() {
           />
         </div>
       </div>
+
+      {/* Record Income Modal */}
+      <RecordIncomeModal
+        isOpen={isRecordIncomeOpen}
+        onClose={() => setIsRecordIncomeOpen(false)}
+        onSuccess={() => {
+          void fetchFinancialData();
+          setStatusModal({
+            type: 'success',
+            title: 'Income Recorded',
+            message: 'The direct revenue receipt has been recorded in the hospital finance ledger.',
+          });
+        }}
+        currencySymbol={currencyConfig.symbol}
+        currencyPosition={currencyConfig.position}
+      />
 
       {/* Record Expense Modal */}
       <RecordExpenseModal

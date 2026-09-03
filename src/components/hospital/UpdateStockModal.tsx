@@ -13,7 +13,7 @@ interface UpdateStockModalProps {
 }
 
 export default function UpdateStockModal({ isOpen, onClose, item, onSuccess }: UpdateStockModalProps) {
-  const [changeAmount, setChangeAmount] = useState(0)
+  const [changeAmount, setChangeAmount] = useState<string | number>('')
   const [type, setType] = useState<'ADD' | 'SUBTRACT'>('ADD')
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
@@ -22,8 +22,10 @@ export default function UpdateStockModal({ isOpen, onClose, item, onSuccess }: U
 
   if (!isOpen) return null
 
+  const numericChangeAmount = Number(changeAmount) || 0
+
   const handleUpdate = async () => {
-    if (changeAmount <= 0) {
+    if (numericChangeAmount <= 0) {
       setStatus({
         type: 'error',
         title: 'Invalid Amount',
@@ -33,7 +35,7 @@ export default function UpdateStockModal({ isOpen, onClose, item, onSuccess }: U
     }
     setLoading(true)
     
-    const quantityDelta = type === 'ADD' ? changeAmount : -changeAmount
+    const quantityDelta = type === 'ADD' ? numericChangeAmount : -numericChangeAmount
     const { data: newStock, error } = await supabase.rpc('adjust_inventory', {
       target_item_id: item.id,
       quantity_delta: quantityDelta,
@@ -93,10 +95,11 @@ export default function UpdateStockModal({ isOpen, onClose, item, onSuccess }: U
                 <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
                 <input 
                   type="number" 
+                  min={1}
                   value={changeAmount}
-                  onChange={(e) => setChangeAmount(parseInt(e.target.value) || 0)}
+                  onChange={(e) => setChangeAmount(e.target.value)}
                   className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-black focus:outline-none focus:ring-2 focus:ring-slate-500/20"
-                  placeholder="0"
+                  placeholder="e.g. 10"
                 />
               </div>
             </div>
@@ -114,7 +117,7 @@ export default function UpdateStockModal({ isOpen, onClose, item, onSuccess }: U
             <div className="pt-4 text-center">
               <p className="text-xs text-slate-400 font-bold mb-4 uppercase tracking-wider">
                 New Level will be <span className="text-slate-900 font-black">
-                  {type === 'ADD' ? item?.stock_level + changeAmount : item?.stock_level - changeAmount}
+                  {type === 'ADD' ? item?.stock_level + numericChangeAmount : item?.stock_level - numericChangeAmount}
                 </span>
               </p>
               <button 

@@ -1,26 +1,50 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { CreditCard, Search, Filter, Plus, FileText, CheckCircle2, AlertCircle, TrendingUp, DollarSign, ArrowUpRight, LogIn, Printer, Loader2 } from "lucide-react";
+import { 
+  CreditCard, 
+  Search, 
+  Filter, 
+  Plus, 
+  FileText, 
+  CheckCircle2, 
+  AlertCircle, 
+  TrendingUp, 
+  DollarSign, 
+  ArrowUpRight, 
+  LogIn, 
+  Printer, 
+  Loader2,
+  Receipt,
+  FileCheck
+} from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
 import RecordPaymentModal from "@/components/hospital/RecordPaymentModal";
 import GenerateInvoiceModal from "@/components/hospital/GenerateInvoiceModal";
+import GenerateReceiptModal from "@/components/hospital/GenerateReceiptModal";
 import { cancelInvoiceAction } from "@/app/hospital/actions";
 import { formatCurrencyAmount } from "@/utils/currency";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
-import { printInvoiceDocument, PrintableInvoiceData } from "@/utils/invoicePrintGenerator";
+import { 
+  printInvoiceDocument, 
+  printReceiptDocument, 
+  PrintableInvoiceData, 
+  PrintableReceiptData 
+} from "@/utils/invoicePrintGenerator";
 
 export default function BillingDashboard() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
+  const [printingReceiptId, setPrintingReceiptId] = useState<string | null>(null);
   const [hospitalSettings, setHospitalSettings] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+  const [isGenerateReceiptModalOpen, setIsGenerateReceiptModalOpen] = useState(false);
   const [currencyConfig, setCurrencyConfig] = useState<{ symbol: string, position: 'prefix' | 'suffix' }>({ symbol: '$', position: 'prefix' });
   const supabase = createClient();
 
@@ -109,6 +133,71 @@ export default function BillingDashboard() {
     }
   };
 
+  const handlePrintReceipt = async (invoice: any) => {
+    setPrintingReceiptId(invoice.id);
+    try {
+      const [{ data: items }, { data: payments }] = await Promise.all([
+        supabase.from('invoice_items').select('*').eq('invoice_id', invoice.id),
+        supabase.from('payments').select('*').eq('invoice_id', invoice.id).order('created_at', { ascending: false }).limit(1),
+      ]);
+
+      const latestPayment = payments?.[0];
+      const recNumber = latestPayment?.reference_number || `REC-${invoice.id.slice(-6).toUpperCase()}`;
+
+      const printableReceipt: PrintableReceiptData = {
+        receiptNumber: recNumber,
+        invoiceId: invoice.id,
+        paymentId: latestPayment?.id,
+        createdAt: latestPayment?.created_at || invoice.created_at || new Date().toISOString(),
+        totalAmount: invoice.total_amount,
+        paidAmount: invoice.paid_amount || invoice.total_amount,
+        paymentMethod: latestPayment?.payment_method || invoice.payment_method || 'CASH',
+        paymentReference: latestPayment?.reference_number || undefined,
+        hospital: {
+          name: hospitalSettings?.hospital_name || 'Hospital Medical Center',
+          brandTitle: hospitalSettings?.brand_title,
+          tagline: hospitalSettings?.tagline,
+          logoUrl: hospitalSettings?.logo_url,
+          address: hospitalSettings?.address,
+          phone: hospitalSettings?.phone,
+          email: hospitalSettings?.email,
+          currencySymbol: currencyConfig.symbol,
+          currencyPosition: currencyConfig.position,
+        },
+        patient: {
+          firstName: invoice.patients?.first_name || 'Patient',
+          lastName: invoice.patients?.last_name || '',
+          fileNumber: invoice.patients?.file_number,
+          phone: invoice.patients?.phone,
+          email: invoice.patients?.email,
+          gender: invoice.patients?.gender,
+          dob: invoice.patients?.dob,
+        },
+        items: (items && items.length > 0)
+          ? items.map((i: any) => ({
+              description: i.description,
+              quantity: i.quantity,
+              unitPrice: i.unit_price,
+              totalPrice: i.total_price || (i.quantity * i.unit_price),
+            }))
+          : [
+              {
+                description: 'General Medical Consultation / Service',
+                quantity: 1,
+                unitPrice: invoice.total_amount,
+                totalPrice: invoice.total_amount,
+              },
+            ],
+      };
+
+      printReceiptDocument(printableReceipt);
+    } catch (err) {
+      console.error('Error printing receipt:', err);
+    } finally {
+      setPrintingReceiptId(null);
+    }
+  };
+
   const filteredInvoices = invoices.filter(inv => 
     inv.patients?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     inv.patients?.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -141,7 +230,14 @@ export default function BillingDashboard() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Billing & Claims</h1>
           <p className="text-xs text-slate-500 font-normal mt-0.5">Financial management, invoice settlements, and insurance processing.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button 
+            onClick={() => setIsGenerateReceiptModalOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
+          >
+            <Receipt size={14} />
+            Generate Receipt
+          </button>
           <button 
             onClick={() => setIsGenerateModalOpen(true)}
             className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
@@ -194,7 +290,7 @@ export default function BillingDashboard() {
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-slate-900">Recent Invoices</h2>
+              <h2 className="text-base font-bold text-slate-900">Recent Invoices & Receipts</h2>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
                 <input 
@@ -214,14 +310,14 @@ export default function BillingDashboard() {
                     <th className="px-4 py-2.5">Patient</th>
                     <th className="px-4 py-2.5">Amount</th>
                     <th className="px-4 py-2.5">Balance</th>
-                    <th className="px-4 py-2.5 text-right">Action</th>
+                    <th className="px-4 py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-normal">Loading invoices...</td></tr>
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-normal">Loading billing records...</td></tr>
                   ) : filteredInvoices.length === 0 ? (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-normal">No invoices found.</td></tr>
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-normal">No billing records found.</td></tr>
                   ) : paginatedInvoices.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-4 py-3">
@@ -248,6 +344,7 @@ export default function BillingDashboard() {
 
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Print Invoice */}
                           <button
                             onClick={() => handlePrintInvoice(row)}
                             disabled={printingInvoiceId === row.id}
@@ -257,10 +354,27 @@ export default function BillingDashboard() {
                             {printingInvoiceId === row.id ? (
                               <Loader2 size={12} className="animate-spin text-slate-600" />
                             ) : (
-                              <Printer size={12} />
+                              <FileText size={12} />
                             )}
-                            Print
+                            Invoice
                           </button>
+
+                          {/* Print Receipt (if paid or partial) */}
+                          {(row.paid_amount > 0 || row.status === 'PAID') && (
+                            <button
+                              onClick={() => handlePrintReceipt(row)}
+                              disabled={printingReceiptId === row.id}
+                              title="Print Official Payment Receipt"
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-xs disabled:opacity-50"
+                            >
+                              {printingReceiptId === row.id ? (
+                                <Loader2 size={12} className="animate-spin text-emerald-600" />
+                              ) : (
+                                <Receipt size={12} />
+                              )}
+                              Receipt
+                            </button>
+                          )}
 
                           {row.status !== 'PAID' && row.status !== 'CANCELLED' && (
                             <>
@@ -330,12 +444,21 @@ export default function BillingDashboard() {
             </div>
           </div>
 
-          <button 
-            onClick={() => setIsGenerateModalOpen(true)}
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-xs font-semibold transition-all shadow-xs active:scale-98"
-          >
-            Create Claim or Invoice
-          </button>
+          <div className="space-y-2">
+            <button 
+              onClick={() => setIsGenerateReceiptModalOpen(true)}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-98 flex items-center justify-center gap-1.5"
+            >
+              <Receipt size={14} />
+              Quick Issue Receipt
+            </button>
+            <button 
+              onClick={() => setIsGenerateModalOpen(true)}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs active:scale-98"
+            >
+              Create Claim or Invoice
+            </button>
+          </div>
         </div>
       </div>
 
@@ -351,6 +474,12 @@ export default function BillingDashboard() {
       <GenerateInvoiceModal 
         isOpen={isGenerateModalOpen}
         onClose={() => setIsGenerateModalOpen(false)}
+        onSuccess={fetchInvoices}
+      />
+
+      <GenerateReceiptModal
+        isOpen={isGenerateReceiptModalOpen}
+        onClose={() => setIsGenerateReceiptModalOpen(false)}
         onSuccess={fetchInvoices}
       />
     </div>

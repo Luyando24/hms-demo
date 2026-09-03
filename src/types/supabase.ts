@@ -39,6 +39,110 @@ export type Database = {
   }
   public: {
     Tables: {
+      incomes: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string | null
+          id: string
+          income_date: string | null
+          notes: string | null
+          payment_method: string | null
+          reference_number: string | null
+          title: string
+        }
+        Insert: {
+          amount: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          income_date?: string | null
+          notes?: string | null
+          payment_method?: string | null
+          reference_number?: string | null
+          title: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          income_date?: string | null
+          notes?: string | null
+          payment_method?: string | null
+          reference_number?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      inventory_categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      inventory_units: {
+        Row: {
+          abbreviation: string | null
+          category_id: string
+          created_at: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          abbreviation?: string | null
+          category_id: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          abbreviation?: string | null
+          category_id?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_units_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admissions: {
         Row: {
           admission_date: string | null

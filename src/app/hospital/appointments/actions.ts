@@ -27,6 +27,8 @@ export interface AppointmentRecord {
     first_name: string | null;
     last_name: string | null;
     role: string;
+    department_id?: string | null;
+    departments?: { name: string } | null;
   } | null;
 }
 
@@ -64,7 +66,7 @@ export async function getHospitalAppointmentsAction() {
     if (providerIds.length > 0) {
       const { data: providers } = await admin
         .from('profiles')
-        .select('id, first_name, last_name, role')
+        .select('id, first_name, last_name, role, department_id, departments(name)')
         .in('id', providerIds);
 
       (providers || []).forEach((p: any) => {

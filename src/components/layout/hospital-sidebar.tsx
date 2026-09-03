@@ -20,7 +20,8 @@ import {
   DoorOpen,
   Tv,
   Calendar,
-  Trash2
+  Trash2,
+  Layers
 } from "lucide-react";
 import clsx from "clsx";
 import { useMobileNav } from "./mobile-nav-context";
