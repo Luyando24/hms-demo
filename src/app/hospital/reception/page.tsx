@@ -120,23 +120,36 @@ export default function ReceptionDashboard() {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      // 1. Count Checked-in Today from walkin_queue
-      const { count: checkedInCount } = await supabase
-        .from('walkin_queue')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', todayStart.toISOString());
-
-      // 2. Count Waiting across all departments
-      const { count: waitingCount } = await supabase
-        .from('walkin_queue')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'WAITING');
-
-      // 3. Count New Patients Registered Today
-      const { count: newRegCount } = await supabase
-        .from('patients')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', todayStart.toISOString());
+      const [
+        { count: checkedInCount },
+        { count: waitingCount },
+        { count: newRegCount },
+        { data: queueData },
+        { data: doctorsData }
+      ] = await Promise.all([
+        supabase
+          .from('walkin_queue')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', todayStart.toISOString()),
+        supabase
+          .from('walkin_queue')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'WAITING'),
+        supabase
+          .from('patients')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', todayStart.toISOString()),
+        supabase
+          .from('walkin_queue')
+          .select('*, patients(*), departments(name)')
+          .order('created_at', { ascending: false })
+          .limit(8),
+        supabase
+          .from('profiles')
+          .select('first_name, last_name, role')
+          .eq('role', 'DOCTOR')
+          .limit(10),
+      ]);
 
       setReceptionStats({
         checkedInToday: checkedInCount || 0,
@@ -144,31 +157,16 @@ export default function ReceptionDashboard() {
         newRegToday: newRegCount || 0,
       });
 
-      // 4. Fetch Recent Walk-in Queue Activity with department names
-      const { data: queueData } = await supabase
-        .from('walkin_queue')
-        .select('*, patients(*), departments(name)')
-        .order('created_at', { ascending: false })
-        .limit(8);
-
       setRecentQueue((queueData as any) || []);
 
-      // 5. Fetch Doctors & OPD Queue Distribution
-      const { data: doctorsData } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, role')
-        .eq('role', 'DOCTOR')
-        .limit(5);
-
-      const docsList: DoctorSchedule[] = (doctorsData || []).map((doc) => ({
-        doctor_name: `Dr. ${doc.first_name} ${doc.last_name}`,
+      const scheds: DoctorSchedule[] = (doctorsData || []).map((doc) => ({
+        doctor_name: `Dr. ${doc.first_name || ''} ${doc.last_name || ''}`.trim(),
+        role: doc.role || 'DOCTOR',
         queue_count: Math.floor(Math.random() * 4) + 1,
-        role: doc.role,
       }));
-
-      setDoctorSchedules(docsList);
+      setDoctorSchedules(scheds);
     } catch (err) {
-      console.error('Error loading reception metrics:', err);
+      console.error('Error fetching reception dashboard:', err);
     } finally {
       setLoading(false);
     }

@@ -120,7 +120,8 @@ export default function OutpatientDashboard() {
         supabase
           .from('walkin_queue')
           .select('*, patients(*), rooms(*)')
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false })
+          .limit(100),
         supabase
           .from('rooms')
           .select('id, name')
