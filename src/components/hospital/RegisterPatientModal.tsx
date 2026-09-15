@@ -58,6 +58,7 @@ export default function RegisterPatientModal({
     title: string;
     message: string;
   } | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const [createdPatientCredentials, setCreatedPatientCredentials] = useState<{
     patientName: string;
@@ -207,39 +208,21 @@ export default function RegisterPatientModal({
     setCurrentStep((prev) => (prev > 1 ? ((prev - 1) as 1 | 2 | 3) : prev));
   };
 
-  // Intercept Enter key inside the form so hitting Enter while typing does NOT prematurely submit
+  // Intercept Enter key inside the form so hitting Enter while typing never submits or skips fields
   const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === 'Enter') {
       // Allow multi-line input in textareas
       if (e.target instanceof HTMLTextAreaElement) {
         return;
       }
-      // Prevent the browser default form submit trigger
+      // Strictly prevent browser default form submit trigger
       e.preventDefault();
       e.stopPropagation();
-
-      // In Step 1 and Step 2, Enter cleanly advances to the next step
-      if (currentStep < 3) {
-        handleNext();
-      }
-      // In Step 3 (final step), Enter key in an input will NOT submit the form!
-      // The user must review all options and click the explicit "Register & Route" button.
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Guard 1: Never allow submission unless the user is on the final step (Step 3)
-    if (currentStep !== 3) {
-      handleNext();
-      return;
-    }
-
-    // Guard 2: Prevent multiple concurrent submissions
-    if (loading) return;
-
-    // Validate all prerequisite steps
+  const handleReviewClick = () => {
+    // Validate all steps before opening confirmation
     if (!validateStep(1)) {
       setCurrentStep(1);
       return;
@@ -253,6 +236,14 @@ export default function RegisterPatientModal({
     if (!validateStep(3)) {
       return;
     }
+
+    // Open explicit manual confirmation dialog
+    setShowConfirmation(true);
+  };
+
+  const handleConfirmRegistration = async () => {
+    // Guard: Prevent multiple concurrent submissions
+    if (loading) return;
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       setStatus({
@@ -282,6 +273,7 @@ export default function RegisterPatientModal({
     const result = await registerPatientAction(patientPayload);
 
     if (!result.success || !result.patientId) {
+      setShowConfirmation(false);
       setStatus({
         type: 'error',
         title: 'Registration Failed',
@@ -363,6 +355,7 @@ export default function RegisterPatientModal({
           ? `${window.location.origin}/patient/login`
           : '/patient/login');
 
+      setShowConfirmation(false);
       setCreatedPatientCredentials({
         patientName,
         fileNumber: result.fileNumber || '',
@@ -379,6 +372,7 @@ export default function RegisterPatientModal({
           ? `${window.location.origin}/patient/login`
           : '/patient/login');
 
+      setShowConfirmation(false);
       setCreatedPatientCredentials({
         patientName,
         fileNumber: result.fileNumber || '',
@@ -716,7 +710,10 @@ First-Time Access Instructions:
           {/* Form Body */}
           <form
             id="registration-form"
-            onSubmit={handleSubmit}
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             onKeyDown={handleFormKeyDown}
             className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4"
           >
@@ -1071,10 +1068,126 @@ First-Time Access Instructions:
               </button>
             ) : (
               <button
+                type="button"
+                onClick={handleReviewClick}
+                className="bg-slate-900 text-white px-5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-98"
+              >
+                <CheckCircle2 size={14} /> Review &amp; Confirm
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Explicit Manual Confirmation Modal */}
+      {showConfirmation && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col border border-slate-200 animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-cyan-400">
+                  <ShieldCheck size={22} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold">Confirm Patient Registration</h2>
+                  <p className="text-xs text-slate-400 font-medium">
+                    Review and manually confirm before routing to census
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfirmation(false)}
                 disabled={loading}
-                type="submit"
-                form="registration-form"
-                className="bg-slate-900 text-white px-5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-98"
+                className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Confirmation Summary Body */}
+            <div className="p-6 space-y-3.5 max-h-[65vh] overflow-y-auto">
+              {/* Patient Basic Info */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Patient Demographics
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
+                    {formData.gender}
+                  </span>
+                </div>
+                <div className="text-base font-black text-slate-900">
+                  {formData.first_name} {formData.last_name}
+                </div>
+                <div className="text-xs text-slate-600 flex flex-wrap gap-x-3 gap-y-1 font-medium">
+                  <span>DOB: <strong>{formData.dob}</strong></span>
+                  {formData.phone && <span>Phone: <strong>{formData.phone}</strong></span>}
+                  {formData.email && <span>Email: <strong>{formData.email}</strong></span>}
+                </div>
+                {formData.address && (
+                  <div className="text-xs text-slate-500 pt-1 border-t border-slate-200/60 truncate">
+                    📍 {formData.address}
+                  </div>
+                )}
+              </div>
+
+              {/* Insurance & Billing Method */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Insurance / Payment Method
+                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-slate-900">
+                    {formData.insurance_provider || 'Self-Pay / Cash'}
+                  </span>
+                  {formData.insurance_policy_number && (
+                    <span className="text-xs font-mono font-semibold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                      #{formData.insurance_policy_number}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Routing Destination */}
+              <div className="p-3.5 bg-cyan-50/60 border border-cyan-200/80 rounded-2xl space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-800">
+                  Intake Routing Destination
+                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-black text-cyan-950">
+                    {nextActionOptions.find((o) => o.id === nextAction)?.label || nextAction}
+                  </span>
+                  {selectedRoomId && (
+                    <span className="text-xs font-medium text-cyan-900 bg-white px-2 py-0.5 rounded-md border border-cyan-200">
+                      Room: {facilityRooms.find((r) => r.id === selectedRoomId)?.name || 'Assigned Room'}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-100/90 border border-slate-200 text-slate-700 text-xs font-medium flex items-center gap-2">
+                <span>ℹ️ Please verify patient details above. Click <strong>Confirm &amp; Register Patient</strong> to complete registration.</span>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-4 px-6 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setShowConfirmation(false)}
+                disabled={loading}
+                className="px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors shadow-xs"
+              >
+                ← Back to Edit
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmRegistration}
+                disabled={loading}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2 disabled:opacity-50 active:scale-98"
               >
                 {loading ? (
                   <>
@@ -1083,14 +1196,15 @@ First-Time Access Instructions:
                   </>
                 ) : (
                   <>
-                    <Save size={14} /> Register & Route
+                    <CheckCircle2 size={15} />
+                    <span>Confirm &amp; Register Patient</span>
                   </>
                 )}
               </button>
-            )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <StatusModal
         isOpen={!!status}
