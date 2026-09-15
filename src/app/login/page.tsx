@@ -10,18 +10,63 @@ import { getSubdomain, getSubdomainUrl } from "@/utils/subdomain";
 import { LoginForm } from "@/components/auth/login-form";
 import { signInStaff, signInAdmin } from "@/app/login/actions";
 import { signInPatient } from "@/app/patient/login/actions";
+import { createAdminClient } from "@/utils/supabase/admin";
 
 export default async function LoginPage() {
   const headerList = await headers();
   const host = headerList.get("host");
   const subdomain = getSubdomain(host);
 
+  // Fetch geofence configuration server-side to prevent blocking desktop logins when geofence is disabled
+  let geofenceConfig = null;
+  try {
+    const adminSupabase = createAdminClient();
+    const { data: settings } = await adminSupabase
+      .from("system_settings")
+      .select(
+        "geofence_enabled, geofence_latitude, geofence_longitude, geofence_radius_meters, geofence_enforce_roles, geofence_allow_admin_bypass"
+      )
+      .limit(1)
+      .maybeSingle();
+
+    if (settings) {
+      geofenceConfig = {
+        enabled: settings.geofence_enabled ?? false,
+        latitude:
+          settings.geofence_latitude && settings.geofence_latitude !== 0
+            ? settings.geofence_latitude
+            : -15.3875,
+        longitude:
+          settings.geofence_longitude && settings.geofence_longitude !== 0
+            ? settings.geofence_longitude
+            : 28.3228,
+        radiusMeters: settings.geofence_radius_meters ?? 500,
+        enforceRoles: (settings.geofence_enforce_roles as string[]) ?? [],
+        allowAdminBypass: settings.geofence_allow_admin_bypass ?? true,
+      };
+    }
+  } catch (e) {
+    console.error("Error fetching login geofence config:", e);
+  }
+
   if (subdomain === "admin") {
-    return <LoginForm audience="admin" action={signInAdmin} />;
+    return (
+      <LoginForm
+        audience="admin"
+        action={signInAdmin}
+        initialGeofenceConfig={geofenceConfig}
+      />
+    );
   }
 
   if (subdomain === "staff") {
-    return <LoginForm audience="staff" action={signInStaff} />;
+    return (
+      <LoginForm
+        audience="staff"
+        action={signInStaff}
+        initialGeofenceConfig={geofenceConfig}
+      />
+    );
   }
 
   if (subdomain === "patient") {

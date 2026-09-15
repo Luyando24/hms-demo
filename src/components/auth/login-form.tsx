@@ -28,9 +28,36 @@ import { getSubdomainUrl } from "@/utils/subdomain";
 
 type LoginAction = (formData: FormData) => void | Promise<void>;
 
+export interface GeofenceConfig {
+  enabled: boolean;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  enforceRoles: string[];
+  allowAdminBypass: boolean;
+}
+
 interface LoginFormProps {
   audience: "patient" | "staff" | "admin";
   action: LoginAction;
+  initialGeofenceConfig?: GeofenceConfig | null;
+}
+
+function isGeofenceRequired(
+  audience: "patient" | "staff" | "admin",
+  cfg?: GeofenceConfig | null
+): boolean {
+  if (audience === "patient") return false;
+  if (!cfg) return false; // If unknown or not loaded, don't preemptively block
+  if (!cfg.enabled) return false;
+  if (audience === "admin" && cfg.allowAdminBypass) return false;
+  if (
+    audience === "admin" &&
+    !cfg.enforceRoles.some((r: string) => r.toUpperCase() === "ADMIN")
+  ) {
+    return false;
+  }
+  return true;
 }
 
 const content = {
@@ -93,16 +120,19 @@ function SubmitButton() {
   );
 }
 
-function LoginContent({ audience, action }: LoginFormProps) {
+function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProps) {
   const searchParams = useSearchParams();
   const serverError = searchParams.get("error");
   const pageContent = content[audience];
   const IdentifierIcon = pageContent.Icon;
   const rootLoginUrl = getSubdomainUrl(null, "/login");
 
-  // Screen step: 1 = Initial Location Check (workforce only), 2 = Credentials Screen
+  // Determine if geofence is required based on initial config from server
+  const geofenceRequired = isGeofenceRequired(audience, initialGeofenceConfig);
+
+  // Screen step: 1 = Initial Location Check (workforce only when geofence active), 2 = Credentials Screen
   const isWorkforce = audience !== 'patient';
-  const [step, setStep] = useState<1 | 2>(isWorkforce ? 1 : 2);
+  const [step, setStep] = useState<1 | 2>(geofenceRequired ? 1 : 2);
 
   const [coords, setCoords] = useState<{ lat: number | null; lng: number | null }>({
     lat: null,
@@ -117,14 +147,9 @@ function LoginContent({ audience, action }: LoginFormProps) {
   // Geofence pre-check result details
   const [rangeInfo, setRangeInfo] = useState<{ distance: string; limit: string } | null>(null);
   // Cache geofence config so we only fetch it once per page load
-  const geofenceConfigRef = useRef<{
-    enabled: boolean;
-    latitude: number;
-    longitude: number;
-    radiusMeters: number;
-    enforceRoles: string[];
-    allowAdminBypass: boolean;
-  } | null>(null);
+  const geofenceConfigRef = useRef<GeofenceConfig | null>(
+    initialGeofenceConfig ?? null
+  );
 
   /** Fetch geofence config from the server (cached after first call) */
   const fetchGeofenceConfig = useCallback(async () => {
@@ -186,7 +211,26 @@ function LoginContent({ audience, action }: LoginFormProps) {
     []
   );
 
-  const requestLocation = useCallback(() => {
+  const requestLocation = useCallback(async () => {
+    // 1. Fetch/verify geofence configuration first
+    const cfg = await fetchGeofenceConfig();
+    if (cfg && !cfg.enabled) {
+      setStep(2);
+      return;
+    }
+    if (cfg && audience === 'admin' && cfg.allowAdminBypass) {
+      setStep(2);
+      return;
+    }
+    if (
+      cfg &&
+      audience === 'admin' &&
+      !cfg.enforceRoles.some((r: string) => r.toUpperCase() === 'ADMIN')
+    ) {
+      setStep(2);
+      return;
+    }
+
     const isHttp = typeof window !== 'undefined' && window.location.protocol === 'http:';
     const isIpHost =
       typeof window !== 'undefined' &&
@@ -201,6 +245,10 @@ function LoginContent({ audience, action }: LoginFormProps) {
     }
 
     if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+      if (!cfg || !cfg.enabled || (audience === 'admin' && cfg.allowAdminBypass)) {
+        setStep(2);
+        return;
+      }
       setLocationStatus('error');
       setLocationError(
         isInsecure
@@ -222,9 +270,9 @@ function LoginContent({ audience, action }: LoginFormProps) {
           setCoords({ lat: latitude, lng: longitude });
 
           // Client-side geofence pre-check (mirrors server-side logic in login.ts)
-          const cfg = await fetchGeofenceConfig();
-          if (cfg && cfg.enabled && isWorkforce) {
-            const result = checkGeofence(latitude, longitude, cfg, audience as 'staff' | 'admin');
+          const activeCfg = (await fetchGeofenceConfig()) || cfg;
+          if (activeCfg && activeCfg.enabled) {
+            const result = checkGeofence(latitude, longitude, activeCfg, audience as 'staff' | 'admin');
             if (!result.allowed) {
               setLocating(false);
               setRangeInfo({ distance: result.distance, limit: result.limit });
@@ -241,32 +289,41 @@ function LoginContent({ audience, action }: LoginFormProps) {
             setStep(2);
           }, 600);
         },
-        (err) => {
+        async (err) => {
           console.warn('Geolocation attempt error (highAccuracy=' + highAccuracy + '):', err.code, err.message);
           if (highAccuracy) {
             // High accuracy (satellite GPS fix) failed or timed out indoors. Fallback to Wi-Fi/Cellular positioning!
             attempt(false);
           } else {
             setLocating(false);
+            // Double check if geofencing is even enabled or if admin is exempt
+            const latestCfg = (await fetchGeofenceConfig()) || cfg;
+            if (!latestCfg || !latestCfg.enabled || (audience === 'admin' && latestCfg.allowAdminBypass)) {
+              setStep(2);
+              return;
+            }
+
             if (err.code === 1) {
               setLocationStatus('denied');
               setLocationError(
                 isInsecure
                   ? 'Location access was blocked because this page is served over HTTP on a network IP. Browsers restrict Geolocation to HTTPS or localhost.'
-                  : 'Location access was blocked. Please enable location permissions in your browser and OS privacy settings, then tap Retry.'
+                  : 'Location permission was denied or turned off in Windows System Settings. On desktop PCs without GPS, enable Location in Windows Settings > Privacy & security > Location or contact an administrator to exempt this role/device.'
               );
             } else if (err.code === 2) {
               setLocationStatus('error');
               setLocationError(
-                'Unable to acquire device position. Please ensure Windows/OS Location Services are enabled and system Date & Time are synchronized.'
+                'Unable to acquire device position. On desktop computers without GPS or Wi-Fi, ensure Windows Location Services are enabled in Windows Settings > Privacy & security > Location.'
               );
             } else if (err.code === 3) {
               setLocationStatus('timeout');
-              setLocationError('GPS detection timed out. Tap "Retry Location Check" below.');
+              setLocationError(
+                'GPS detection timed out. On desktop computers without GPS sensors, ensure Windows Location Services are active or tap "Retry Location Check" below.'
+              );
             } else {
               setLocationStatus('error');
               setLocationError(
-                'Unable to acquire GPS position. Please check device Location Services and system Date & Time.'
+                'Unable to acquire GPS position. Please check device Location Services in system settings.'
               );
             }
           }
@@ -280,14 +337,14 @@ function LoginContent({ audience, action }: LoginFormProps) {
     };
 
     attempt(true);
-  }, [fetchGeofenceConfig, checkGeofence]);
+  }, [fetchGeofenceConfig, checkGeofence, audience]);
 
-  // Automatic GPS acquisition on mount for Screen 1
+  // Automatic GPS acquisition on mount ONLY when geofencing is required
   useEffect(() => {
-    if (!isWorkforce) return;
+    if (!geofenceRequired) return;
     const timeoutId = window.setTimeout(requestLocation, 0);
     return () => window.clearTimeout(timeoutId);
-  }, [isWorkforce, requestLocation]);
+  }, [geofenceRequired, requestLocation]);
 
   const [patientMode, setPatientMode] = useState<'signin' | 'first_time'>('signin');
   const [firstTimeLoading, setFirstTimeLoading] = useState(false);
@@ -609,15 +666,25 @@ function LoginContent({ audience, action }: LoginFormProps) {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={requestLocation}
-                    disabled={locating}
-                    className="w-full py-3.5 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20 disabled:opacity-70"
-                  >
-                    <RefreshCw className={locating ? 'animate-spin' : ''} size={18} />
-                    <span>Retry Location Check</span>
-                  </button>
+                  <div className="space-y-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={requestLocation}
+                      disabled={locating}
+                      className="w-full py-3.5 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20 disabled:opacity-70"
+                    >
+                      <RefreshCw className={locating ? 'animate-spin' : ''} size={18} />
+                      <span>Retry Location Check</span>
+                    </button>
+
+                    <a
+                      href={rootLoginUrl}
+                      className="w-full py-3 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-xs"
+                    >
+                      <ArrowRight size={14} className="rotate-180" />
+                      <span>Return to Sign-In Options</span>
+                    </a>
+                  </div>
                 </div>
               )}
 
