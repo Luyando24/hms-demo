@@ -99,12 +99,6 @@ export function Navbar({ settings }: NavbarProps = {}) {
           {/* Desktop CTAs */}
           <div className="hidden md:flex items-center gap-3">
             <Link
-              href={getSubdomainUrl(null, "/login")}
-              className="text-[13px] font-bold text-slate-300 hover:text-white border border-white/10 hover:border-white/20 px-4 py-2 rounded-xl transition-all"
-            >
-              Staff Login
-            </Link>
-            <Link
               href={getSubdomainUrl("patient", "/login")}
               className="text-[13px] font-bold text-slate-300 hover:text-white border border-white/10 hover:border-white/20 px-4 py-2 rounded-xl transition-all"
             >
@@ -142,13 +136,6 @@ export function Navbar({ settings }: NavbarProps = {}) {
               </Link>
             ))}
             <div className="pt-3 flex flex-col gap-3 border-t border-white/5">
-              <Link
-                href={getSubdomainUrl(null, "/login")}
-                className="block text-center text-sm font-bold text-slate-300 border border-white/10 px-4 py-3 rounded-xl"
-                onClick={() => setMobileOpen(false)}
-              >
-                Staff &amp; Admin Login
-              </Link>
               <Link
                 href={getSubdomainUrl("patient", "/login")}
                 className="block text-center text-sm font-bold text-white border border-white/20 px-4 py-3 rounded-xl"
