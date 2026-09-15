@@ -29,10 +29,11 @@ const TRUST_STATS = [
 ];
 
 const QUICK_LINKS = [
-  { icon: Stethoscope, label: "OPD Consultation", href: "/book-appointment" },
-  { icon: Clock, label: "Emergency Room", href: "#services" },
-  { icon: Award, label: "Diagnostics & Lab", href: "#lab-tests" },
+  { icon: Stethoscope, label: "OPD / General Consultation", href: "/book-appointment" },
+  { icon: Clock, label: "Emergency Room (24/7)", href: "#services" },
+  { icon: Award, label: "Diagnostics & Lab Tests", href: "#lab-tests" },
   { icon: Users, label: "Patient Portal", href: getSubdomainUrl("patient", "/login") ?? "/patient/login" },
+  { icon: ShieldCheck, label: "Staff & Admin Sign In", href: getSubdomainUrl(null, "/login") ?? "/login" },
 ];
 
 export function Hero({ settings }: HeroProps = {}) {
