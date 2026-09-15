@@ -4,7 +4,47 @@ export type Subdomain = 'patient' | 'staff' | 'admin' | null;
  * Retrieves the root domain host (without protocol) from environment variables.
  * Checks NEXT_PUBLIC_ROOT_DOMAIN first, then NEXT_PUBLIC_APP_URL.
  */
-export function getRootDomain(): string {
+export function getRootDomain(currentHost?: string | null): string {
+  // 1. If explicit host passed (e.g. from server header)
+  if (currentHost) {
+    const hostWithoutPort = currentHost.split(':')[0].toLowerCase();
+    const port = currentHost.includes(':') ? `:${currentHost.split(':')[1]}` : '';
+    if (hostWithoutPort.endsWith('.localhost')) {
+      const parts = hostWithoutPort.split('.');
+      if (['patient', 'staff', 'admin'].includes(parts[0])) {
+        return `${parts.slice(1).join('.')}${port}`;
+      }
+    }
+    if (
+      hostWithoutPort.startsWith('patient.') ||
+      hostWithoutPort.startsWith('staff.') ||
+      hostWithoutPort.startsWith('admin.')
+    ) {
+      return `${hostWithoutPort.replace(/^(patient|staff|admin)\./, '')}${port}`;
+    }
+  }
+
+  // 2. Client-side browser inspection if running in browser
+  if (typeof window !== 'undefined' && window.location?.host) {
+    const hostWithoutPort = window.location.hostname.toLowerCase();
+    const port = window.location.port ? `:${window.location.port}` : '';
+    if (hostWithoutPort.endsWith('.localhost')) {
+      const parts = hostWithoutPort.split('.');
+      if (['patient', 'staff', 'admin'].includes(parts[0])) {
+        return `${parts.slice(1).join('.')}${port}`;
+      }
+    }
+    if (
+      hostWithoutPort.startsWith('patient.') ||
+      hostWithoutPort.startsWith('staff.') ||
+      hostWithoutPort.startsWith('admin.')
+    ) {
+      return `${hostWithoutPort.replace(/^(patient|staff|admin)\./, '')}${port}`;
+    }
+    return window.location.host;
+  }
+
+  // 3. Environment variable fallback
   if (process.env.NEXT_PUBLIC_ROOT_DOMAIN) {
     return process.env.NEXT_PUBLIC_ROOT_DOMAIN;
   }
@@ -30,7 +70,7 @@ export function getSubdomain(host: string | null): Subdomain {
   const hostname = host.split(':')[0].toLowerCase();
   
   // Get configured root domain host without port
-  const envRoot = getRootDomain();
+  const envRoot = getRootDomain(host);
   const rootDomain = envRoot.split(':')[0].toLowerCase();
 
   // 1. Handle *.localhost format (e.g. patient.localhost)
@@ -61,11 +101,17 @@ export function getSubdomain(host: string | null): Subdomain {
 /**
  * Constructs a full URL for a specific subdomain and path.
  */
-export function getSubdomainUrl(subdomain: Subdomain, path: string = '/'): string {
-  const rootDomain = getRootDomain();
+export function getSubdomainUrl(
+  subdomain: Subdomain,
+  path: string = '/',
+  currentHost?: string | null
+): string {
+  const rootDomain = getRootDomain(currentHost);
   let protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
 
-  if (process.env.NEXT_PUBLIC_APP_URL) {
+  if (typeof window !== 'undefined' && window.location?.protocol) {
+    protocol = window.location.protocol.replace(':', '');
+  } else if (process.env.NEXT_PUBLIC_APP_URL) {
     try {
       const parsedUrl = new URL(process.env.NEXT_PUBLIC_APP_URL);
       protocol = parsedUrl.protocol.replace(':', '');

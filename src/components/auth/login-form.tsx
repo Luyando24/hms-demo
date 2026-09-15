@@ -24,6 +24,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { setupPatientFirstTimePasswordAction } from "@/app/patient/login/actions";
+import { getSubdomainUrl } from "@/utils/subdomain";
 
 type LoginAction = (formData: FormData) => void | Promise<void>;
 
@@ -97,6 +98,7 @@ function LoginContent({ audience, action }: LoginFormProps) {
   const serverError = searchParams.get("error");
   const pageContent = content[audience];
   const IdentifierIcon = pageContent.Icon;
+  const rootLoginUrl = getSubdomainUrl(null, "/login");
 
   // Screen step: 1 = Initial Location Check (workforce only), 2 = Credentials Screen
   const isWorkforce = audience !== 'patient';
@@ -314,9 +316,13 @@ function LoginContent({ audience, action }: LoginFormProps) {
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#f8f9fa] p-4 font-sans">
       {/* Header */}
       <div className="mb-8 flex flex-col items-center text-center">
-        <div className="mb-6 rounded-2xl bg-brand-600 p-3.5 text-white shadow-md shadow-brand-500/20">
+        <a
+          href={rootLoginUrl}
+          title="Return to sign-in options"
+          className="mb-6 rounded-2xl bg-brand-600 p-3.5 text-white shadow-md shadow-brand-500/20 transition-transform hover:scale-105"
+        >
           <HeartPulse size={36} strokeWidth={2.5} />
-        </div>
+        </a>
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-brand-600">
           {pageContent.eyebrow}
         </p>
@@ -567,15 +573,25 @@ function LoginContent({ audience, action }: LoginFormProps) {
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={requestLocation}
-                    disabled={locating}
-                    className="w-full py-3.5 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20 disabled:opacity-70"
-                  >
-                    <RefreshCw className={locating ? 'animate-spin' : ''} size={18} />
-                    <span>Re-check Location</span>
-                  </button>
+                  <div className="space-y-2.5">
+                    <button
+                      type="button"
+                      onClick={requestLocation}
+                      disabled={locating}
+                      className="w-full py-3.5 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20 disabled:opacity-70"
+                    >
+                      <RefreshCw className={locating ? 'animate-spin' : ''} size={18} />
+                      <span>Re-check Location</span>
+                    </button>
+
+                    <a
+                      href={rootLoginUrl}
+                      className="w-full py-3 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-xs"
+                    >
+                      <ArrowRight size={14} className="rotate-180" />
+                      <span>Return to Sign-In Options</span>
+                    </a>
+                  </div>
                 </div>
               ) : (
                 /* LOCATION ERROR / DENIED / TIMEOUT */
@@ -738,12 +754,12 @@ function LoginContent({ audience, action }: LoginFormProps) {
           <div className="mt-8 border-t border-slate-100 pt-6 text-center">
             <p className="text-[13px] text-slate-500 font-medium">
               {pageContent.switchPrompt}{" "}
-              <Link
-                href={pageContent.switchHref}
+              <a
+                href={rootLoginUrl}
                 className="font-bold text-brand-600 transition-colors hover:text-brand-700"
               >
                 {pageContent.switchLabel}
-              </Link>
+              </a>
             </p>
           </div>
         </div>
