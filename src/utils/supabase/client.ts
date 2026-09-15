@@ -1,5 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/types/supabase'
+import { getAuthCookieDomain } from '@/utils/subdomain'
 
 let clientSideSupabaseInstance: ReturnType<typeof createBrowserClient<Database>> | null = null;
 
@@ -8,11 +9,8 @@ export function createClient() {
     return clientSideSupabaseInstance;
   }
 
-  const envRoot = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-  const rootDomainHost = envRoot.split(':')[0];
-  const domain = (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1'))
-    ? `.${rootDomainHost}`
-    : undefined;
+  const host = typeof window !== 'undefined' ? window.location.host : null;
+  const authCookieDomain = getAuthCookieDomain(host);
 
   const client = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,7 +20,7 @@ export function createClient() {
         maxAge: 60 * 60 * 24 * 365, // 1 year persistent session
         sameSite: 'lax',
         path: '/',
-        domain,
+        ...(authCookieDomain ? { domain: authCookieDomain } : {}),
       },
       auth: {
         autoRefreshToken: true,

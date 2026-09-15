@@ -1,12 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { Database } from '@/types/supabase'
-import { getRootDomain } from '@/utils/subdomain'
+import { getAuthCookieDomain } from '@/utils/subdomain'
 
 export async function createClient() {
   const cookieStore = await cookies()
-  const envRoot = getRootDomain()
-  const rootDomainHost = envRoot.split(':')[0]
+  const authCookieDomain = getAuthCookieDomain()
 
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,14 +18,14 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              const cookieOptions = {
+              const cookieOptions: any = {
                 ...options,
                 maxAge: 60 * 60 * 24 * 365, // 1 year persistent session
                 sameSite: 'lax' as const,
                 path: '/',
               }
-              if (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1')) {
-                cookieOptions.domain = `.${rootDomainHost}`
+              if (authCookieDomain) {
+                cookieOptions.domain = authCookieDomain
               }
               cookieStore.set(name, value, cookieOptions)
             })

@@ -212,6 +212,6 @@ export async function setupPatientFirstTimePasswordAction(formData: FormData): P
 
 export async function patientSignOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: 'local' });
   redirect(getSubdomainUrl(null, '/patient/login'));
 }

@@ -131,12 +131,12 @@ const LAB_CAPABILITIES = [
 
 export function LabTests() {
   return (
-    <section id="lab-tests" className="py-24 px-6 bg-slate-50 relative z-20 border-t border-slate-200">
+    <section id="lab-tests" className="py-24 px-6 bg-white relative z-20 border-t border-slate-100">
       <div className="max-w-7xl mx-auto space-y-16">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto space-y-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-50 border border-brand-200 text-brand-700 text-xs font-extrabold uppercase tracking-wider">
-            <FlaskConical className="w-4 h-4 text-brand-600" />
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-extrabold uppercase tracking-widest">
+            <FlaskConical className="w-4 h-4 text-blue-600" />
             Diagnostic Pathology & Laboratory
           </div>
           <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">
@@ -156,7 +156,7 @@ export function LabTests() {
                 key={idx}
                 className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex items-start gap-4"
               >
-                <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 font-bold">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 font-bold">
                   <Icon size={24} />
                 </div>
                 <div>
@@ -175,16 +175,16 @@ export function LabTests() {
           {COMMON_LAB_TESTS.map((test) => (
             <div
               key={test.id}
-              className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs hover:shadow-xl hover:border-brand-400 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group relative overflow-hidden"
+              className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs hover:shadow-xl hover:border-cyan-400 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group relative overflow-hidden"
             >
               {test.popular && (
-                <div className="absolute top-0 right-0 bg-brand-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl shadow-xs">
+                <div className="absolute top-0 right-0 bg-cyan-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl shadow-xs">
                   Common
                 </div>
               )}
 
               <div className="space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-700 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
                   <TestTube2 size={24} />
                 </div>
 
@@ -192,7 +192,7 @@ export function LabTests() {
                   <span className="inline-block px-2.5 py-1 bg-slate-100 text-slate-600 text-[10px] font-extrabold uppercase tracking-wider rounded-md mb-2">
                     {test.category}
                   </span>
-                  <h3 className="text-lg font-black text-slate-900 leading-snug group-hover:text-brand-600 transition-colors">
+                  <h3 className="text-lg font-black text-slate-900 leading-snug group-hover:text-cyan-600 transition-colors">
                     {test.name}
                   </h3>
                 </div>
@@ -222,9 +222,9 @@ export function LabTests() {
         </div>
 
         {/* Bottom Call to Action Banner */}
-        <div className="bg-linear-to-r from-slate-900 via-brand-950 to-slate-900 rounded-3xl p-8 md:p-10 text-white border border-brand-800/40 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="bg-gradient-to-r from-[#060f1e] via-[#0c1a30] to-[#060f1e] rounded-3xl p-8 md:p-10 text-white border border-cyan-900/30 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-2 text-center md:text-left">
-            <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-brand-300">
+            <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-cyan-400">
               <Microscope size={15} /> Comprehensive Clinical Diagnostics
             </div>
             <h3 className="text-2xl font-black tracking-tight text-white">
@@ -237,7 +237,7 @@ export function LabTests() {
 
           <Link
             href="/book-appointment"
-            className="px-8 py-4 bg-brand-600 hover:bg-brand-500 active:bg-brand-700 text-white rounded-2xl text-sm font-black tracking-wide shadow-lg shadow-brand-600/40 transition-all transform hover:-translate-y-0.5 flex items-center gap-2 shrink-0"
+            className="px-8 py-4 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-2xl text-sm font-black tracking-wide shadow-lg shadow-cyan-500/30 transition-all transform hover:-translate-y-0.5 flex items-center gap-2 shrink-0"
           >
             Book Lab Test / Appointment
             <ArrowRight size={16} />

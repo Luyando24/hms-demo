@@ -118,7 +118,7 @@ export async function authenticateLogin(
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     return { ok: false, reason: 'invalid-credentials' };
   }
 
@@ -130,7 +130,7 @@ export async function authenticateLogin(
   const role = profile?.role?.toUpperCase() ?? '';
 
   if (profileError || !isRoleAllowedForAudience(role, audience)) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     return { ok: false, reason: 'invalid-credentials' };
   }
 
@@ -179,13 +179,13 @@ export async function authenticateLogin(
 
       if (isEnforced && isRoleTargeted) {
         if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: 'local' });
           return { ok: false, reason: 'location-required' };
         }
 
         const check = isLocationWithinGeofence(latitude, longitude, role, geofenceConfig);
         if (!check.allowed) {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: 'local' });
           return {
             ok: false,
             reason: 'geofence-denied',

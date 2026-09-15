@@ -47,6 +47,6 @@ export async function signInAdmin(formData: FormData) {
 
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: 'local' });
   redirect(getSubdomainUrl(null, '/login'));
 }

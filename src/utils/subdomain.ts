@@ -82,3 +82,42 @@ export function getSubdomainUrl(subdomain: Subdomain, path: string = '/'): strin
 
   return `${protocol}://${subdomain}.${rootDomain}${cleanPath}`;
 }
+
+/**
+ * Safely computes the shared cookie domain for authentication cookies across subdomains.
+ * Returns undefined for localhost, IP addresses, or single-label hosts to avoid RFC 6265 browser cookie rejections.
+ * Returns `.${rootDomain}` for multi-subdomain deployments on real domains.
+ */
+export function getAuthCookieDomain(currentHost?: string | null): string | undefined {
+  const envRoot = getRootDomain();
+  const rootDomainHost = envRoot.split(':')[0].toLowerCase();
+
+  // If current host is provided, check if it's an IP or localhost
+  const hostToCheck = (currentHost || rootDomainHost).split(':')[0].toLowerCase();
+
+  // Check if localhost or .localhost
+  if (hostToCheck === 'localhost' || hostToCheck.endsWith('.localhost')) {
+    return undefined;
+  }
+
+  // Check if IPv4 address (e.g. 192.168.1.100, 127.0.0.1) or IPv6
+  const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostToCheck) || hostToCheck.includes(':');
+  if (isIp) {
+    return undefined;
+  }
+
+  // Check if rootDomainHost is an IP or localhost
+  if (rootDomainHost === 'localhost' || rootDomainHost.endsWith('.localhost')) {
+    return undefined;
+  }
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(rootDomainHost) || rootDomainHost.includes(':')) {
+    return undefined;
+  }
+
+  // Must have at least one dot to be a valid domain with a shared parent domain
+  if (!rootDomainHost.includes('.')) {
+    return undefined;
+  }
+
+  return `.${rootDomainHost}`;
+}

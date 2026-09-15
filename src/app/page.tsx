@@ -4,6 +4,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { Navbar } from "@/components/landing/navbar";
 import { Hero } from "@/components/landing/hero";
 import { Features, DepartmentItem } from "@/components/landing/features";
+import { WhyUs } from "@/components/landing/why-us";
 import { LabTests } from "@/components/landing/lab-tests";
 import { Footer } from "@/components/landing/footer";
 
@@ -19,7 +20,11 @@ export default async function LandingPage() {
 
   const [{ data: settings }, { data: departmentsData }] = await Promise.all([
     adminSupabase.from("system_settings").select("*").limit(1).maybeSingle(),
-    supabase.from("departments").select("id, name, description").order("name"),
+    supabase
+      .from("departments")
+      .select("id, name, description")
+      .eq("is_bookable", true)
+      .order("name"),
   ]);
 
   const departments: DepartmentItem[] = (departmentsData || []).map((d) => ({
@@ -29,11 +34,12 @@ export default async function LandingPage() {
   }));
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col bg-[#f8fafc]">
       <Navbar settings={settings} />
       <main className="flex-1">
         <Hero settings={settings} />
         <Features departments={departments} />
+        <WhyUs />
         <LabTests />
       </main>
       <Footer settings={settings} />

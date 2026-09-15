@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { getSubdomain, getSubdomainUrl, getRootDomain } from '@/utils/subdomain'
+import { getSubdomain, getSubdomainUrl, getRootDomain, getAuthCookieDomain } from '@/utils/subdomain'
 import { getRoleLandingDestination, isRouteAllowedForRole } from '@/utils/rbac'
 import type { Database } from '@/types/supabase'
 
@@ -9,8 +9,8 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
-  const envRoot = getRootDomain()
-  const rootDomainHost = envRoot.split(':')[0]
+  const host = request.headers.get('host')
+  const authCookieDomain = getAuthCookieDomain(host)
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,14 +22,14 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            const cookieOptions = {
+            const cookieOptions: any = {
               ...options,
               maxAge: 60 * 60 * 24 * 365, // 1 year persistent session
               sameSite: 'lax' as const,
               path: '/',
             }
-            if (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1')) {
-              cookieOptions.domain = `.${rootDomainHost}`
+            if (authCookieDomain) {
+              cookieOptions.domain = authCookieDomain
             }
             request.cookies.set(name, value)
           })
@@ -37,14 +37,14 @@ export async function updateSession(request: NextRequest) {
             request,
           })
           cookiesToSet.forEach(({ name, value, options }) => {
-            const cookieOptions = {
+            const cookieOptions: any = {
               ...options,
               maxAge: 60 * 60 * 24 * 365, // 1 year persistent session
               sameSite: 'lax' as const,
               path: '/',
             }
-            if (rootDomainHost !== 'localhost' && !rootDomainHost.includes('127.0.0.1')) {
-              cookieOptions.domain = `.${rootDomainHost}`
+            if (authCookieDomain) {
+              cookieOptions.domain = authCookieDomain
             }
             supabaseResponse.cookies.set(name, value, cookieOptions)
           })
@@ -53,18 +53,21 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  const host = request.headers.get('host')
   const subdomain = getSubdomain(host)
   const pathname = request.nextUrl.pathname
 
   const helperResponse = (res: NextResponse) => {
     supabaseResponse.cookies.getAll().forEach((cookie) => {
-      res.cookies.set(cookie.name, cookie.value, {
+      const cookieOptions: any = {
         ...cookie,
         maxAge: 60 * 60 * 24 * 365,
         sameSite: 'lax',
         path: '/',
-      })
+      }
+      if (authCookieDomain) {
+        cookieOptions.domain = authCookieDomain
+      }
+      res.cookies.set(cookie.name, cookie.value, cookieOptions)
     })
     return res
   }

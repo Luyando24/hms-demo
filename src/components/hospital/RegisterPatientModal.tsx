@@ -28,6 +28,7 @@ import {
   CheckCheck,
   Sparkles,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import StatusModal from './StatusModal';
 import { registerPatientAction } from '@/app/hospital/actions';
@@ -179,6 +180,18 @@ export default function RegisterPatientModal({
         return false;
       }
     }
+    if (step === 2) {
+      if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+        setStepError('Please enter a valid email address or leave it empty.');
+        return false;
+      }
+    }
+    if (step === 3) {
+      if (customInsuranceMode && !formData.insurance_provider.trim()) {
+        setStepError('Please enter the custom insurance provider name, or switch back to Self-Pay.');
+        return false;
+      }
+    }
     setStepError(null);
     return true;
   };
@@ -194,10 +207,50 @@ export default function RegisterPatientModal({
     setCurrentStep((prev) => (prev > 1 ? ((prev - 1) as 1 | 2 | 3) : prev));
   };
 
+  // Intercept Enter key inside the form so hitting Enter while typing does NOT prematurely submit
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === 'Enter') {
+      // Allow multi-line input in textareas
+      if (e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      // Prevent the browser default form submit trigger
+      e.preventDefault();
+      e.stopPropagation();
+
+      // In Step 1 and Step 2, Enter cleanly advances to the next step
+      if (currentStep < 3) {
+        handleNext();
+      }
+      // In Step 3 (final step), Enter key in an input will NOT submit the form!
+      // The user must review all options and click the explicit "Register & Route" button.
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Guard 1: Never allow submission unless the user is on the final step (Step 3)
+    if (currentStep !== 3) {
+      handleNext();
+      return;
+    }
+
+    // Guard 2: Prevent multiple concurrent submissions
+    if (loading) return;
+
+    // Validate all prerequisite steps
     if (!validateStep(1)) {
       setCurrentStep(1);
+      return;
+    }
+
+    if (!validateStep(2)) {
+      setCurrentStep(2);
+      return;
+    }
+
+    if (!validateStep(3)) {
       return;
     }
 
@@ -664,6 +717,7 @@ First-Time Access Instructions:
           <form
             id="registration-form"
             onSubmit={handleSubmit}
+            onKeyDown={handleFormKeyDown}
             className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4"
           >
             {/* Offline & Form Draft Recovery Alert */}
@@ -894,6 +948,24 @@ First-Time Access Instructions:
                   )}
                 </div>
 
+                {/* Insurance Policy / Member Card # */}
+                {formData.insurance_provider && formData.insurance_provider !== 'Self-Pay' && (
+                  <div className="p-3.5 bg-slate-50/70 border border-slate-200 rounded-2xl space-y-1.5 animate-in fade-in">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <CreditCard size={13} className="text-slate-600" />
+                      Insurance Policy / Member Card # (Optional)
+                    </label>
+                    <input
+                      name="insurance_policy_number"
+                      type="text"
+                      value={formData.insurance_policy_number}
+                      onChange={handleChange}
+                      placeholder="e.g. NHI-987654321 or Member Card ID"
+                      className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
+                    />
+                  </div>
+                )}
+
                 <div className="pt-2 border-t border-slate-100">
                   <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-2">
                     <Send size={13} className="text-slate-600" />
@@ -1005,7 +1077,10 @@ First-Time Access Instructions:
                 className="bg-slate-900 text-white px-5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-98"
               >
                 {loading ? (
-                  'Registering...'
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Registering...</span>
+                  </>
                 ) : (
                   <>
                     <Save size={14} /> Register & Route

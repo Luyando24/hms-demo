@@ -12,6 +12,7 @@ interface Department {
   id: string;
   name: string;
   description?: string;
+  is_bookable?: boolean;
   created_at: string;
   rooms?: Array<{ id: string }>;
 }
@@ -65,6 +66,7 @@ export default function DepartmentsAdminPage() {
     const formData = new FormData(e.currentTarget);
     const name = (formData.get('name') as string).trim();
     const description = (formData.get('description') as string).trim();
+    const is_bookable = formData.get('is_bookable') === 'on';
 
     if (!name) {
       setStatusModal({ type: 'error', title: 'Validation Error', message: 'Department name is required.' });
@@ -72,13 +74,25 @@ export default function DepartmentsAdminPage() {
       return;
     }
 
-    const deptData = { name, description };
+    const deptPayload = { 
+      name, 
+      description: description || null, 
+      is_bookable 
+    };
 
-    let result;
-    if (editingDept) {
-      result = await supabase.from('departments').update(deptData).eq('id', editingDept.id);
-    } else {
-      result = await supabase.from('departments').insert(deptData);
+    let result = editingDept
+      ? await supabase.from('departments').update(deptPayload).eq('id', editingDept.id)
+      : await supabase.from('departments').insert([deptPayload]);
+
+    // Graceful fallback if is_bookable column hasn't been migrated yet in Postgres
+    if (result.error && (result.error.message?.includes('is_bookable') || (result.error as any).code === 'PGRST204')) {
+      const fallbackPayload = { 
+        name, 
+        description: description || null 
+      };
+      result = editingDept
+        ? await supabase.from('departments').update(fallbackPayload).eq('id', editingDept.id)
+        : await supabase.from('departments').insert([fallbackPayload]);
     }
 
     if (result.error) {
@@ -153,7 +167,7 @@ export default function DepartmentsAdminPage() {
       {/* Real Summary Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Active Departments</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Departments</p>
           <p className="text-3xl font-black text-slate-900">{departments.length}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -161,8 +175,10 @@ export default function DepartmentsAdminPage() {
           <p className="text-3xl font-black text-slate-900">{roomsCount}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Clinical Status</p>
-          <p className="text-3xl font-black text-emerald-600">100% Active</p>
+          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Bookable Online</p>
+          <p className="text-3xl font-black text-emerald-600">
+            {departments.filter(d => d.is_bookable !== false).length} Active
+          </p>
         </div>
       </div>
 
@@ -187,6 +203,7 @@ export default function DepartmentsAdminPage() {
             <tr className="bg-slate-50/50 border-b border-slate-100">
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Department Name</th>
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Description</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Booking Status</th>
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Rooms / Units</th>
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Created Date</th>
               <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
@@ -195,14 +212,14 @@ export default function DepartmentsAdminPage() {
           <tbody className="divide-y divide-slate-50">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-xs">
+                <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-xs">
                   <Loader2 className="animate-spin text-brand-600 mx-auto mb-2" size={24} />
                   Loading departments from database...
                 </td>
               </tr>
             ) : filteredDepartments.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold text-xs">
+                <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-bold text-xs">
                   No departments found.
                 </td>
               </tr>
@@ -218,6 +235,18 @@ export default function DepartmentsAdminPage() {
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-500 font-medium max-w-xs truncate">
                   {dept.description || 'No description provided.'}
+                </td>
+                <td className="px-6 py-4">
+                  {dept.is_bookable !== false ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      Bookable Online
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-xs font-semibold">
+                      Admin / Internal
+                    </span>
+                  )}
                 </td>
                 <td className="px-6 py-4">
                   <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
@@ -288,8 +317,24 @@ export default function DepartmentsAdminPage() {
                   defaultValue={editingDept?.description}
                   rows={3}
                   placeholder="Details about clinical services or administrative scope..." 
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all" 
                 />
+              </div>
+              <div className="pt-1">
+                <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100/70 transition-colors cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    name="is_bookable" 
+                    defaultChecked={editingDept ? editingDept.is_bookable !== false : true}
+                    className="mt-0.5 w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300" 
+                  />
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-slate-900">Available for Online Appointment Booking</p>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Allow public patients to select this department when booking appointments.
+                    </p>
+                  </div>
+                </label>
               </div>
               <div className="flex gap-3 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors">

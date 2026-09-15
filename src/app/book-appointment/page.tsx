@@ -12,9 +12,45 @@ export const metadata: Metadata = {
 export default async function PublicBookAppointmentPage() {
   const adminSupabase = createAdminClient();
 
-  const [{ data: settings }, { data: departmentsData }, { data: doctorsData }] = await Promise.all([
+  // Non-bookable / administrative department names fallback filter
+  const EXCLUDED_DEPARTMENT_NAMES = new Set([
+    'administration',
+    'human resources',
+    'hr',
+    'billing',
+    'maintenance',
+    'reception',
+    'er',
+    'ipd',
+    'nursing',
+    'pharmacy',
+  ]);
+
+  // Fetch departments safely supporting both migrated (is_bookable) and pre-migration schema
+  let departmentsData: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    is_bookable?: boolean | null;
+  }> = [];
+
+  const initialDeptRes = await adminSupabase
+    .from('departments')
+    .select('id, name, description, is_bookable')
+    .order('name');
+
+  if (initialDeptRes.error) {
+    const fallbackDeptRes = await adminSupabase
+      .from('departments')
+      .select('id, name, description')
+      .order('name');
+    departmentsData = fallbackDeptRes.data || [];
+  } else {
+    departmentsData = initialDeptRes.data || [];
+  }
+
+  const [{ data: settings }, { data: doctorsData }] = await Promise.all([
     adminSupabase.from('system_settings').select('*').limit(1).maybeSingle(),
-    adminSupabase.from('departments').select('id, name, description').order('name'),
     adminSupabase
       .from('profiles')
       .select('id, first_name, last_name, role, department_id, departments(name)')
@@ -26,11 +62,19 @@ export default async function PublicBookAppointmentPage() {
   const logoUrl = settings?.logo_url || '';
   const tagline = settings?.tagline || 'Integrated Healthcare & Clinical Operations';
 
-  const departments = (departmentsData || []).map(d => ({
-    id: d.id,
-    name: d.name,
-    description: d.description,
-  }));
+  const departments = (departmentsData || [])
+    .filter((d: any) => {
+      if (typeof d.is_bookable === 'boolean') {
+        return d.is_bookable;
+      }
+      const normalizedName = (d.name || '').trim().toLowerCase();
+      return !EXCLUDED_DEPARTMENT_NAMES.has(normalizedName);
+    })
+    .map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      description: d.description,
+    }));
 
   const doctors = (doctorsData || []).map((p: any) => ({
     id: p.id,

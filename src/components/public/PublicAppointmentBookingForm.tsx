@@ -92,9 +92,21 @@ export function PublicAppointmentBookingForm({ departments, doctors, settings }:
     email: string | null;
   } | null>(null);
 
+  // Locate OPD department if provided in the list
+  const opdDept = departments.find(
+    d => d.name.trim().toUpperCase() === 'OPD' || d.name.toLowerCase().includes('outpatient')
+  );
+  const clinicalSpecialties = departments.filter(d => d.id !== opdDept?.id);
+  const isOpdSelected = !formData.department_id || (!!opdDept && formData.department_id === opdDept.id);
+
   // Filter doctors by chosen department
   const filteredDoctors = formData.department_id
-    ? doctors.filter(doc => doc.department_id === formData.department_id)
+    ? doctors.filter(doc => {
+        if (doc.department_id === formData.department_id) return true;
+        // Unassigned doctors or general physicians serve OPD
+        if (isOpdSelected && !doc.department_id) return true;
+        return false;
+      })
     : doctors;
 
   const handleNextStep1 = (e: React.FormEvent) => {
@@ -325,22 +337,22 @@ export function PublicAppointmentBookingForm({ departments, doctors, settings }:
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               <button
                 type="button"
-                onClick={() => setFormData({ ...formData, department_id: '', provider_id: '' })}
+                onClick={() => setFormData({ ...formData, department_id: opdDept ? opdDept.id : '', provider_id: '' })}
                 className={clsx(
                   "p-4 rounded-2xl border text-left transition-all flex flex-col justify-between gap-2",
-                  !formData.department_id
+                  isOpdSelected
                     ? "bg-brand-50 border-brand-500 text-brand-900 ring-2 ring-brand-500/20"
                     : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
                 )}
               >
                 <div className="flex items-center justify-between">
                   <span className="font-extrabold text-sm">General Outpatient (OPD)</span>
-                  <Building size={16} className={!formData.department_id ? "text-brand-600" : "text-slate-400"} />
+                  <Building size={16} className={isOpdSelected ? "text-brand-600" : "text-slate-400"} />
                 </div>
-                <span className="text-[11px] text-slate-500 font-medium">General consultation and triage</span>
+                <span className="text-[11px] text-slate-500 font-medium">{opdDept?.description || 'General consultation and triage'}</span>
               </button>
 
-              {departments.map((dept) => (
+              {clinicalSpecialties.map((dept) => (
                 <button
                   key={dept.id}
                   type="button"

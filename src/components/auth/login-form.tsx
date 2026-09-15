@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
+  MapPin,
   ArrowRight,
   HeartPulse,
   Lock,
@@ -107,10 +108,58 @@ function LoginContent({ audience, action }: LoginFormProps) {
   });
   const [locating, setLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState<
-    'idle' | 'acquired' | 'denied' | 'timeout' | 'error'
+    'idle' | 'acquired' | 'out-of-range' | 'denied' | 'timeout' | 'error'
   >('idle');
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isInsecureOrigin, setIsInsecureOrigin] = useState(false);
+  // Geofence pre-check result details
+  const [rangeInfo, setRangeInfo] = useState<{ distance: string; limit: string } | null>(null);
+  // Cache geofence config so we only fetch it once per page load
+  const geofenceConfigRef = useRef<{
+    enabled: boolean;
+    latitude: number;
+    longitude: number;
+    radiusMeters: number;
+    enforceRoles: string[];
+    allowAdminBypass: boolean;
+  } | null>(null);
+
+  /** Fetch geofence config from the server (cached after first call) */
+  const fetchGeofenceConfig = useCallback(async () => {
+    if (geofenceConfigRef.current !== null) return geofenceConfigRef.current;
+    try {
+      const res = await fetch('/api/geofence-config');
+      if (!res.ok) return null;
+      const data = await res.json();
+      geofenceConfigRef.current = data;
+      return data;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  /** Client-side Haversine distance check (mirrors server logic) */
+  const checkGeofence = useCallback(
+    (lat: number, lng: number, cfg: NonNullable<typeof geofenceConfigRef.current>) => {
+      if (!cfg.enabled) return { allowed: true, distance: '0 m', limit: '0 m' };
+
+      const toRad = (d: number) => (d * Math.PI) / 180;
+      const R = 6371000;
+      const dLat = toRad(cfg.latitude - lat);
+      const dLon = toRad(cfg.longitude - lng);
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.sin(dLon / 2) ** 2 * Math.cos(toRad(lat)) * Math.cos(toRad(cfg.latitude));
+      const distM = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const fmt = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`);
+      return {
+        allowed: distM <= cfg.radiusMeters,
+        distance: fmt(distM),
+        limit: fmt(cfg.radiusMeters),
+      };
+    },
+    []
+  );
 
   const requestLocation = useCallback(() => {
     const isHttp = typeof window !== 'undefined' && window.location.protocol === 'http:';
@@ -138,20 +187,34 @@ function LoginContent({ audience, action }: LoginFormProps) {
 
     setLocating(true);
     setLocationError(null);
+    setRangeInfo(null);
 
     const attempt = (highAccuracy: boolean) => {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
           const latitude = Number(pos.coords.latitude.toFixed(6));
           const longitude = Number(pos.coords.longitude.toFixed(6));
           setCoords({ lat: latitude, lng: longitude });
+
+          // Client-side geofence pre-check
+          const cfg = await fetchGeofenceConfig();
+          if (cfg && cfg.enabled) {
+            const result = checkGeofence(latitude, longitude, cfg);
+            if (!result.allowed) {
+              setLocating(false);
+              setRangeInfo({ distance: result.distance, limit: result.limit });
+              setLocationStatus('out-of-range');
+              return;
+            }
+          }
+
           setLocationStatus('acquired');
           setLocating(false);
 
           // Auto-advance smoothly to Screen 2 after brief verification confirmation
           setTimeout(() => {
             setStep(2);
-          }, 400);
+          }, 600);
         },
         (err) => {
           console.warn('Geolocation attempt error (highAccuracy=' + highAccuracy + '):', err.code, err.message);
@@ -174,7 +237,7 @@ function LoginContent({ audience, action }: LoginFormProps) {
               );
             } else if (err.code === 3) {
               setLocationStatus('timeout');
-              setLocationError('GPS detection timed out. Tap "Retry Location Check" below or proceed to credentials.');
+              setLocationError('GPS detection timed out. Tap "Retry Location Check" below.');
             } else {
               setLocationStatus('error');
               setLocationError(
@@ -192,7 +255,7 @@ function LoginContent({ audience, action }: LoginFormProps) {
     };
 
     attempt(true);
-  }, []);
+  }, [fetchGeofenceConfig, checkGeofence]);
 
   // Automatic GPS acquisition on mount for Screen 1
   useEffect(() => {
@@ -453,7 +516,46 @@ function LoginContent({ audience, action }: LoginFormProps) {
                     </p>
                   </div>
                 </div>
+              ) : locationStatus === 'out-of-range' ? (
+                /* OUT OF RANGE: blocked — do not show credentials form */
+                <div className="space-y-5">
+                  <div className="w-20 h-20 mx-auto rounded-3xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-inner">
+                    <MapPin size={36} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <h2 className="text-lg font-black text-rose-900">
+                      Out of Range
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Sign-in is only permitted within the hospital premises.
+                    </p>
+                    {rangeInfo && (
+                      <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-medium text-left leading-relaxed space-y-1">
+                        <div className="flex justify-between">
+                          <span>Your distance:</span>
+                          <span className="font-black">{rangeInfo.distance}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Permitted radius:</span>
+                          <span className="font-black">{rangeInfo.limit}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={requestLocation}
+                    disabled={locating}
+                    className="w-full py-3.5 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20 disabled:opacity-70"
+                  >
+                    <RefreshCw className={locating ? 'animate-spin' : ''} size={18} />
+                    <span>Re-check Location</span>
+                  </button>
+                </div>
               ) : (
+                /* LOCATION ERROR / DENIED / TIMEOUT */
                 <div className="space-y-5">
                   <div className="w-20 h-20 mx-auto rounded-3xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-inner">
                     <AlertCircle size={36} />
@@ -477,14 +579,6 @@ function LoginContent({ audience, action }: LoginFormProps) {
                     <RefreshCw className={locating ? 'animate-spin' : ''} size={18} />
                     <span>Retry Location Check</span>
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    className="block w-full text-center text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors pt-1"
-                  >
-                    Proceed to Login Credentials &rarr;
-                  </button>
                 </div>
               )}
 
@@ -498,8 +592,8 @@ function LoginContent({ audience, action }: LoginFormProps) {
               )}
             </div>
           ) : (
-            /* SCREEN 2: LOGIN CREDENTIALS FORM */
-            (!isWorkforce || step === 2) && (
+            /* SCREEN 2: LOGIN CREDENTIALS FORM — only shown when in range or geofence disabled */
+            (!isWorkforce || step === 2) && locationStatus !== 'out-of-range' && (
               <form action={action} className="space-y-5 animate-in fade-in duration-300">
                 {isWorkforce && (
                   <>

@@ -538,18 +538,21 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          is_bookable: boolean | null
           name: string
         }
         Insert: {
           created_at?: string | null
           description?: string | null
           id?: string
+          is_bookable?: boolean | null
           name: string
         }
         Update: {
           created_at?: string | null
           description?: string | null
           id?: string
+          is_bookable?: boolean | null
           name?: string
         }
         Relationships: []
