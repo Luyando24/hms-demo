@@ -49,9 +49,6 @@ export function Navbar({ settings }: NavbarProps = {}) {
                 {phone}
               </a>
             )}
-            <a href={getSubdomainUrl(null, "/login")} className="hover:text-cyan-400 transition-colors font-medium">
-              Staff & Admin Sign In →
-            </a>
           </div>
         </div>
       </div>

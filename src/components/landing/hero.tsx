@@ -3,8 +3,6 @@ import { getSubdomainUrl } from "@/utils/subdomain";
 import {
   Calendar,
   Phone,
-  ShieldCheck,
-  Clock,
   Users,
   Award,
   ArrowRight,
@@ -21,19 +19,10 @@ interface HeroProps {
   } | null;
 }
 
-const TRUST_STATS = [
-  { value: "10,000+", label: "Patients Served" },
-  { value: "25+", label: "Specialists" },
-  { value: "24/7", label: "Emergency Care" },
-  { value: "15+", label: "Departments" },
-];
-
 const QUICK_LINKS = [
   { icon: Stethoscope, label: "OPD / General Consultation", href: "/book-appointment" },
-  { icon: Clock, label: "Emergency Room (24/7)", href: "#services" },
   { icon: Award, label: "Diagnostics & Lab Tests", href: "#lab-tests" },
   { icon: Users, label: "Patient Portal", href: getSubdomainUrl("patient", "/login") ?? "/patient/login" },
-  { icon: ShieldCheck, label: "Staff & Admin Sign In", href: getSubdomainUrl(null, "/login") ?? "/login" },
 ];
 
 export function Hero({ settings }: HeroProps = {}) {
@@ -65,11 +54,6 @@ export function Hero({ settings }: HeroProps = {}) {
 
           {/* LEFT: Content */}
           <div className="lg:col-span-7 space-y-7 text-center lg:text-left">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold uppercase tracking-widest animate-in fade-in duration-700">
-              <ShieldCheck size={13} />
-              ISO Accredited · 24/7 Emergency Services
-            </div>
 
             {/* Headline */}
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] text-white animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
@@ -120,15 +104,7 @@ export function Hero({ settings }: HeroProps = {}) {
               </Link>
             </div>
 
-            {/* Trust stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 animate-in fade-in duration-700 delay-500">
-              {TRUST_STATS.map((stat) => (
-                <div key={stat.label} className="text-center lg:text-left">
-                  <div className="text-2xl font-black text-white">{stat.value}</div>
-                  <div className="text-xs text-slate-400 font-medium mt-0.5">{stat.label}</div>
-                </div>
-              ))}
-            </div>
+
           </div>
 
           {/* RIGHT: Quick Access Card */}
