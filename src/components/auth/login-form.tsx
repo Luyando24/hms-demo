@@ -138,11 +138,34 @@ function LoginContent({ audience, action }: LoginFormProps) {
     }
   }, []);
 
-  /** Client-side Haversine distance check (mirrors server logic) */
+  /** Client-side Haversine distance check — mirrors server-side logic in login.ts exactly */
   const checkGeofence = useCallback(
-    (lat: number, lng: number, cfg: NonNullable<typeof geofenceConfigRef.current>) => {
+    (
+      lat: number,
+      lng: number,
+      cfg: NonNullable<typeof geofenceConfigRef.current>,
+      loginAudience: 'staff' | 'admin'
+    ) => {
+      // 1. Geofence disabled globally
       if (!cfg.enabled) return { allowed: true, distance: '0 m', limit: '0 m' };
 
+      // 2. Admin bypass: if admin login and bypass is allowed, skip entirely
+      if (loginAudience === 'admin' && cfg.allowAdminBypass) {
+        return { allowed: true, distance: '0 m', limit: '0 m' };
+      }
+
+      // 3. Role enforcement: only block if this audience's role is in enforceRoles
+      //    For 'admin' audience the role is ADMIN; for 'staff' we conservatively enforce
+      //    (server will validate the exact role after credentials are submitted)
+      const audienceRole = loginAudience === 'admin' ? 'ADMIN' : null;
+      if (audienceRole) {
+        const isRoleTargeted = cfg.enforceRoles.some(
+          (r: string) => r.toUpperCase() === audienceRole
+        );
+        if (!isRoleTargeted) return { allowed: true, distance: '0 m', limit: '0 m' };
+      }
+
+      // 4. Calculate Haversine distance
       const toRad = (d: number) => (d * Math.PI) / 180;
       const R = 6371000;
       const dLat = toRad(cfg.latitude - lat);
@@ -196,10 +219,10 @@ function LoginContent({ audience, action }: LoginFormProps) {
           const longitude = Number(pos.coords.longitude.toFixed(6));
           setCoords({ lat: latitude, lng: longitude });
 
-          // Client-side geofence pre-check
+          // Client-side geofence pre-check (mirrors server-side logic in login.ts)
           const cfg = await fetchGeofenceConfig();
-          if (cfg && cfg.enabled) {
-            const result = checkGeofence(latitude, longitude, cfg);
+          if (cfg && cfg.enabled && isWorkforce) {
+            const result = checkGeofence(latitude, longitude, cfg, audience as 'staff' | 'admin');
             if (!result.allowed) {
               setLocating(false);
               setRangeInfo({ distance: result.distance, limit: result.limit });
