@@ -5,7 +5,10 @@ import { createAdminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
 import { ROLE_PERMISSIONS, type UserRole } from '@/utils/rbac';
 
+import { headers, cookies } from 'next/headers';
 import { isLocationWithinGeofence } from '@/utils/geofence';
+import { getClientIp, isClientOnHospitalNetwork, DEFAULT_HOSPITAL_SUBNETS } from '@/utils/network-check';
+import { verifyWorkstationToken, WORKSTATION_COOKIE_NAME } from '@/utils/workstation';
 
 export type LoginAudience = 'patient' | 'staff' | 'admin';
 
@@ -65,6 +68,11 @@ export async function authenticateLogin(
   const { identifier, password } = parsed.data;
   const latitude = parseCoordinate(formData.get('latitude'));
   const longitude = parseCoordinate(formData.get('longitude'));
+  const cookieStore = await cookies();
+  const workstationToken =
+    (formData.get('workstation_token') as string | null) ||
+    cookieStore.get(WORKSTATION_COOKIE_NAME)?.value ||
+    null;
   let effectiveEmail = identifier;
 
   if (!identifier.includes('@')) {
@@ -150,13 +158,13 @@ export async function authenticateLogin(
     }
   }
 
-  // Geofence check for staff and administrator sign-in.
+  // Perimeter security check for staff and administrator sign-in.
   if (audience !== 'patient') {
     const adminSupabase = createAdminClient();
     const { data: settings } = await adminSupabase
       .from('system_settings')
       .select(
-        'geofence_enabled, geofence_latitude, geofence_longitude, geofence_radius_meters, geofence_enforce_roles, geofence_allow_admin_bypass'
+        'geofence_enabled, geofence_latitude, geofence_longitude, geofence_radius_meters, geofence_enforce_roles, geofence_allow_admin_bypass, geofence_network_check_enabled, geofence_allowed_subnets, geofence_allowed_ips, geofence_trusted_workstations_enabled'
       )
       .limit(1)
       .maybeSingle();
@@ -169,29 +177,54 @@ export async function authenticateLogin(
         radiusMeters: settings.geofence_radius_meters ?? 500,
         enforceRoles: (settings.geofence_enforce_roles as string[]) || [],
         allowAdminBypass: settings.geofence_allow_admin_bypass ?? true,
+        networkCheckEnabled: (settings as any).geofence_network_check_enabled ?? true,
+        allowedSubnets: (settings as any).geofence_allowed_subnets ?? DEFAULT_HOSPITAL_SUBNETS,
+        allowedIps: (settings as any).geofence_allowed_ips ?? [],
+        trustedWorkstationsEnabled: (settings as any).geofence_trusted_workstations_enabled ?? true,
       };
 
-      const isEnforced =
-        role !== 'ADMIN' || !geofenceConfig.allowAdminBypass;
+      const isEnforced = role !== 'ADMIN' || !geofenceConfig.allowAdminBypass;
       const isRoleTargeted = geofenceConfig.enforceRoles.some(
         (r) => r.toUpperCase() === role
       );
 
       if (isEnforced && isRoleTargeted) {
-        if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
-          await supabase.auth.signOut({ scope: 'local' });
-          return { ok: false, reason: 'location-required' };
+        let isAuthorized = false;
+
+        // 1. Check Trusted Workstation token
+        if (geofenceConfig.trustedWorkstationsEnabled && workstationToken) {
+          const { valid } = await verifyWorkstationToken(workstationToken);
+          if (valid) {
+            isAuthorized = true;
+          }
         }
 
-        const check = isLocationWithinGeofence(latitude, longitude, role, geofenceConfig);
-        if (!check.allowed) {
-          await supabase.auth.signOut({ scope: 'local' });
-          return {
-            ok: false,
-            reason: 'geofence-denied',
-            distance: check.formattedDistance,
-            limit: check.formattedLimit,
-          };
+        // 2. Check Hospital Network (LAN / Subnet / Static IP)
+        if (!isAuthorized && geofenceConfig.networkCheckEnabled) {
+          const headerList = await headers();
+          const clientIp = getClientIp(headerList);
+          if (isClientOnHospitalNetwork(clientIp, geofenceConfig.allowedSubnets, geofenceConfig.allowedIps)) {
+            isAuthorized = true;
+          }
+        }
+
+        // 3. Fallback to GPS coordinates check
+        if (!isAuthorized) {
+          if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
+            await supabase.auth.signOut({ scope: 'local' });
+            return { ok: false, reason: 'location-required' };
+          }
+
+          const check = isLocationWithinGeofence(latitude, longitude, role, geofenceConfig);
+          if (!check.allowed) {
+            await supabase.auth.signOut({ scope: 'local' });
+            return {
+              ok: false,
+              reason: 'geofence-denied',
+              distance: check.formattedDistance,
+              limit: check.formattedLimit,
+            };
+          }
         }
       }
     }

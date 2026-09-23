@@ -64,6 +64,22 @@ export function GeofenceGuard() {
         .maybeSingle();
 
       if (settings && settings.geofence_enabled) {
+        // First check network & workstation whitelist via pre-check API
+        try {
+          const localToken = typeof window !== 'undefined' ? localStorage.getItem('hms_workstation_token') : null;
+          const url = localToken ? `/api/geofence-config?workstation_token=${encodeURIComponent(localToken)}` : '/api/geofence-config';
+          const preCheckRes = await fetch(url);
+          if (preCheckRes.ok) {
+            const preCheckData = await preCheckRes.json();
+            if (preCheckData.verified) {
+              // Verified by hospital network, trusted workstation, or admin bypass: no GPS polling needed!
+              return;
+            }
+          }
+        } catch (e) {
+          // If precheck fails, continue to GPS fallback
+        }
+
         const geoConfig: GeofenceConfig = {
           enabled: settings.geofence_enabled,
           latitude: (settings.geofence_latitude && settings.geofence_latitude !== 0) ? settings.geofence_latitude : -15.3875,

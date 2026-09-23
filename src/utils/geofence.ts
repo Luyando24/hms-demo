@@ -5,6 +5,10 @@ export interface GeofenceConfig {
   radiusMeters: number;
   enforceRoles: string[];
   allowAdminBypass: boolean;
+  networkCheckEnabled?: boolean;
+  allowedSubnets?: string[];
+  allowedIps?: string[];
+  trustedWorkstationsEnabled?: boolean;
 }
 
 export interface GeofenceCheckResult {
@@ -12,7 +16,17 @@ export interface GeofenceCheckResult {
   distanceMeters: number;
   formattedDistance: string;
   formattedLimit: string;
-  reason?: 'out-of-bounds' | 'disabled' | 'role-exempt' | 'admin-bypassed';
+  reason?:
+    | 'out-of-bounds'
+    | 'disabled'
+    | 'role-exempt'
+    | 'admin-bypassed'
+    | 'hospital-network'
+    | 'trusted-workstation'
+    | 'location-or-network-required';
+  method?: 'hospital-network' | 'trusted-workstation' | 'gps' | 'bypass';
+  workstationName?: string;
+  clientIp?: string;
 }
 
 /**

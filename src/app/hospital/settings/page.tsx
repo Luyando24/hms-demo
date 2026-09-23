@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Settings as SettingsIcon, DollarSign, Building, Save, Loader2, ShieldAlert, CreditCard, Shield, Plus, X, Mail, MapPin, Navigation, Crosshair, Tv, Radio, Trash2, ArrowRight, Sparkles, Database } from 'lucide-react';
+import { Settings as SettingsIcon, DollarSign, Building, Save, Loader2, ShieldAlert, CreditCard, Shield, Plus, X, Mail, MapPin, Navigation, Crosshair, Tv, Radio, Trash2, ArrowRight, Sparkles, Database, Monitor, Wifi, CheckCircle2, AlertCircle, Laptop } from 'lucide-react';
 import clsx from 'clsx';
 import { createClient } from '@/utils/supabase/client';
 import { SUPPORTED_CURRENCIES, formatCurrencyAmount } from '@/utils/currency';
 import StatusModal from '@/components/hospital/StatusModal';
 import { EmailNotificationSettingsPanel } from '@/components/hospital/EmailNotificationSettingsPanel';
-import { updateSystemSettingsAction } from '@/app/hospital/actions';
+import { updateSystemSettingsAction, listTrustedWorkstationsAction, authorizeCurrentWorkstationAction, revokeTrustedWorkstationAction } from '@/app/hospital/actions';
 import { formatDistance } from '@/utils/geofence';
 import { TvBroadcastModal } from '@/components/hospital/TvBroadcastModal';
 
@@ -53,10 +53,29 @@ export default function SystemSettingsPage() {
     geofence_radius_meters: 500,
     geofence_enforce_roles: ['DOCTOR', 'NURSE', 'RECEPTIONIST', 'PHARMACIST', 'LAB_TECH', 'RADIOLOGIST', 'ACCOUNTANT', 'STAFF'],
     geofence_allow_admin_bypass: true,
+    geofence_network_check_enabled: true,
+    geofence_allowed_subnets: ['192.168.0.0/16', '10.0.0.0/8', '172.16.0.0/12', '127.0.0.1/32', '::1/128'],
+    geofence_allowed_ips: [] as string[],
+    geofence_trusted_workstations_enabled: true,
   });
 
   const [newPaymentMethod, setNewPaymentMethod] = useState('');
   const [newInsuranceProvider, setNewInsuranceProvider] = useState('');
+  const [trustedWorkstations, setTrustedWorkstations] = useState<any[]>([]);
+  const [loadingWorkstations, setLoadingWorkstations] = useState(false);
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  const [workstationEnrollName, setWorkstationEnrollName] = useState('');
+  const [enrollingWorkstation, setEnrollingWorkstation] = useState(false);
+  const [detectedClientIp, setDetectedClientIp] = useState<string | null>(null);
+  const [newSubnetInput, setNewSubnetInput] = useState('');
+  const [newIpInput, setNewIpInput] = useState('');
+  const [isCurrentWorkstationEnrolled, setIsCurrentWorkstationEnrolled] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsCurrentWorkstationEnrolled(Boolean(localStorage.getItem('hms_workstation_token')));
+    }
+  }, []);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -108,6 +127,12 @@ export default function SystemSettingsPage() {
           .map((r: string) => (typeof r === 'string' ? r.trim() : ''))
           .filter((r: string) => r.length > 0),
         geofence_allow_admin_bypass: data.geofence_allow_admin_bypass ?? true,
+        geofence_network_check_enabled: data.geofence_network_check_enabled ?? true,
+        geofence_allowed_subnets: (data.geofence_allowed_subnets && data.geofence_allowed_subnets.length > 0)
+          ? data.geofence_allowed_subnets
+          : ['192.168.0.0/16', '10.0.0.0/8', '172.16.0.0/12', '127.0.0.1/32', '::1/128'],
+        geofence_allowed_ips: data.geofence_allowed_ips || [],
+        geofence_trusted_workstations_enabled: data.geofence_trusted_workstations_enabled ?? true,
       });
     }
     setLoading(false);
@@ -156,6 +181,100 @@ export default function SystemSettingsPage() {
     setForm(prev => ({ ...prev, insurance_providers: prev.insurance_providers.filter(p => p !== provider) }));
   };
 
+  const fetchWorkstations = useCallback(async () => {
+    setLoadingWorkstations(true);
+    const res = await listTrustedWorkstationsAction();
+    if (res.success && res.workstations) {
+      setTrustedWorkstations(res.workstations);
+    }
+    setLoadingWorkstations(false);
+  }, []);
+
+  const fetchClientNetworkInfo = useCallback(async () => {
+    try {
+      const res = await fetch('/api/geofence-config');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.clientIp) setDetectedClientIp(data.clientIp);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'geofence') {
+      void fetchWorkstations();
+      void fetchClientNetworkInfo();
+    }
+  }, [activeTab, fetchWorkstations, fetchClientNetworkInfo]);
+
+  const handleAuthorizeThisComputer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workstationEnrollName.trim()) return;
+    setEnrollingWorkstation(true);
+    try {
+      const res = await authorizeCurrentWorkstationAction(workstationEnrollName.trim());
+      if (res.success && res.token) {
+        localStorage.setItem('hms_workstation_token', res.token);
+        setIsCurrentWorkstationEnrolled(true);
+        setIsEnrollModalOpen(false);
+        setWorkstationEnrollName('');
+        setStatus({
+          type: 'success',
+          title: 'Workstation Enrolled',
+          message: `This computer has been successfully enrolled as "${res.workstation?.name || 'Trusted Terminal'}". Staff can now log in without GPS prompts.`,
+        });
+        await fetchWorkstations();
+      } else {
+        alert(res.error || 'Failed to authorize workstation.');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Error enrolling workstation.');
+    } finally {
+      setEnrollingWorkstation(false);
+    }
+  };
+
+  const handleRevokeWorkstation = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to revoke authorization for "${name}"? Users on that computer will be required to meet network or GPS policy.`)) return;
+    const res = await revokeTrustedWorkstationAction(id);
+    if (res.success) {
+      await fetchWorkstations();
+      setStatus({
+        type: 'success',
+        title: 'Workstation Revoked',
+        message: `Authorization for "${name}" has been disabled.`,
+      });
+    } else {
+      alert(res.error || 'Failed to revoke workstation.');
+    }
+  };
+
+  const handleAddSubnet = () => {
+    if (!newSubnetInput.trim()) return;
+    const clean = newSubnetInput.trim();
+    if (!form.geofence_allowed_subnets.includes(clean)) {
+      setForm(prev => ({ ...prev, geofence_allowed_subnets: [...prev.geofence_allowed_subnets, clean] }));
+    }
+    setNewSubnetInput('');
+  };
+
+  const handleRemoveSubnet = (subnet: string) => {
+    setForm(prev => ({ ...prev, geofence_allowed_subnets: prev.geofence_allowed_subnets.filter(s => s !== subnet) }));
+  };
+
+  const handleAddIp = () => {
+    if (!newIpInput.trim()) return;
+    const clean = newIpInput.trim();
+    if (!form.geofence_allowed_ips.includes(clean)) {
+      setForm(prev => ({ ...prev, geofence_allowed_ips: [...prev.geofence_allowed_ips, clean] }));
+    }
+    setNewIpInput('');
+  };
+
+  const handleRemoveIp = (ip: string) => {
+    setForm(prev => ({ ...prev, geofence_allowed_ips: prev.geofence_allowed_ips.filter(i => i !== ip) }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (userRole !== 'ADMIN') {
@@ -173,6 +292,10 @@ export default function SystemSettingsPage() {
       geofence_latitude: Number.isNaN(form.geofence_latitude) ? -15.3875 : form.geofence_latitude,
       geofence_longitude: Number.isNaN(form.geofence_longitude) ? 28.3228 : form.geofence_longitude,
       geofence_radius_meters: (Number.isNaN(form.geofence_radius_meters) || form.geofence_radius_meters < 10) ? 500 : form.geofence_radius_meters,
+      geofence_network_check_enabled: form.geofence_network_check_enabled,
+      geofence_allowed_subnets: form.geofence_allowed_subnets.map(s => s.trim()).filter(Boolean),
+      geofence_allowed_ips: form.geofence_allowed_ips.map(ip => ip.trim()).filter(Boolean),
+      geofence_trusted_workstations_enabled: form.geofence_trusted_workstations_enabled,
     };
 
     const res = await updateSystemSettingsAction(cleanedForm);
@@ -183,7 +306,7 @@ export default function SystemSettingsPage() {
       setStatus({ 
         type: 'success', 
         title: 'Settings Saved', 
-        message: 'System settings, payment methods, and accepted insurance providers updated successfully.' 
+        message: 'System settings, payment methods, perimeter security, and accepted insurance providers updated successfully.' 
       });
       await fetchSettings();
     }
@@ -675,8 +798,8 @@ export default function SystemSettingsPage() {
                   <MapPin size={20} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-slate-900">Geographical Fencing & Access Controls</h2>
-                  <p className="text-xs text-slate-500 font-medium">Restrict workforce system access strictly within designated physical facility boundaries.</p>
+                  <h2 className="text-lg font-black text-slate-900">Perimeter Security & Geofence Policy</h2>
+                  <p className="text-xs text-slate-500 font-medium">Configure perimeter access controls for hospital workstations, local networks, and mobile devices.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -684,20 +807,20 @@ export default function SystemSettingsPage() {
                   "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider",
                   form.geofence_enabled ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"
                 )}>
-                  {form.geofence_enabled ? "Geo-fence Active" : "Geo-fence Disabled"}
+                  {form.geofence_enabled ? "Perimeter Policy Active" : "Perimeter Policy Disabled"}
                 </span>
               </div>
             </div>
 
-            {/* Enable Toggle Card */}
+            {/* Enable Master Toggle Card */}
             <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
                 <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
                   <Navigation size={16} className="text-brand-600" />
-                  Enable Geographical Access Restriction
+                  Enable Perimeter & Location Restriction
                 </h3>
                 <p className="text-xs text-slate-500 font-medium max-w-xl">
-                  When enabled, workforce users attempting to log in outside the designated GPS radius will be denied access to clinical and administrative portals.
+                  When enabled, workforce users must satisfy perimeter authorization (Hospital LAN/Wi-Fi, Trusted Workstation, or GPS boundary) to sign in.
                 </p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -712,10 +835,245 @@ export default function SystemSettingsPage() {
               </label>
             </div>
 
-            {/* Location Coordinates & Radius */}
-            <div className="space-y-4">
+            {/* SECTION 1: HOSPITAL NETWORK (LAN / WI-FI) AUTHENTICATION */}
+            <div className="space-y-4 pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                    <Wifi size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Hospital Local Network (LAN / Wi-Fi) Whitelist</h3>
+                    <p className="text-xs text-slate-500 font-medium">Instantly verifies desktop PCs (via USB Wi-Fi or Ethernet) and mobile phones connected to hospital network.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input 
+                      type="checkbox" 
+                      checked={form.geofence_network_check_enabled}
+                      onChange={e => setForm({ ...form, geofence_network_check_enabled: e.target.checked })}
+                      disabled={userRole !== 'ADMIN'}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+              </div>
+
+              {detectedClientIp && (
+                <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl flex items-center justify-between gap-3 text-xs text-emerald-900">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                    <span>Your Current Client IP: <strong className="font-mono">{detectedClientIp}</strong></span>
+                  </div>
+                  {userRole === 'ADMIN' && !form.geofence_allowed_ips.includes(detectedClientIp) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!form.geofence_allowed_ips.includes(detectedClientIp)) {
+                          setForm(prev => ({ ...prev, geofence_allowed_ips: [...prev.geofence_allowed_ips, detectedClientIp] }));
+                        }
+                      }}
+                      className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline"
+                    >
+                      + Add IP to Whitelist
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Subnet List */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Allowed Subnets (CIDR Notation)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {form.geofence_allowed_subnets.map(subnet => (
+                    <span 
+                      key={subnet}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-mono font-bold text-slate-800"
+                    >
+                      {subnet}
+                      {userRole === 'ADMIN' && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSubnet(subnet)}
+                          className="text-slate-400 hover:text-rose-600 transition-colors"
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+
+                {userRole === 'ADMIN' && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <input 
+                      type="text" 
+                      placeholder="e.g. 192.168.1.0/24 or 10.0.1.0/24" 
+                      value={newSubnetInput}
+                      onChange={e => setNewSubnetInput(e.target.value)}
+                      className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-brand-500/20 max-w-xs w-full"
+                    />
+                    <button 
+                      type="button"
+                      onClick={handleAddSubnet}
+                      className="bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 transition-all flex items-center gap-1"
+                    >
+                      <Plus size={14} /> Add Subnet
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* SECTION 2: TRUSTED WORKSTATIONS (ONE-CLICK ENROLLMENT) */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                    <Monitor size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Trusted Workstations (Terminal Enrollment)</h3>
+                    <p className="text-xs text-slate-500 font-medium">Authorize stationary desktop PCs (Reception, OPD, Pharmacy, Lab). Bypasses GPS permanently on that machine.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input 
+                      type="checkbox" 
+                      checked={form.geofence_trusted_workstations_enabled}
+                      onChange={e => setForm({ ...form, geofence_trusted_workstations_enabled: e.target.checked })}
+                      disabled={userRole !== 'ADMIN'}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Current Computer Status Card */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={clsx(
+                    "w-9 h-9 rounded-xl flex items-center justify-center font-black shrink-0",
+                    isCurrentWorkstationEnrolled ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+                  )}>
+                    <Laptop size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">
+                      {isCurrentWorkstationEnrolled ? "This Computer is Enrolled as a Trusted Workstation" : "This Computer is Not Yet Enrolled"}
+                    </p>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      {isCurrentWorkstationEnrolled ? "Staff can sign in from this browser without GPS permissions or location checks." : "Enroll this stationary computer so staff can sign in without needing GPS."}
+                    </p>
+                  </div>
+                </div>
+
+                {userRole === 'ADMIN' && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEnrollModalOpen(true)}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-600/10 shrink-0 flex items-center gap-1.5"
+                  >
+                    <Plus size={14} />
+                    {isCurrentWorkstationEnrolled ? "Re-Authorize This PC" : "Authorize This Computer"}
+                  </button>
+                )}
+              </div>
+
+              {/* Workstations Table */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                    Enrolled Hospital Workstations ({trustedWorkstations.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void fetchWorkstations()}
+                    disabled={loadingWorkstations}
+                    className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                  >
+                    {loadingWorkstations ? <Loader2 size={12} className="animate-spin" /> : null}
+                    Refresh List
+                  </button>
+                </div>
+
+                {trustedWorkstations.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic py-2">No workstations enrolled yet. Click &quot;Authorize This Computer&quot; to register this terminal.</p>
+                ) : (
+                  <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold uppercase tracking-wider">
+                        <tr>
+                          <th className="px-4 py-3">Terminal Name</th>
+                          <th className="px-4 py-3">Enrolled Date</th>
+                          <th className="px-4 py-3">Last Active</th>
+                          <th className="px-4 py-3">Status</th>
+                          {userRole === 'ADMIN' && <th className="px-4 py-3 text-right">Action</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {trustedWorkstations.map(wks => (
+                          <tr key={wks.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-4 py-3 font-bold text-slate-900 flex items-center gap-2">
+                              <Monitor size={14} className="text-indigo-600 shrink-0" />
+                              {wks.name}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {new Date(wks.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {wks.last_used_at ? new Date(wks.last_used_at).toLocaleString() : 'Never'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={clsx(
+                                "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                                wks.is_active ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                              )}>
+                                {wks.is_active ? "Active" : "Revoked"}
+                              </span>
+                            </td>
+                            {userRole === 'ADMIN' && (
+                              <td className="px-4 py-3 text-right">
+                                {wks.is_active ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRevokeWorkstation(wks.id, wks.name)}
+                                    className="text-rose-600 hover:text-rose-800 font-bold text-xs"
+                                  >
+                                    Revoke
+                                  </button>
+                                ) : (
+                                  <span className="text-slate-400 text-xs">Revoked</span>
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* SECTION 3: PHYSICAL GPS GEOFENCE (FALLBACK & ROAMING) */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-black uppercase tracking-widest text-slate-700">Facility Center Coordinates & Allowed Radius</h3>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <MapPin size={16} className="text-amber-600" />
+                    Physical GPS Boundary (Roaming Mobile Devices & Laptops)
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">Used as a fallback for devices outside the hospital local network or unenrolled hardware.</p>
+                </div>
                 {userRole === 'ADMIN' && (
                   <button
                     type="button"
@@ -804,7 +1162,7 @@ export default function SystemSettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-black uppercase tracking-widest text-slate-700">Enforced Workforce Roles</h3>
-                  <p className="text-xs text-slate-500 font-medium">Select which personnel roles require physical presence within the geo-fence boundary to log in.</p>
+                  <p className="text-xs text-slate-500 font-medium">Select which personnel roles require physical presence within the facility perimeter to log in.</p>
                 </div>
                 {userRole === 'ADMIN' && (
                   <div className="flex items-center gap-3 text-xs font-bold text-brand-600">
@@ -877,14 +1235,14 @@ export default function SystemSettingsPage() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <MapPin size={16} className="text-emerald-400" />
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Configured Geo-Fence Parameters</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Configured Perimeter Parameters</p>
                 </div>
                 <p className="text-sm font-bold text-slate-200">
-                  Center: <span className="font-mono text-emerald-400">{form.geofence_latitude.toFixed(6)}, {form.geofence_longitude.toFixed(6)}</span> &bull; Radius: <span className="text-emerald-400 font-bold">{formatDistance(form.geofence_radius_meters)}</span>
+                  Network Whitelist: <span className="text-emerald-400 font-bold">{form.geofence_network_check_enabled ? 'Active' : 'Off'}</span> &bull; Workstations: <span className="text-emerald-400 font-bold">{trustedWorkstations.filter(w => w.is_active).length} Active</span> &bull; GPS Radius: <span className="text-emerald-400 font-bold">{formatDistance(form.geofence_radius_meters)}</span>
                 </p>
               </div>
               <div className="text-xs text-slate-400 font-medium text-right">
-                <span className="font-bold text-white">{form.geofence_enforce_roles.length}</span> of {WORKFORCE_ROLES.length} roles subject to GPS restriction
+                <span className="font-bold text-white">{form.geofence_enforce_roles.length}</span> of {WORKFORCE_ROLES.length} roles subject to perimeter restriction
               </div>
             </div>
           </section>
@@ -1034,6 +1392,67 @@ export default function SystemSettingsPage() {
                 Launch Data Management
               </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Authorize This Computer */}
+      {isEnrollModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-100 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                  <Monitor size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Authorize This Computer</h3>
+                  <p className="text-xs text-slate-500 font-medium">Enroll this browser as a stationary terminal</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEnrollModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAuthorizeThisComputer} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Workstation Identifier / Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Reception Desk 1, OPD Clinic A, Pharmacy Main"
+                  value={workstationEnrollName}
+                  onChange={e => setWorkstationEnrollName(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/20"
+                />
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                  A cryptographic authorization token will be saved in this browser. Workforce members can sign in on this machine without GPS prompts or external hardware.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEnrollModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={enrollingWorkstation || !workstationEnrollName.trim()}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2 disabled:opacity-50"
+                >
+                  {enrollingWorkstation ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  Enroll Computer
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

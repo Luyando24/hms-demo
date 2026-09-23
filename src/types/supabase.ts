@@ -2368,6 +2368,10 @@ export type Database = {
           geofence_latitude: number | null
           geofence_longitude: number | null
           geofence_radius_meters: number | null
+          geofence_network_check_enabled: boolean | null
+          geofence_allowed_subnets: string[] | null
+          geofence_allowed_ips: string[] | null
+          geofence_trusted_workstations_enabled: boolean | null
           hospital_name: string | null
           id: string
           insurance_providers: string[] | null
@@ -2392,6 +2396,10 @@ export type Database = {
           geofence_latitude?: number | null
           geofence_longitude?: number | null
           geofence_radius_meters?: number | null
+          geofence_network_check_enabled?: boolean | null
+          geofence_allowed_subnets?: string[] | null
+          geofence_allowed_ips?: string[] | null
+          geofence_trusted_workstations_enabled?: boolean | null
           hospital_name?: string | null
           id?: string
           insurance_providers?: string[] | null
@@ -2416,6 +2424,10 @@ export type Database = {
           geofence_latitude?: number | null
           geofence_longitude?: number | null
           geofence_radius_meters?: number | null
+          geofence_network_check_enabled?: boolean | null
+          geofence_allowed_subnets?: string[] | null
+          geofence_allowed_ips?: string[] | null
+          geofence_trusted_workstations_enabled?: boolean | null
           hospital_name?: string | null
           id?: string
           insurance_providers?: string[] | null
@@ -2426,6 +2438,45 @@ export type Database = {
           tax_rate?: number | null
           consultation_fee?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      trusted_workstations: {
+        Row: {
+          id: string
+          name: string
+          token_hash: string
+          authorized_by: string | null
+          ip_address: string | null
+          user_agent: string | null
+          is_active: boolean
+          last_used_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          token_hash: string
+          authorized_by?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
+          is_active?: boolean
+          last_used_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          token_hash?: string
+          authorized_by?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
+          is_active?: boolean
+          last_used_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }

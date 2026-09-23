@@ -22,42 +22,17 @@ import {
   KeyRound,
   Calendar,
   Sparkles,
+  Monitor,
+  Wifi,
 } from "lucide-react";
 import { setupPatientFirstTimePasswordAction } from "@/app/patient/login/actions";
 import { getSubdomainUrl } from "@/utils/subdomain";
 
 type LoginAction = (formData: FormData) => void | Promise<void>;
 
-export interface GeofenceConfig {
-  enabled: boolean;
-  latitude: number;
-  longitude: number;
-  radiusMeters: number;
-  enforceRoles: string[];
-  allowAdminBypass: boolean;
-}
-
 interface LoginFormProps {
   audience: "patient" | "staff" | "admin";
   action: LoginAction;
-  initialGeofenceConfig?: GeofenceConfig | null;
-}
-
-function isGeofenceRequired(
-  audience: "patient" | "staff" | "admin",
-  cfg?: GeofenceConfig | null
-): boolean {
-  if (audience === "patient") return false;
-  if (!cfg) return false; // If unknown or not loaded, don't preemptively block
-  if (!cfg.enabled) return false;
-  if (audience === "admin" && cfg.allowAdminBypass) return false;
-  if (
-    audience === "admin" &&
-    !cfg.enforceRoles.some((r: string) => r.toUpperCase() === "ADMIN")
-  ) {
-    return false;
-  }
-  return true;
 }
 
 const content = {
@@ -120,19 +95,16 @@ function SubmitButton() {
   );
 }
 
-function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProps) {
+function LoginContent({ audience, action }: LoginFormProps) {
   const searchParams = useSearchParams();
   const serverError = searchParams.get("error");
   const pageContent = content[audience];
   const IdentifierIcon = pageContent.Icon;
   const rootLoginUrl = getSubdomainUrl(null, "/login");
 
-  // Determine if geofence is required based on initial config from server
-  const geofenceRequired = isGeofenceRequired(audience, initialGeofenceConfig);
-
-  // Screen step: 1 = Initial Location Check (workforce only when geofence active), 2 = Credentials Screen
+  // Screen step: 1 = Initial Location Check (workforce only), 2 = Credentials Screen
   const isWorkforce = audience !== 'patient';
-  const [step, setStep] = useState<1 | 2>(geofenceRequired ? 1 : 2);
+  const [step, setStep] = useState<1 | 2>(isWorkforce ? 1 : 2);
 
   const [coords, setCoords] = useState<{ lat: number | null; lng: number | null }>({
     lat: null,
@@ -146,16 +118,41 @@ function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProp
   const [isInsecureOrigin, setIsInsecureOrigin] = useState(false);
   // Geofence pre-check result details
   const [rangeInfo, setRangeInfo] = useState<{ distance: string; limit: string } | null>(null);
-  // Cache geofence config so we only fetch it once per page load
-  const geofenceConfigRef = useRef<GeofenceConfig | null>(
-    initialGeofenceConfig ?? null
-  );
+  const [workstationToken, setWorkstationToken] = useState<string | null>(null);
+  const [verificationMethod, setVerificationMethod] = useState<
+    'hospital_network' | 'trusted_workstation' | 'gps' | 'disabled' | null
+  >(null);
+  const [workstationName, setWorkstationName] = useState<string | null>(null);
 
-  /** Fetch geofence config from the server (cached after first call) */
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('hms_workstation_token');
+      if (token) setWorkstationToken(token);
+    }
+  }, []);
+
+  // Cache geofence config so we only fetch it once per page load
+  const geofenceConfigRef = useRef<{
+    enabled: boolean;
+    latitude: number;
+    longitude: number;
+    radiusMeters: number;
+    enforceRoles: string[];
+    allowAdminBypass: boolean;
+    verified?: boolean;
+    method?: string;
+    workstationName?: string;
+  } | null>(null);
+
+  /** Fetch geofence config and perimeter authorization status from the server */
   const fetchGeofenceConfig = useCallback(async () => {
     if (geofenceConfigRef.current !== null) return geofenceConfigRef.current;
     try {
-      const res = await fetch('/api/geofence-config');
+      const localToken = typeof window !== 'undefined' ? localStorage.getItem('hms_workstation_token') : null;
+      const url = localToken ? `/api/geofence-config?workstation_token=${encodeURIComponent(localToken)}` : '/api/geofence-config';
+      const res = await fetch(url, {
+        headers: localToken ? { 'x-workstation-token': localToken } : {},
+      });
       if (!res.ok) return null;
       const data = await res.json();
       geofenceConfigRef.current = data;
@@ -211,26 +208,7 @@ function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProp
     []
   );
 
-  const requestLocation = useCallback(async () => {
-    // 1. Fetch/verify geofence configuration first
-    const cfg = await fetchGeofenceConfig();
-    if (cfg && !cfg.enabled) {
-      setStep(2);
-      return;
-    }
-    if (cfg && audience === 'admin' && cfg.allowAdminBypass) {
-      setStep(2);
-      return;
-    }
-    if (
-      cfg &&
-      audience === 'admin' &&
-      !cfg.enforceRoles.some((r: string) => r.toUpperCase() === 'ADMIN')
-    ) {
-      setStep(2);
-      return;
-    }
-
+  const requestLocation = useCallback(() => {
     const isHttp = typeof window !== 'undefined' && window.location.protocol === 'http:';
     const isIpHost =
       typeof window !== 'undefined' &&
@@ -245,10 +223,6 @@ function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProp
     }
 
     if (typeof window === 'undefined' || !('geolocation' in navigator)) {
-      if (!cfg || !cfg.enabled || (audience === 'admin' && cfg.allowAdminBypass)) {
-        setStep(2);
-        return;
-      }
       setLocationStatus('error');
       setLocationError(
         isInsecure
@@ -270,9 +244,9 @@ function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProp
           setCoords({ lat: latitude, lng: longitude });
 
           // Client-side geofence pre-check (mirrors server-side logic in login.ts)
-          const activeCfg = (await fetchGeofenceConfig()) || cfg;
-          if (activeCfg && activeCfg.enabled) {
-            const result = checkGeofence(latitude, longitude, activeCfg, audience as 'staff' | 'admin');
+          const cfg = await fetchGeofenceConfig();
+          if (cfg && cfg.enabled && isWorkforce) {
+            const result = checkGeofence(latitude, longitude, cfg, audience as 'staff' | 'admin');
             if (!result.allowed) {
               setLocating(false);
               setRangeInfo({ distance: result.distance, limit: result.limit });
@@ -289,41 +263,32 @@ function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProp
             setStep(2);
           }, 600);
         },
-        async (err) => {
+        (err) => {
           console.warn('Geolocation attempt error (highAccuracy=' + highAccuracy + '):', err.code, err.message);
           if (highAccuracy) {
             // High accuracy (satellite GPS fix) failed or timed out indoors. Fallback to Wi-Fi/Cellular positioning!
             attempt(false);
           } else {
             setLocating(false);
-            // Double check if geofencing is even enabled or if admin is exempt
-            const latestCfg = (await fetchGeofenceConfig()) || cfg;
-            if (!latestCfg || !latestCfg.enabled || (audience === 'admin' && latestCfg.allowAdminBypass)) {
-              setStep(2);
-              return;
-            }
-
             if (err.code === 1) {
               setLocationStatus('denied');
               setLocationError(
                 isInsecure
                   ? 'Location access was blocked because this page is served over HTTP on a network IP. Browsers restrict Geolocation to HTTPS or localhost.'
-                  : 'Location permission was denied or turned off in Windows System Settings. On desktop PCs without GPS, enable Location in Windows Settings > Privacy & security > Location or contact an administrator to exempt this role/device.'
+                  : 'Location access was blocked. Please enable location permissions in your browser and OS privacy settings, then tap Retry.'
               );
             } else if (err.code === 2) {
               setLocationStatus('error');
               setLocationError(
-                'Unable to acquire device position. On desktop computers without GPS or Wi-Fi, ensure Windows Location Services are enabled in Windows Settings > Privacy & security > Location.'
+                'Unable to acquire device position. Please ensure Windows/OS Location Services are enabled and system Date & Time are synchronized.'
               );
             } else if (err.code === 3) {
               setLocationStatus('timeout');
-              setLocationError(
-                'GPS detection timed out. On desktop computers without GPS sensors, ensure Windows Location Services are active or tap "Retry Location Check" below.'
-              );
+              setLocationError('GPS detection timed out. Tap "Retry Location Check" below.');
             } else {
               setLocationStatus('error');
               setLocationError(
-                'Unable to acquire GPS position. Please check device Location Services in system settings.'
+                'Unable to acquire GPS position. Please check device Location Services and system Date & Time.'
               );
             }
           }
@@ -337,14 +302,46 @@ function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProp
     };
 
     attempt(true);
-  }, [fetchGeofenceConfig, checkGeofence, audience]);
+  }, [fetchGeofenceConfig, checkGeofence]);
 
-  // Automatic GPS acquisition on mount ONLY when geofencing is required
+  // Smart perimeter check on mount for Screen 1: checks Network & Workstations first
   useEffect(() => {
-    if (!geofenceRequired) return;
-    const timeoutId = window.setTimeout(requestLocation, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, [geofenceRequired, requestLocation]);
+    if (!isWorkforce) return;
+    let active = true;
+
+    const runPerimeterPreCheck = async () => {
+      setLocating(true);
+      const cfg = await fetchGeofenceConfig();
+      if (!active) return;
+
+      if (!cfg || !cfg.enabled || cfg.verified) {
+        if (cfg?.method === 'trusted_workstation') {
+          setVerificationMethod('trusted_workstation');
+          setWorkstationName(cfg.workstationName || null);
+        } else if (cfg?.method === 'hospital_network') {
+          setVerificationMethod('hospital_network');
+        } else {
+          setVerificationMethod('disabled');
+        }
+        setLocationStatus('acquired');
+        setLocating(false);
+        setTimeout(() => {
+          if (active) setStep(2);
+        }, 300);
+        return;
+      }
+
+      // Not verified by Network or Workstation -> fallback to GPS geolocation
+      setVerificationMethod('gps');
+      requestLocation();
+    };
+
+    const timeoutId = window.setTimeout(runPerimeterPreCheck, 0);
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [isWorkforce, fetchGeofenceConfig, requestLocation]);
 
   const [patientMode, setPatientMode] = useState<'signin' | 'first_time'>('signin');
   const [firstTimeLoading, setFirstTimeLoading] = useState(false);
@@ -666,25 +663,15 @@ function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProp
                     </div>
                   </div>
 
-                  <div className="space-y-2.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={requestLocation}
-                      disabled={locating}
-                      className="w-full py-3.5 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20 disabled:opacity-70"
-                    >
-                      <RefreshCw className={locating ? 'animate-spin' : ''} size={18} />
-                      <span>Retry Location Check</span>
-                    </button>
-
-                    <a
-                      href={rootLoginUrl}
-                      className="w-full py-3 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-xs"
-                    >
-                      <ArrowRight size={14} className="rotate-180" />
-                      <span>Return to Sign-In Options</span>
-                    </a>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={requestLocation}
+                    disabled={locating}
+                    className="w-full py-3.5 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20 disabled:opacity-70"
+                  >
+                    <RefreshCw className={locating ? 'animate-spin' : ''} size={18} />
+                    <span>Retry Location Check</span>
+                  </button>
                 </div>
               )}
 
@@ -705,6 +692,11 @@ function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProp
                   <>
                     <input
                       type="hidden"
+                      name="workstation_token"
+                      value={workstationToken || ''}
+                    />
+                    <input
+                      type="hidden"
                       name="latitude"
                       value={coords.lat !== null ? String(coords.lat) : ''}
                     />
@@ -714,17 +706,50 @@ function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProp
                       value={coords.lng !== null ? String(coords.lng) : ''}
                     />
 
-                    {coords.lat !== null && coords.lng !== null ? (
-                      /* Clean Status Badge: Within Range */
+                    {verificationMethod === 'trusted_workstation' ? (
+                      /* Status Badge: Authorized Workstation */
+                      <div className="flex items-center justify-between rounded-2xl bg-emerald-50/90 border border-emerald-200/80 px-4 py-3 text-[13px]">
+                        <div className="flex items-center gap-2.5">
+                          <Monitor size={18} className="text-emerald-600 shrink-0" />
+                          <div>
+                            <span className="font-bold text-emerald-950">Authorized Terminal</span>
+                            {workstationName && (
+                              <span className="text-xs text-emerald-700 ml-1.5 font-medium">({workstationName})</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+                          Workstation
+                        </span>
+                      </div>
+                    ) : verificationMethod === 'hospital_network' ? (
+                      /* Status Badge: Hospital Network Verified */
+                      <div className="flex items-center justify-between rounded-2xl bg-emerald-50/90 border border-emerald-200/80 px-4 py-3 text-[13px]">
+                        <div className="flex items-center gap-2.5">
+                          <Wifi size={18} className="text-emerald-600 shrink-0" />
+                          <div>
+                            <span className="font-bold text-emerald-950">Hospital Network Verified</span>
+                            <span className="text-[11px] text-emerald-700 block">On-Premises LAN / Wi-Fi</span>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+                          Local Network
+                        </span>
+                      </div>
+                    ) : coords.lat !== null && coords.lng !== null ? (
+                      /* Clean Status Badge: Within Range (GPS) */
                       <div className="flex items-center justify-between rounded-2xl bg-emerald-50/90 border border-emerald-200/80 px-4 py-3 text-[13px]">
                         <div className="flex items-center gap-2.5">
                           <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
-                          <span className="font-bold text-emerald-950">Within Range</span>
+                          <span className="font-bold text-emerald-950">Within Range (GPS)</span>
                         </div>
 
                         <button
                           type="button"
-                          onClick={() => setStep(1)}
+                          onClick={() => {
+                            setStep(1);
+                            requestLocation();
+                          }}
                           className="text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 transition-colors px-2.5 py-1 bg-emerald-100/80 hover:bg-emerald-200/80 rounded-xl"
                         >
                           <RefreshCw size={11} /> Re-verify
@@ -736,7 +761,7 @@ function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProp
                         <div className="flex items-center gap-2.5">
                           <AlertCircle size={18} className="text-amber-600 shrink-0" />
                           <div>
-                            <span className="font-bold text-amber-950 block text-xs">GPS Unverified</span>
+                            <span className="font-bold text-amber-950 block text-xs">Perimeter Pending</span>
                             <span className="text-[11px] text-amber-800">Geofenced roles verified on sign-in</span>
                           </div>
                         </div>
@@ -749,7 +774,7 @@ function LoginContent({ audience, action, initialGeofenceConfig }: LoginFormProp
                           }}
                           className="text-xs font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1 transition-colors px-2.5 py-1 bg-amber-100/80 hover:bg-amber-200/80 rounded-xl"
                         >
-                          <RefreshCw size={11} /> Retry GPS
+                          <RefreshCw size={11} /> Check Location
                         </button>
                       </div>
                     )}

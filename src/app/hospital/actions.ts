@@ -1,11 +1,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { AuthorizationError, requireRole } from '@/lib/auth';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { getSubdomainUrl } from '@/utils/subdomain';
+import { generateWorkstationToken, WORKSTATION_COOKIE_NAME } from '@/utils/workstation';
 
 const uuidSchema = z.string().uuid();
 const optionalText = (maxLength: number) =>
@@ -92,6 +94,18 @@ const systemSettingsSchema = z
       .optional()
       .default([]),
     geofence_allow_admin_bypass: z.boolean().optional().default(true),
+    geofence_network_check_enabled: z.boolean().optional().default(true),
+    geofence_allowed_subnets: z
+      .array(z.string().trim())
+      .transform((arr) => arr.filter((i) => i.length > 0))
+      .optional()
+      .default(['192.168.0.0/16', '10.0.0.0/8', '172.16.0.0/12', '127.0.0.1/32', '::1/128']),
+    geofence_allowed_ips: z
+      .array(z.string().trim())
+      .transform((arr) => arr.filter((i) => i.length > 0))
+      .optional()
+      .default([]),
+    geofence_trusted_workstations_enabled: z.boolean().optional().default(true),
   })
   .strict();
 
@@ -381,6 +395,83 @@ export async function updateSystemSettingsAction(input: unknown) {
           .from('system_settings')
           .insert({ ...settingsData, updated_at: new Date().toISOString() });
     const { error } = await operation;
+    if (error) throw error;
+
+    revalidatePath('/hospital/settings');
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: actionError(error) };
+  }
+}
+
+export async function listTrustedWorkstationsAction() {
+  try {
+    await requireRole(['ADMIN']);
+    const adminSupabase = createAdminClient();
+    const { data, error } = await (adminSupabase as any)
+      .from('trusted_workstations')
+      .select('id, name, is_active, ip_address, user_agent, last_used_at, created_at')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return { success: true, workstations: data || [] };
+  } catch (error) {
+    return { success: false, error: actionError(error), workstations: [] };
+  }
+}
+
+export async function authorizeCurrentWorkstationAction(name: string) {
+  try {
+    const { user } = await requireRole(['ADMIN']);
+    const trimmedName = z.string().trim().min(1).max(100).parse(name);
+    const { rawToken, tokenHash } = generateWorkstationToken();
+    const adminSupabase = createAdminClient();
+
+    const { data, error } = await (adminSupabase as any)
+      .from('trusted_workstations')
+      .insert({
+        name: trimmedName,
+        token_hash: tokenHash,
+        authorized_by: user.id,
+        is_active: true,
+      })
+      .select('id, name, created_at')
+      .single();
+
+    if (error) throw error;
+
+    // Set HTTP-only cookie with long persistence (10 years)
+    const cookieStore = await cookies();
+    cookieStore.set(WORKSTATION_COOKIE_NAME, rawToken, {
+      httpOnly: false, // Accessible to client so it can also be kept in localStorage
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365 * 10, // 10 years
+    });
+
+    revalidatePath('/hospital/settings');
+    return {
+      success: true,
+      token: rawToken,
+      workstation: data,
+    };
+  } catch (error) {
+    return { success: false, error: actionError(error) };
+  }
+}
+
+export async function revokeTrustedWorkstationAction(id: string) {
+  try {
+    await requireRole(['ADMIN']);
+    const workstationId = uuidSchema.parse(id);
+    const adminSupabase = createAdminClient();
+
+    const { error } = await (adminSupabase as any)
+      .from('trusted_workstations')
+      .update({ is_active: false })
+      .eq('id', workstationId);
+
     if (error) throw error;
 
     revalidatePath('/hospital/settings');
