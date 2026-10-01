@@ -136,21 +136,66 @@ export async function verifyTvBroadcastCode(code: string) {
 
   const cleanCode = code.trim().toUpperCase();
   const { codes } = await getSystemSettingsTvCodes();
-  const matched = codes.find((c) => c.code.toUpperCase() === cleanCode && c.is_active);
+  const matched = codes.find((c) => c.code.toUpperCase() === cleanCode);
 
-  if (matched) {
-    matched.last_connected_at = new Date().toISOString();
-    void saveSystemSettingsTvCodes(codes);
+  if (!matched) {
     return {
-      valid: true,
-      name: matched.name,
-      code: cleanCode,
+      valid: false,
+      message: 'Invalid TV connection code. Please check the code and try again.',
     };
   }
 
+  if (!matched.is_active) {
+    return {
+      valid: false,
+      message: 'This TV connection code was revoked by an Administrator. Please request a new activation code.',
+    };
+  }
+
+  matched.last_connected_at = new Date().toISOString();
+  void saveSystemSettingsTvCodes(codes);
+
   return {
-    valid: false,
-    message: 'Invalid or revoked TV connection code. Please request a new activation code from your Administrator.',
+    valid: true,
+    name: matched.name,
+    code: cleanCode,
+  };
+}
+
+export async function checkTvCodeStatus(code: string): Promise<{ valid: boolean; name?: string; message?: string }> {
+  if (!code || typeof code !== 'string') {
+    return { valid: false, message: 'Missing TV connection code.' };
+  }
+
+  const cleanCode = code.trim().toUpperCase();
+  const { codes } = await getSystemSettingsTvCodes();
+  const matched = codes.find((c) => c.code.toUpperCase() === cleanCode);
+
+  if (!matched) {
+    return {
+      valid: false,
+      message: 'This TV connection code does not exist.',
+    };
+  }
+
+  if (!matched.is_active) {
+    return {
+      valid: false,
+      message: 'This TV connection code was manually revoked by an Administrator.',
+    };
+  }
+
+  // Throttled update of last_connected_at (at most once every 5 minutes to avoid excessive DB writes)
+  const now = Date.now();
+  const lastConnectedTime = matched.last_connected_at ? new Date(matched.last_connected_at).getTime() : 0;
+  if (now - lastConnectedTime > 5 * 60 * 1000) {
+    matched.last_connected_at = new Date(now).toISOString();
+    void saveSystemSettingsTvCodes(codes);
+  }
+
+  return {
+    valid: true,
+    name: matched.name,
   };
 }
 

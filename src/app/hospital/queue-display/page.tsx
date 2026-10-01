@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { 
   Volume2, 
   VolumeX, 
@@ -11,12 +11,12 @@ import {
   DoorOpen, 
   Stethoscope, 
   Radio, 
-  Tv,
-  CheckCircle2,
-  Users,
-  RefreshCw,
-  ArrowLeft,
-  LogOut
+  Tv, 
+  CheckCircle2, 
+  Users, 
+  RefreshCw, 
+  ArrowLeft, 
+  LogOut 
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { playVoiceNotification, isVoiceEnabled, setVoiceEnabled } from '@/utils/voiceNotification';
@@ -54,6 +54,8 @@ interface RoomDisplay {
 }
 
 export default function QueueDisplayPage() {
+  const pathname = usePathname();
+  const isTvMode = pathname?.startsWith('/tv');
   const [queueItems, setQueueItems] = useState<PatientQueueItem[]>([]);
   const [rooms, setRooms] = useState<RoomDisplay[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
@@ -289,14 +291,16 @@ export default function QueueDisplayPage() {
       {!isFullscreen && (
         <header className="bg-white/90 border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-xs backdrop-blur-md">
           <div className="flex items-center gap-4">
-            <button
-              onClick={handleLogout}
-              className="p-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-2xl transition-all flex items-center gap-2 text-xs font-semibold shadow-xs"
-              title="Sign out of Waiting Room Display"
-            >
-              <LogOut size={18} />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
+            {!isTvMode && (
+              <button
+                onClick={handleLogout}
+                className="p-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-2xl transition-all flex items-center gap-2 text-xs font-semibold shadow-xs"
+                title="Sign out of Waiting Room Display"
+              >
+                <LogOut size={18} />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            )}
             <div className="p-2.5 bg-brand-50 border border-brand-200 text-brand-600 rounded-2xl flex items-center justify-center">
               <Tv size={24} className="animate-pulse" />
             </div>

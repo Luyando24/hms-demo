@@ -11,14 +11,67 @@ import {
   Unplug,
   Maximize2
 } from 'lucide-react';
-import { verifyTvBroadcastCode } from './actions';
+import { verifyTvBroadcastCode, checkTvCodeStatus } from './actions';
 import QueueDisplayPage from '@/app/hospital/queue-display/page';
+
+const TV_STORAGE_KEY = 'tv_broadcast_code';
+const TV_COOKIE_MAX_AGE = 60 * 60 * 24 * 365 * 10; // 10 years in seconds
+
+function getStoredTvCode(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  // 1. Try LocalStorage
+  try {
+    const local = localStorage.getItem(TV_STORAGE_KEY);
+    if (local && local.trim()) return local.trim().toUpperCase();
+  } catch {
+    // LocalStorage restricted or unavailable in TV browser
+  }
+
+  // 2. Fallback to Cookie
+  try {
+    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${TV_STORAGE_KEY}=([^;]*)`));
+    if (match && match[1]) {
+      return decodeURIComponent(match[1]).trim().toUpperCase();
+    }
+  } catch {
+    // Cookie read failed
+  }
+
+  return null;
+}
+
+function persistTvCode(code: string) {
+  if (typeof window === 'undefined') return;
+
+  const clean = code.trim().toUpperCase();
+  try {
+    localStorage.setItem(TV_STORAGE_KEY, clean);
+  } catch {}
+
+  try {
+    document.cookie = `${TV_STORAGE_KEY}=${encodeURIComponent(clean)}; Path=/; Max-Age=${TV_COOKIE_MAX_AGE}; SameSite=Lax`;
+  } catch {}
+}
+
+function clearPersistedTvCode() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    localStorage.removeItem(TV_STORAGE_KEY);
+  } catch {}
+
+  try {
+    document.cookie = `${TV_STORAGE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
+  } catch {}
+}
 
 function TvPageContent() {
   const searchParams = useSearchParams();
   const urlCode = searchParams.get('code');
 
   const [inputCode, setInputCode] = useState('');
+  const [isInitializing, setIsInitializing] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -37,17 +90,6 @@ function TvPageContent() {
     };
   }, []);
 
-  // Prefill input if code parameter was passed in URL, but strip query param so URL is clean
-  useEffect(() => {
-    if (urlCode) {
-      const formatted = urlCode.startsWith('TV-') ? urlCode : `TV-${urlCode}`;
-      setInputCode(formatted);
-      if (typeof window !== 'undefined') {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    }
-  }, [urlCode]);
-
   const requestFullscreenMode = () => {
     if (typeof window !== 'undefined' && document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().catch(() => {
@@ -56,30 +98,104 @@ function TvPageContent() {
     }
   };
 
-  const performVerification = useCallback(async (codeToVerify: string) => {
+  const performVerification = useCallback(async (codeToVerify: string, isAutoConnect = false) => {
     setVerifying(true);
     setErrorMsg(null);
 
-    const res = await verifyTvBroadcastCode(codeToVerify);
+    try {
+      const res = await verifyTvBroadcastCode(codeToVerify);
 
-    if (res.valid && res.code) {
-      setIsConnected(true);
-      setTvName(res.name || 'Smart TV Display');
-      setActiveCode(res.code);
+      if (res.valid && res.code) {
+        setIsConnected(true);
+        setTvName(res.name || 'Smart TV Display');
+        setActiveCode(res.code);
+        persistTvCode(res.code);
 
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('tv_broadcast_code', res.code);
-        window.history.replaceState({}, document.title, window.location.pathname);
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } else {
+        setIsConnected(false);
+        setActiveCode(null);
+        setTvName(null);
+        clearPersistedTvCode();
+        setErrorMsg(res.message || 'Invalid or revoked TV connection code.');
       }
-    } else {
-      setIsConnected(false);
-      setErrorMsg(res.message || 'Invalid activation code.');
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('tv_broadcast_code');
+    } catch {
+      if (isAutoConnect) {
+        setErrorMsg('Network error connecting to TV broadcast. Retrying...');
+      } else {
+        setErrorMsg('Network error while connecting. Please try again.');
       }
+    } finally {
+      setVerifying(false);
+      setIsInitializing(false);
     }
-    setVerifying(false);
   }, []);
+
+  // Auto-restore session from permanent cookie/storage OR auto-connect from URL ?code=...
+  useEffect(() => {
+    const initSession = async () => {
+      // 1. Direct URL query param takes priority if present
+      if (urlCode) {
+        let formatted = urlCode.trim().toUpperCase();
+        if (!formatted.startsWith('TV-') && /^\d+$/.test(formatted)) {
+          formatted = `TV-${formatted}`;
+        }
+        setInputCode(formatted);
+        await performVerification(formatted, true);
+        return;
+      }
+
+      // 2. Otherwise restore permanent session from Cookie / LocalStorage
+      const savedCode = getStoredTvCode();
+      if (savedCode) {
+        setInputCode(savedCode);
+        await performVerification(savedCode, true);
+        return;
+      }
+
+      // 3. No stored code: proceed to code entry screen
+      setIsInitializing(false);
+    };
+
+    void initSession();
+  }, [urlCode, performVerification]);
+
+  // Periodic revocation heartbeat while connected (checks every 30 seconds)
+  // If an administrator revokes the code, the TV immediately disconnects and clears credentials
+  useEffect(() => {
+    if (!isConnected || !activeCode) return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const check = await checkTvCodeStatus(activeCode);
+        if (!isMounted) return;
+
+        if (!check.valid) {
+          // Administrator manually revoked the code!
+          clearPersistedTvCode();
+          if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
+          setIsConnected(false);
+          setActiveCode(null);
+          setTvName(null);
+          setErrorMsg(check.message || 'This TV connection code was manually revoked by an Administrator.');
+        } else if (check.name && check.name !== tvName) {
+          setTvName(check.name);
+        }
+      } catch {
+        // Transient network blip: do not disconnect TV on brief network timeout
+      }
+    }, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isConnected, activeCode, tvName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,11 +213,9 @@ function TvPageContent() {
   };
 
   const handleDisconnect = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('tv_broadcast_code');
-      if (document.fullscreenElement && document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      }
+    clearPersistedTvCode();
+    if (typeof window !== 'undefined' && document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
     }
     setIsConnected(false);
     setActiveCode(null);
@@ -109,6 +223,25 @@ function TvPageContent() {
     setInputCode('');
     setErrorMsg(null);
   };
+
+  // State 0: Initializing / Auto-reconnecting on boot or refresh
+  if (isInitializing) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-slate-950 p-4 font-sans text-slate-100 select-none">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-900/30 via-slate-950 to-slate-950 pointer-events-none" />
+        <div className="relative z-10 flex flex-col items-center space-y-4 text-center">
+          <div className="rounded-3xl bg-brand-600 p-4 text-white shadow-xl shadow-brand-500/20 border border-brand-400/30">
+            <HeartPulse size={44} strokeWidth={2.5} className="animate-pulse" />
+          </div>
+          <div className="flex items-center gap-2 text-brand-400 font-bold text-base">
+            <Loader2 className="animate-spin" size={20} />
+            <span>Connecting to TV Broadcast...</span>
+          </div>
+          <p className="text-xs text-slate-400 font-medium">Restoring permanent display session</p>
+        </div>
+      </main>
+    );
+  }
 
   // State A: Connected to TV Broadcast -> Render Full Queue Display
   if (isConnected && activeCode) {
@@ -123,6 +256,9 @@ function TvPageContent() {
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
               </span>
               <span>Broadcasting: <strong>{tvName}</strong></span>
+              <span className="ml-2 font-mono text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
+                {activeCode}
+              </span>
             </div>
 
             <div className="flex items-center gap-2">
