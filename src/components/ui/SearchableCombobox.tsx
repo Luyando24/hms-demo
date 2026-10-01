@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, Check, X, Search } from 'lucide-react';
 
 export interface ComboboxOption {
@@ -38,33 +38,72 @@ export function SearchableCombobox({
   disabled = false,
 }: SearchableComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Normalize options to object structure
-  const normalizedOptions: ComboboxOption[] = options.map(opt => 
-    typeof opt === 'string' ? { value: opt, label: opt } : opt
-  );
+  const normalizedOptions: ComboboxOption[] = useMemo(() => {
+    return options.map((opt) =>
+      typeof opt === 'string' ? { value: opt, label: opt } : opt
+    );
+  }, [options]);
 
+  // Find matching option for current value
+  const selectedOption = useMemo(() => {
+    return normalizedOptions.find((opt) => opt.value === value);
+  }, [normalizedOptions, value]);
+
+  // searchQuery represents the human-readable text shown in the input
+  const [searchQuery, setSearchQuery] = useState(() => {
+    const match = normalizedOptions.find((opt) => opt.value === value);
+    return match ? match.label : (allowCustom ? (value || '') : '');
+  });
+
+  // Keep displayed text in sync when value or options change (e.g. async inventory fetch or draft restore)
   useEffect(() => {
-    setSearchQuery(value);
-  }, [value]);
+    if (!isOpen) {
+      const match = normalizedOptions.find((opt) => opt.value === value);
+      if (match) {
+        setSearchQuery(match.label);
+      } else if (allowCustom) {
+        setSearchQuery(value || '');
+      } else if (!value) {
+        setSearchQuery('');
+      }
+    }
+  }, [value, normalizedOptions, isOpen, allowCustom]);
 
-  // Click outside handler
+  // Click outside handler: close dropdown and ensure input displays option label
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        const match = normalizedOptions.find((opt) => opt.value === value);
+        if (match) {
+          setSearchQuery(match.label);
+        } else if (allowCustom) {
+          setSearchQuery(value || '');
+        } else if (!value) {
+          setSearchQuery('');
+        }
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [value, normalizedOptions, allowCustom]);
 
-  const filteredOptions = normalizedOptions.filter(opt =>
-    opt.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (opt.sublabel && opt.sublabel.toLowerCase().includes(searchQuery.toLowerCase()))
+  // When input matches the currently selected option's label, show all options in dropdown
+  const isQueryMatchingCurrentLabel = Boolean(
+    selectedOption && searchQuery.trim().toLowerCase() === selectedOption.label.trim().toLowerCase()
   );
+
+  const filteredOptions = normalizedOptions.filter((opt) => {
+    if (!searchQuery.trim() || isQueryMatchingCurrentLabel) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      opt.label.toLowerCase().includes(q) ||
+      (opt.sublabel && opt.sublabel.toLowerCase().includes(q))
+    );
+  });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;

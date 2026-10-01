@@ -959,6 +959,7 @@ export default function ConsultationModal({
                             <FieldLabel>Medication / Formulary Item *</FieldLabel>
                             <SearchableCombobox
                               value={medication.drugId}
+                              allowCustom={false}
                               onChange={(val) =>
                                 setMedications((current) =>
                                   current.map((item) =>
