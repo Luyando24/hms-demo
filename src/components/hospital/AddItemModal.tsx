@@ -19,6 +19,12 @@ interface AddItemModalProps {
     stock_level: number;
     reorder_level?: number;
     unit_price?: number;
+    batch_number?: string | null;
+    expiry_date?: string | null;
+    manufacturer?: string | null;
+    dosage_form?: string | null;
+    strength?: string | null;
+    storage_condition?: string | null;
   } | null;
 }
 
@@ -34,7 +40,13 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, initialItem }
     unit: 'Tablet',
     stock_level: '',
     reorder_level: '',
-    unit_price: ''
+    unit_price: '',
+    batch_number: '',
+    expiry_date: '',
+    manufacturer: '',
+    dosage_form: 'Tablet',
+    strength: '',
+    storage_condition: 'Room Temperature',
   });
 
   const [customUnitMode, setCustomUnitMode] = useState(false);
@@ -59,7 +71,13 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, initialItem }
         unit: initialItem.unit || 'Tablet',
         stock_level: initialItem.stock_level !== undefined && initialItem.stock_level !== null ? String(initialItem.stock_level) : '',
         reorder_level: initialItem.reorder_level !== undefined && initialItem.reorder_level !== null ? String(initialItem.reorder_level) : '',
-        unit_price: initialItem.unit_price !== undefined && initialItem.unit_price !== null ? String(initialItem.unit_price) : ''
+        unit_price: initialItem.unit_price !== undefined && initialItem.unit_price !== null ? String(initialItem.unit_price) : '',
+        batch_number: initialItem.batch_number || '',
+        expiry_date: initialItem.expiry_date || '',
+        manufacturer: initialItem.manufacturer || '',
+        dosage_form: initialItem.dosage_form || 'Tablet',
+        strength: initialItem.strength || '',
+        storage_condition: initialItem.storage_condition || 'Room Temperature',
       });
     } else {
       setFormData({
@@ -68,7 +86,13 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, initialItem }
         unit: 'Tablet',
         stock_level: '',
         reorder_level: '',
-        unit_price: ''
+        unit_price: '',
+        batch_number: '',
+        expiry_date: '',
+        manufacturer: '',
+        dosage_form: 'Tablet',
+        strength: '',
+        storage_condition: 'Room Temperature',
       });
     }
   }, [initialItem, isOpen]);
@@ -170,7 +194,14 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, initialItem }
       unit: formData.unit.trim(),
       stock_level: formData.stock_level === '' ? 0 : Number(formData.stock_level) || 0,
       reorder_level: formData.reorder_level === '' ? 0 : Number(formData.reorder_level) || 0,
-      unit_price: formData.unit_price === '' ? 0 : Number(formData.unit_price) || 0
+      unit_price: formData.unit_price === '' ? 0 : Number(formData.unit_price) || 0,
+      inventory_type: 'MEDICAL',
+      batch_number: formData.batch_number.trim() || null,
+      expiry_date: formData.expiry_date || null,
+      manufacturer: formData.manufacturer.trim() || null,
+      dosage_form: formData.dosage_form.trim() || null,
+      strength: formData.strength.trim() || null,
+      storage_condition: formData.storage_condition.trim() || null,
     };
 
     let error = null;
@@ -206,8 +237,8 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, initialItem }
 
   return (
     <>
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4 overflow-y-auto">
+        <div className="bg-white rounded-3xl w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in duration-200">
           <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
             <div>
               <h2 className="text-xl font-black">
@@ -370,6 +401,98 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, initialItem }
                     placeholder="0.00"
                   />
                 </div>
+              </div>
+
+              {/* Strength & Dosage Form */}
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                  Strength / Concentration
+                </label>
+                <input 
+                  type="text"
+                  value={formData.strength}
+                  onChange={(e) => setFormData({ ...formData, strength: e.target.value })}
+                  placeholder="e.g. 500mg, 10mg/5ml, 1g"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-slate-900/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                  Dosage Form
+                </label>
+                <select
+                  value={formData.dosage_form}
+                  onChange={(e) => setFormData({ ...formData, dosage_form: e.target.value })}
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-slate-900/20 text-slate-800"
+                >
+                  <option value="Tablet">Tablet</option>
+                  <option value="Capsule">Capsule</option>
+                  <option value="Syrup / Liquid">Syrup / Liquid</option>
+                  <option value="Injection / Ampoule">Injection / Ampoule</option>
+                  <option value="IV Infusion">IV Infusion</option>
+                  <option value="Ointment / Cream">Ointment / Cream</option>
+                  <option value="Suppository">Suppository</option>
+                  <option value="Inhaler / Resp">Inhaler / Resp</option>
+                  <option value="Surgical Consumable">Surgical Consumable</option>
+                </select>
+              </div>
+
+              {/* Batch Number & Expiry Date */}
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                  Batch / Lot Number
+                </label>
+                <input 
+                  type="text"
+                  value={formData.batch_number}
+                  onChange={(e) => setFormData({ ...formData, batch_number: e.target.value })}
+                  placeholder="e.g. B-94021"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-slate-900/20 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                  Expiry Date
+                </label>
+                <input 
+                  type="date"
+                  value={formData.expiry_date}
+                  onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-slate-900/20"
+                />
+              </div>
+
+              {/* Manufacturer & Storage Condition */}
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                  Manufacturer / Brand
+                </label>
+                <input 
+                  type="text"
+                  value={formData.manufacturer}
+                  onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
+                  placeholder="e.g. Pfizer, Novartis, Cipla"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-slate-900/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                  Storage Condition
+                </label>
+                <select
+                  value={formData.storage_condition}
+                  onChange={(e) => setFormData({ ...formData, storage_condition: e.target.value })}
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-slate-900/20 text-slate-800"
+                >
+                  <option value="Room Temperature">Room Temperature (15-25°C)</option>
+                  <option value="Refrigerated (2-8°C)">Refrigerated (2-8°C)</option>
+                  <option value="Deep Freeze (-20°C)">Deep Freeze (-20°C)</option>
+                  <option value="Cool & Dry">Cool & Dry</option>
+                  <option value="Protect from Light">Protect from Light</option>
+                </select>
               </div>
             </div>
 

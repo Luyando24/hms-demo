@@ -28,6 +28,7 @@ import {
   downloadFormattedCsv, 
   formatValue 
 } from '@/utils/reportDocumentGenerator';
+import { evaluateMedicalStock } from '@/utils/stockWarnings';
 import ReportDocumentPreview from './ReportDocumentPreview';
 import { sendFinancialReportEmailAction } from '@/app/hospital/finance/actions';
 
@@ -141,6 +142,26 @@ export default function ReportExportModal({
       const { startIso, endIso, label } = getPeriodDates();
       const sym = hospitalInfo.currencySymbol;
       const pos = hospitalInfo.currencyPosition;
+
+      // Strictly restrict revenue analytics and investor reports to Super Users
+      if (reportKey === 'financial' || reportKey === 'investor_prospectus') {
+        const { data: { user } } = await supabase.auth.getUser();
+        let role = 'STAFF';
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+          role = profile?.role || 'STAFF';
+        }
+        if (role !== 'SUPER_USER') {
+          setLoading(false);
+          setDocData(null);
+          setEmailError('Revenue analytics and investor reports are restricted exclusively to Super User accounts.');
+          return;
+        }
+      }
 
       let rows: Array<Record<string, any>> = [];
       let kpiCards: KpiCard[] = [];
@@ -336,12 +357,14 @@ export default function ReportExportModal({
       } else if (reportKey === 'inventory') {
         const { data } = await supabase
           .from('inventory_items')
-          .select('id, name, category, stock_level, reorder_level, unit, unit_price');
+          .select('id, name, category, stock_level, reorder_level, unit, unit_price, inventory_type')
+          .or('inventory_type.eq.MEDICAL,inventory_type.is.null');
 
         let totalValue = 0;
         rows = (data || []).map((item: any) => {
           const val = Number(item.stock_level || 0) * Number(item.unit_price || 0);
           totalValue += val;
+          const evalRes = evaluateMedicalStock(item);
 
           return {
             Item_ID: String(item.id).substring(0, 8).toUpperCase(),
@@ -350,7 +373,7 @@ export default function ReportExportModal({
             Stock_Level: `${item.stock_level || 0} ${item.unit || 'units'}`,
             Unit_Price: formatValue(item.unit_price || 0, sym, pos),
             Total_Valuation: formatValue(val, sym, pos),
-            Status: (item.stock_level || 0) <= (item.reorder_level || 5) ? 'REORDER LOW' : 'IN STOCK'
+            Status: evalRes.label.toUpperCase(),
           };
         });
 

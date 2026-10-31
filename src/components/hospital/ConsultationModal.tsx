@@ -32,6 +32,7 @@ import StatusModal from './StatusModal';
 import { createClient } from '@/utils/supabase/client';
 import { formatCurrencyAmount } from '@/utils/currency';
 import type { Database, Json } from '@/types/supabase';
+import type { CommonTestType } from '@/types/clinical';
 import { SearchableCombobox } from '../ui/SearchableCombobox';
 import { useFormDraft } from '@/hooks/useFormDraft';
 import { FormDraftAlert } from '@/components/common/FormDraftAlert';
@@ -119,6 +120,7 @@ export default function ConsultationModal({
   const [notes, setNotes] = useState(emptyNotes);
   const [medications, setMedications] = useState<MedicationDraft[]>([]);
   const [labTests, setLabTests] = useState<LabDraft[]>([]);
+  const [commonTests, setCommonTests] = useState<CommonTestType[]>([]);
   const [radiologyStudies, setRadiologyStudies] = useState<RadiologyDraft[]>([]);
   const [charges, setCharges] = useState<ChargeDraft[]>([]);
   const [currencyConfig, setCurrencyConfig] = useState<{
@@ -183,7 +185,7 @@ export default function ConsultationModal({
     let cancelled = false;
 
     async function loadConsultationReferences() {
-      const [vitalsResult, inventoryResult, deptsResult, queueResult, settingsResult, roomsResult] = await Promise.all([
+      const [vitalsResult, inventoryResult, deptsResult, queueResult, settingsResult, roomsResult, commonTestsResult] = await Promise.all([
         supabase
           .from('vitals')
           .select('*')
@@ -215,6 +217,12 @@ export default function ConsultationModal({
           .select('id, name')
           .eq('is_active', true)
           .order('name', { ascending: true }),
+        supabase
+          .from('common_test_types')
+          .select('*')
+          .eq('is_active', true)
+          .order('category', { ascending: true })
+          .order('name', { ascending: true }),
       ]);
 
       if (!cancelled) {
@@ -222,6 +230,7 @@ export default function ConsultationModal({
         setInventory(inventoryResult.data || []);
         setDepartments(deptsResult.data || []);
         setFacilityRooms(roomsResult.data || []);
+        setCommonTests((commonTestsResult.data as CommonTestType[]) || []);
         setCurrentQueueToken(queueResult.data?.token_number || null);
 
         const currentRoom = queueResult.data?.room_id || initialRoomId || '';
@@ -1057,69 +1066,129 @@ export default function ConsultationModal({
                       onAdd={addLabTest}
                       empty={labTests.length === 0}
                     >
-                      {labTests.map((labTest) => (
-                        <div
-                          key={labTest.id}
-                          className='grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 md:grid-cols-5 items-end shadow-xs'
-                        >
-                          <div className='md:col-span-2'>
-                            <DraftInput
-                              label='Test Name *'
-                              placeholder='e.g. Full Blood Count (FBC) / Malaria Rapid'
-                              value={labTest.testName}
-                              onChange={(value) =>
-                                updateLabTest(labTest.id, 'testName', value, setLabTests)
-                              }
-                            />
-                          </div>
-                          <div>
-                            <FieldLabel>Priority Level</FieldLabel>
-                            <select
-                              value={labTest.priority}
-                              onChange={(event) =>
-                                setLabTests((current) =>
-                                  current.map((item) =>
-                                    item.id === labTest.id
-                                      ? {
-                                          ...item,
-                                          priority: event.target.value as 'NORMAL' | 'URGENT' | 'CRITICAL',
-                                        }
-                                      : item,
-                                  ),
-                                )
-                              }
-                              className={fieldClass}
-                            >
-                              <option value='NORMAL'>Normal / Routine</option>
-                              <option value='URGENT'>Urgent / Stat</option>
-                              <option value='CRITICAL'>Critical Emergency</option>
-                            </select>
-                          </div>
-                          <div>
-                            <DraftInput
-                              label='Reference Range (Optional)'
-                              placeholder='e.g. 4.0 - 11.0'
-                              value={labTest.referenceRange}
-                              onChange={(value) =>
-                                updateLabTest(labTest.id, 'referenceRange', value, setLabTests)
-                              }
-                            />
-                          </div>
-                          <div className='flex items-end gap-2'>
-                            <div className='flex-1'>
-                              <DraftInput
-                                label='Unit (Optional)'
-                                placeholder='e.g. 10^9/L'
-                                value={labTest.unit}
-                                onChange={(value) =>
-                                  updateLabTest(labTest.id, 'unit', value, setLabTests)
-                                }
-                              />
+                      {labTests.map((labTest) => {
+                        const matchingCommonTest = commonTests.find(
+                          (ct) => ct.name.toLowerCase() === labTest.testName.trim().toLowerCase(),
+                        );
+                        const testCategories = Array.from(
+                          new Set(commonTests.map((ct) => ct.category || 'General')),
+                        ).sort();
+
+                        return (
+                          <div
+                            key={labTest.id}
+                            className='rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-xs space-y-3'
+                          >
+                            <div className='grid gap-3 md:grid-cols-2'>
+                              <div>
+                                <div className='flex items-center justify-between mb-1'>
+                                  <FieldLabel>Common Test Type</FieldLabel>
+                                  <span className='text-[10px] font-bold text-brand-600 uppercase tracking-wider'>
+                                    Quick Select
+                                  </span>
+                                </div>
+                                <select
+                                  value={matchingCommonTest ? matchingCommonTest.id : ''}
+                                  onChange={(e) => {
+                                    const selectedId = e.target.value;
+                                    if (selectedId) {
+                                      const selected = commonTests.find((ct) => ct.id === selectedId);
+                                      if (selected) {
+                                        setLabTests((current) =>
+                                          current.map((item) =>
+                                            item.id === labTest.id
+                                              ? {
+                                                  ...item,
+                                                  testName: selected.name,
+                                                  unit: selected.default_unit || item.unit,
+                                                  referenceRange: selected.default_reference_range || item.referenceRange,
+                                                }
+                                              : item,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }}
+                                  className={fieldClass}
+                                >
+                                  <option value=''>-- Select Standard Test Type --</option>
+                                  {testCategories.map((cat) => (
+                                    <optgroup key={cat} label={`📂 ${cat}`}>
+                                      {commonTests
+                                        .filter((ct) => (ct.category || 'General') === cat)
+                                        .map((ct) => (
+                                          <option key={ct.id} value={ct.id}>
+                                            {ct.name} {ct.default_unit ? `(${ct.default_unit})` : ''}
+                                          </option>
+                                        ))}
+                                    </optgroup>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <DraftInput
+                                  label='Test Name *'
+                                  placeholder='e.g. Full Blood Count (FBC) / Malaria Rapid'
+                                  value={labTest.testName}
+                                  onChange={(value) =>
+                                    updateLabTest(labTest.id, 'testName', value, setLabTests)
+                                  }
+                                />
+                              </div>
                             </div>
-                            <RemoveButton onClick={() => setLabTests((current) => current.filter((i) => i.id !== labTest.id))} />
+
+                            <div className='grid gap-3 md:grid-cols-4 items-end'>
+                              <div>
+                                <FieldLabel>Priority Level</FieldLabel>
+                                <select
+                                  value={labTest.priority}
+                                  onChange={(event) =>
+                                    setLabTests((current) =>
+                                      current.map((item) =>
+                                        item.id === labTest.id
+                                          ? {
+                                              ...item,
+                                              priority: event.target.value as 'NORMAL' | 'URGENT' | 'CRITICAL',
+                                            }
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                  className={fieldClass}
+                                >
+                                  <option value='NORMAL'>Normal / Routine</option>
+                                  <option value='URGENT'>Urgent / Stat</option>
+                                  <option value='CRITICAL'>Critical Emergency</option>
+                                </select>
+                              </div>
+                              <div>
+                                <DraftInput
+                                  label='Reference Range (Optional)'
+                                  placeholder='e.g. 4.0 - 11.0'
+                                  value={labTest.referenceRange}
+                                  onChange={(value) =>
+                                    updateLabTest(labTest.id, 'referenceRange', value, setLabTests)
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <DraftInput
+                                  label='Unit (Optional)'
+                                  placeholder='e.g. 10^9/L'
+                                  value={labTest.unit}
+                                  onChange={(value) =>
+                                    updateLabTest(labTest.id, 'unit', value, setLabTests)
+                                  }
+                                />
+                              </div>
+                              <div className='flex justify-end'>
+                                <RemoveButton onClick={() => setLabTests((current) => current.filter((i) => i.id !== labTest.id))} />
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </OrderSection>
                   </div>
                 )}

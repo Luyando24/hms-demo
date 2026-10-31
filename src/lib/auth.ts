@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server';
 import type { UserRole } from '@/utils/rbac';
 
 const KNOWN_ROLES: readonly UserRole[] = [
+  'SUPER_USER',
   'ADMIN',
   'DOCTOR',
   'NURSE',
@@ -72,8 +73,21 @@ export async function requireRole(
   supabase: Awaited<ReturnType<typeof createClient>>;
 }> {
   const actor = await requireAuthenticatedUser();
-  if (!allowedRoles.includes(actor.role)) {
+  // SUPER_USER has supreme access to any feature permitted for ADMIN
+  const isAllowed =
+    allowedRoles.includes(actor.role) ||
+    (actor.role === 'SUPER_USER' && allowedRoles.includes('ADMIN'));
+
+  if (!isAllowed) {
     throw new AuthorizationError();
   }
   return actor;
+}
+
+export async function requireSuperUser(): Promise<{
+  user: User;
+  role: UserRole;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}> {
+  return requireRole(['SUPER_USER']);
 }

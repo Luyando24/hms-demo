@@ -8,6 +8,7 @@ import { AuthorizationError, requireRole } from '@/lib/auth';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { getSubdomainUrl } from '@/utils/subdomain';
 import { generateWorkstationToken, WORKSTATION_COOKIE_NAME } from '@/utils/workstation';
+import { logAuditEvent } from '@/utils/auditLogger';
 
 const uuidSchema = z.string().uuid();
 const optionalText = (maxLength: number) =>
@@ -82,7 +83,7 @@ const systemSettingsSchema = z
       .pipe(z.array(z.string().min(1).max(60)).min(1).max(30)),
     insurance_providers: z
       .array(z.string().trim())
-      .transform((arr) => arr.filter((i) => i.length > 0))
+      .transform((arr) => arr.filter((i) => i.length > 0 && !i.startsWith('TVCODE:') && !i.startsWith('{')))
       .pipe(z.array(z.string().min(1).max(150)).max(100)),
     geofence_enabled: z.boolean().optional().default(false),
     geofence_latitude: z.coerce.number().min(-90).max(90).optional().default(0),
@@ -247,7 +248,7 @@ export async function updatePatientAction(id: string, input: unknown) {
 
 export async function deletePatientAction(id: string) {
   try {
-    const { supabase } = await requireRole(['ADMIN']);
+    const { supabase } = await requireRole(['SUPER_USER']);
     const patientId = uuidSchema.parse(id);
     const { data: patient, error: lookupError } = await supabase
       .from('patients')
@@ -258,6 +259,13 @@ export async function deletePatientAction(id: string) {
 
     const { error } = await supabase.from('patients').delete().eq('id', patientId);
     if (error) throw error;
+
+    void logAuditEvent({
+      action: 'RECORD_DELETE',
+      module: 'PATIENTS',
+      recordId: patientId,
+      recordType: 'patients',
+    });
 
     if (patient?.auth_user_id) {
       const { error: authError } = await createAdminClient().auth.admin.deleteUser(
@@ -272,6 +280,45 @@ export async function deletePatientAction(id: string) {
     }
 
     revalidatePath('/hospital/patients');
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: actionError(error) };
+  }
+}
+
+export async function deleteCapitalAssetAction(id: string) {
+  try {
+    const { supabase } = await requireRole(['SUPER_USER']);
+    const assetId = uuidSchema.parse(id);
+    const { error } = await supabase.from('clinic_assets').delete().eq('id', assetId);
+    if (error) throw error;
+    void logAuditEvent({
+      action: 'RECORD_DELETE',
+      module: 'CAPITAL_ASSETS',
+      recordId: assetId,
+      recordType: 'clinic_assets',
+    });
+    revalidatePath('/hospital/inventory');
+    revalidatePath('/hospital/assets');
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: actionError(error) };
+  }
+}
+
+export async function deleteClinicDocumentAction(id: string) {
+  try {
+    const { supabase } = await requireRole(['SUPER_USER']);
+    const docId = uuidSchema.parse(id);
+    const { error } = await supabase.from('clinic_documents').delete().eq('id', docId);
+    if (error) throw error;
+    void logAuditEvent({
+      action: 'RECORD_DELETE',
+      module: 'ADMIN',
+      recordId: docId,
+      recordType: 'clinic_documents',
+    });
+    revalidatePath('/hospital/management');
     return { success: true };
   } catch (error) {
     return { success: false, error: actionError(error) };
@@ -396,6 +443,14 @@ export async function updateSystemSettingsAction(input: unknown) {
           .insert({ ...settingsData, updated_at: new Date().toISOString() });
     const { error } = await operation;
     if (error) throw error;
+
+    void logAuditEvent({
+      action: 'SETTINGS_UPDATE',
+      module: 'SYSTEM_SETTINGS',
+      recordId: existing?.id || 'system_settings',
+      recordType: 'system_settings',
+      newValues: settingsData as any,
+    });
 
     revalidatePath('/hospital/settings');
     return { success: true };

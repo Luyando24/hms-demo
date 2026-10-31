@@ -50,7 +50,10 @@ export default function EditPatientModal({ isOpen, onClose, onSuccess, patient }
           .limit(1)
           .maybeSingle()
         if (data?.insurance_providers && Array.isArray(data.insurance_providers) && data.insurance_providers.length > 0) {
-          setAdminProviders(data.insurance_providers)
+          const cleanProviders = data.insurance_providers.filter((p: string) => typeof p === 'string' && !p.startsWith('TVCODE:') && !p.startsWith('{'));
+          if (cleanProviders.length > 0) {
+            setAdminProviders(cleanProviders);
+          }
         }
       } catch (e) {
         console.error('Error loading insurance providers:', e)

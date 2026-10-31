@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { createClient } from "@/utils/supabase/client";
 import CreateLabOrderModal from "@/components/hospital/CreateLabOrderModal";
 import EnterLabResultModal from "@/components/hospital/EnterLabResultModal";
+import ManageCommonTestsModal from "@/components/hospital/ManageCommonTestsModal";
 import StatusModal from "@/components/hospital/StatusModal";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
@@ -43,6 +44,7 @@ export default function LaboratoryDashboard() {
   const [selectedResult, setSelectedResult] = useState<any>(null);
   const [selectedPatientName, setSelectedPatientName] = useState("");
   const [isEnterResultModalOpen, setIsEnterResultModalOpen] = useState(false);
+  const [isManageTestsModalOpen, setIsManageTestsModalOpen] = useState(false);
   const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
 
   const supabase = createClient();
@@ -131,6 +133,14 @@ export default function LaboratoryDashboard() {
           <p className="text-xs text-slate-500 font-normal mt-0.5">Sample tracking, diagnostic test execution, and result verification desk.</p>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setIsManageTestsModalOpen(true)}
+            className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
+            title="Configure Common Medical Test Types"
+          >
+            <FlaskConical size={14} className="text-brand-600" />
+            Common Tests
+          </button>
           <button 
             onClick={fetchOrders}
             className="bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-xs flex items-center gap-1.5"
@@ -327,6 +337,14 @@ export default function LaboratoryDashboard() {
           onSuccess={fetchOrders}
           labResult={selectedResult}
           patientName={selectedPatientName}
+        />
+      )}
+
+      {isManageTestsModalOpen && (
+        <ManageCommonTestsModal
+          isOpen={isManageTestsModalOpen}
+          onClose={() => setIsManageTestsModalOpen(false)}
+          onTestsChanged={fetchOrders}
         />
       )}
 

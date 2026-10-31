@@ -5,6 +5,7 @@ import { authenticateLogin } from '@/lib/login';
 import { getSubdomainUrl } from '@/utils/subdomain';
 import { getRoleLandingDestination } from '@/utils/rbac';
 import { createClient } from '@/utils/supabase/server';
+import { logAuditEvent } from '@/utils/auditLogger';
 
 function loginError(audience: 'staff' | 'admin', message: string): never {
   const targetUrl = getSubdomainUrl(audience, '/login?error=' + encodeURIComponent(message));
@@ -34,6 +35,26 @@ async function signInWorkforce(
     loginError(audience, 'Your account does not have a valid access profile.');
   }
 
+  // Record audit log entry for user login
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      void logAuditEvent({
+        userId: user.id,
+        actorName: user.email || 'Authenticated User',
+        actorRole: result.role,
+        action: 'LOGIN',
+        module: 'AUTH',
+        recordId: user.id,
+        recordType: 'auth_user',
+        metadata: { audience, role: result.role },
+      });
+    }
+  } catch {
+    // Non-blocking
+  }
+
   redirect(getSubdomainUrl(destination.subdomain, destination.path));
 }
 
@@ -47,6 +68,17 @@ export async function signInAdmin(formData: FormData) {
 
 export async function signOut() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    void logAuditEvent({
+      userId: user.id,
+      actorName: user.email,
+      action: 'LOGOUT',
+      module: 'AUTH',
+      recordId: user.id,
+      recordType: 'auth_user',
+    });
+  }
   await supabase.auth.signOut({ scope: 'local' });
   redirect(getSubdomainUrl(null, '/login'));
 }

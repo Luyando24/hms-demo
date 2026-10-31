@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Settings as SettingsIcon, DollarSign, Building, Save, Loader2, ShieldAlert, CreditCard, Shield, Plus, X, Mail, MapPin, Navigation, Crosshair, Tv, Radio, Trash2, ArrowRight, Sparkles, Database, Monitor, Wifi, CheckCircle2, AlertCircle, Laptop } from 'lucide-react';
+import { Settings as SettingsIcon, DollarSign, Building, Save, Loader2, ShieldAlert, CreditCard, Shield, Plus, X, Mail, MapPin, Navigation, Crosshair, Tv, Radio, Trash2, ArrowRight, Sparkles, Database, Monitor, Wifi, CheckCircle2, AlertCircle, Laptop, FlaskConical } from 'lucide-react';
 import clsx from 'clsx';
 import { createClient } from '@/utils/supabase/client';
 import { SUPPORTED_CURRENCIES, formatCurrencyAmount } from '@/utils/currency';
 import StatusModal from '@/components/hospital/StatusModal';
 import { EmailNotificationSettingsPanel } from '@/components/hospital/EmailNotificationSettingsPanel';
+import { CommonTestsSettingsPanel } from '@/components/hospital/CommonTestsSettingsPanel';
 import { updateSystemSettingsAction, listTrustedWorkstationsAction, authorizeCurrentWorkstationAction, revokeTrustedWorkstationAction } from '@/app/hospital/actions';
 import { formatDistance } from '@/utils/geofence';
 import { TvBroadcastModal } from '@/components/hospital/TvBroadcastModal';
@@ -29,7 +30,7 @@ export default function SystemSettingsPage() {
   const [detectingGps, setDetectingGps] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'financial' | 'payments' | 'insurance' | 'notifications' | 'geofence' | 'tv_broadcast' | 'data_management'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'financial' | 'payments' | 'insurance' | 'clinical_tests' | 'notifications' | 'geofence' | 'tv_broadcast' | 'data_management'>('general');
   const [isTvModalOpen, setIsTvModalOpen] = useState(false);
 
   const [form, setForm] = useState({
@@ -118,7 +119,7 @@ export default function SystemSettingsPage() {
           .filter((m: string) => m.length > 0),
         insurance_providers: (data.insurance_providers || ['NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct'])
           .map((p: string) => (typeof p === 'string' ? p.trim() : ''))
-          .filter((p: string) => p.length > 0),
+          .filter((p: string) => p.length > 0 && !p.startsWith('TVCODE:') && !p.startsWith('{')),
         geofence_enabled: data.geofence_enabled ?? false,
         geofence_latitude: (data.geofence_latitude && data.geofence_latitude !== 0) ? data.geofence_latitude : -15.3875,
         geofence_longitude: (data.geofence_longitude && data.geofence_longitude !== 0) ? data.geofence_longitude : 28.3228,
@@ -171,6 +172,10 @@ export default function SystemSettingsPage() {
   const handleAddInsuranceProvider = () => {
     if (!newInsuranceProvider.trim()) return;
     const formatted = newInsuranceProvider.trim();
+    if (formatted.startsWith('TVCODE:') || formatted.startsWith('{') || formatted.length > 150) {
+      setNewInsuranceProvider('');
+      return;
+    }
     if (!form.insurance_providers.includes(formatted)) {
       setForm(prev => ({ ...prev, insurance_providers: [...prev.insurance_providers, formatted] }));
     }
@@ -287,7 +292,7 @@ export default function SystemSettingsPage() {
       ...form,
       hospital_name: form.hospital_name.trim() || 'HMS Medical Center',
       payment_methods: form.payment_methods.map(m => m.trim()).filter(Boolean),
-      insurance_providers: form.insurance_providers.map(p => p.trim()).filter(Boolean),
+      insurance_providers: form.insurance_providers.map(p => p.trim()).filter((p) => Boolean(p) && !p.startsWith('TVCODE:') && !p.startsWith('{')),
       geofence_enforce_roles: form.geofence_enforce_roles.map(r => r.trim()).filter(Boolean),
       geofence_latitude: Number.isNaN(form.geofence_latitude) ? -15.3875 : form.geofence_latitude,
       geofence_longitude: Number.isNaN(form.geofence_longitude) ? 28.3228 : form.geofence_longitude,
@@ -422,6 +427,7 @@ export default function SystemSettingsPage() {
     { id: 'financial', label: 'Currency & Finance', icon: DollarSign },
     { id: 'payments', label: 'Payment Options', icon: CreditCard },
     { id: 'insurance', label: 'Insurance Providers', icon: Shield },
+    { id: 'clinical_tests', label: 'Common Medical Tests', icon: FlaskConical },
     { id: 'geofence', label: 'Geo-Fence & Security', icon: MapPin },
     { id: 'notifications', label: 'Email & Notifications', icon: Mail },
     { id: 'tv_broadcast', label: 'TV Broadcast', icon: Tv },
@@ -443,7 +449,7 @@ export default function SystemSettingsPage() {
         </div>
       </div>
 
-      {userRole !== 'ADMIN' && (
+      {!['ADMIN', 'SUPER_USER'].includes(userRole || '') && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl flex items-center gap-3">
           <ShieldAlert size={20} className="text-amber-600 shrink-0" />
           <p className="text-xs font-bold">
@@ -477,7 +483,7 @@ export default function SystemSettingsPage() {
       </div>
 
       {/* Settings Forms */}
-      {activeTab !== 'notifications' && (
+      {activeTab !== 'notifications' && activeTab !== 'clinical_tests' && (
         <form onSubmit={handleSubmit} className="space-y-8">
         {/* Tab 1: General & Branding */}
         {activeTab === 'general' && (
@@ -721,6 +727,12 @@ export default function SystemSettingsPage() {
                     placeholder="Add payment method (e.g. MOBILE_MONEY, CHEQUE)" 
                     value={newPaymentMethod}
                     onChange={e => setNewPaymentMethod(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddPaymentMethod();
+                      }
+                    }}
                     className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-brand-500/20 max-w-md w-full"
                   />
                   <button 
@@ -774,6 +786,12 @@ export default function SystemSettingsPage() {
                     placeholder="Add insurance provider (e.g. NHIMA, Sanlam)" 
                     value={newInsuranceProvider}
                     onChange={e => setNewInsuranceProvider(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddInsuranceProvider();
+                      }
+                    }}
                     className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-brand-500/20 max-w-md w-full"
                   />
                   <button 
@@ -1264,10 +1282,17 @@ export default function SystemSettingsPage() {
         </form>
       )}
 
-      {/* Tab 5: Email Notifications uses its own independent form. */}
+      {/* Tab: Common Medical Tests Configuration */}
+      {activeTab === 'clinical_tests' && (
+        <div className="animate-in fade-in duration-300">
+          <CommonTestsSettingsPanel userRole={userRole} />
+        </div>
+      )}
+
+      {/* Tab: Email Notifications uses its own independent form. */}
       {activeTab === 'notifications' && (
         <div className="animate-in fade-in duration-300">
-          <EmailNotificationSettingsPanel canEdit={userRole === 'ADMIN'} />
+          <EmailNotificationSettingsPanel canEdit={['ADMIN', 'SUPER_USER'].includes(userRole || '')} />
         </div>
       )}
 

@@ -46,6 +46,7 @@ export default function PatientsPage() {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<any>(null);
   const [status, setStatus] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   const pageSize = 10;
   const supabase = createClient();
@@ -60,20 +61,27 @@ export default function PatientsPage() {
 
   const fetchPatientMetrics = async () => {
     try {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
-      const [{ count: todayCount }, { count: insCount }] = await Promise.all([
+      const [{ data: authData }, { count: todayCount }, { count: insCount }] = await Promise.all([
+        supabase.auth.getUser(),
         supabase
           .from('patients')
           .select('*', { count: 'exact', head: true })
-          .gte('created_at', todayStart.toISOString()),
+          .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
         supabase
           .from('patients')
           .select('*', { count: 'exact', head: true })
           .not('insurance_provider', 'is', null)
           .neq('insurance_provider', '')
       ]);
+
+      if (authData?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+        setUserRole(profile?.role || 'STAFF');
+      }
 
       setAddedTodayCount(todayCount || 0);
       setInsuredCount(insCount || 0);
@@ -114,6 +122,10 @@ export default function PatientsPage() {
   };
 
   const handleDeletePatient = async (id: string, name: string) => {
+    if (userRole !== 'SUPER_USER') {
+      setStatus({ type: 'error', title: 'Unauthorized', message: 'Only Super Users can delete patient records.' });
+      return;
+    }
     if (confirm(`Are you sure you want to permanently delete patient ${name}?`)) {
       const res = await deletePatientAction(id);
       if (res.error) {
@@ -323,13 +335,15 @@ export default function PatientsPage() {
                           >
                             <Edit2 size={16} />
                           </button>
-                          <button 
-                            onClick={() => handleDeletePatient(patient.id, `${patient.first_name} ${patient.last_name}`)}
-                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                            title="Delete Patient"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {userRole === 'SUPER_USER' && (
+                            <button 
+                              onClick={() => handleDeletePatient(patient.id, `${patient.first_name} ${patient.last_name}`)}
+                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                              title="Delete Patient"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -21,7 +21,8 @@ import {
   Tv,
   Calendar,
   Trash2,
-  Layers
+  Layers,
+  ShieldCheck
 } from "lucide-react";
 import clsx from "clsx";
 import { useMobileNav } from "./mobile-nav-context";
@@ -78,6 +79,7 @@ const navGroups = [
       { name: "Rooms & Facilities", href: "/hospital/admin/rooms", icon: DoorOpen },
       { name: "HR & Staffing", href: "/hospital/hr", icon: Users },
       { name: "Reports & Analytics", href: "/hospital/reports", icon: LayoutDashboard },
+      { name: "Audit Trail", href: "/hospital/admin/audit", icon: ShieldCheck },
       { name: "Data Purge & Wipe", href: "/hospital/admin/data-management", icon: Trash2 },
     ]
   }

@@ -24,9 +24,12 @@ import {
   RefreshCw,
   Loader2,
   FileSpreadsheet,
+  ShieldAlert,
 } from 'lucide-react';
+import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import { formatCurrencyAmount } from '@/utils/currency';
+import { evaluateMedicalStock } from '@/utils/stockWarnings';
 import clsx from 'clsx';
 import { Pagination } from '@/components/ui/Pagination';
 import { usePagination } from '@/hooks/usePagination';
@@ -45,6 +48,8 @@ export default function FinanceDashboard() {
   const [payrollRecords, setPayrollRecords] = useState<any[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [checkingRole, setCheckingRole] = useState(true);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TransactionType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,10 +69,31 @@ export default function FinanceDashboard() {
   const supabase = createClient();
 
   useEffect(() => {
-    void fetchFinancialData();
-    void fetchSettings();
+    async function initAuth() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+          const role = profile?.role || 'STAFF';
+          setUserRole(role);
+          if (role === 'SUPER_USER') {
+            void fetchFinancialData();
+            void fetchSettings();
+          }
+        }
+      } catch (err) {
+        console.error('Error verifying user role:', err);
+      } finally {
+        setCheckingRole(false);
+      }
+    }
+    void initAuth();
 
-    // Subscribe to live financial and inventory channels
+    // Subscribe to live financial and inventory channels only if Super User
     const channel = supabase
       .channel('finance_dashboard_live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => void fetchFinancialData())
@@ -106,7 +132,7 @@ export default function FinanceDashboard() {
         supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
         supabase.from('payroll_records').select('*, profiles(first_name, last_name, staff_number, role)').order('created_at', { ascending: false }),
         supabase.from('purchase_orders').select('*, suppliers(name)').order('created_at', { ascending: false }),
-        supabase.from('inventory_items').select('*').order('name', { ascending: true }),
+        supabase.from('inventory_items').select('*').or('inventory_type.eq.MEDICAL,inventory_type.is.null').order('name', { ascending: true }),
         supabase.from('incomes').select('*').order('income_date', { ascending: false }),
       ]);
 
@@ -144,13 +170,12 @@ export default function FinanceDashboard() {
       0
     );
     const totalStockCount = inventoryItems.length;
-    const outOfStockCount = inventoryItems.filter((i) => (Number(i.stock_level) || 0) === 0).length;
-    const lowStockCount = inventoryItems.filter(
-      (i) => (Number(i.stock_level) || 0) > 0 && (Number(i.stock_level) || 0) <= (Number(i.reorder_level) || 50)
-    ).length;
-    const inStockCount = inventoryItems.filter(
-      (i) => (Number(i.stock_level) || 0) > (Number(i.reorder_level) || 50)
-    ).length;
+    const outOfStockCount = inventoryItems.filter((i) => evaluateMedicalStock(i).status === 'OUT_OF_STOCK').length;
+    const lowStockCount = inventoryItems.filter((i) => {
+      const evalRes = evaluateMedicalStock(i);
+      return evalRes.needsRestock || evalRes.isApproaching;
+    }).length;
+    const inStockCount = inventoryItems.filter((i) => evaluateMedicalStock(i).status === 'ADEQUATE').length;
 
     return {
       totalInvoiced,
@@ -323,6 +348,37 @@ export default function FinanceDashboard() {
       setEmailingReport(false);
     }
   };
+
+  if (checkingRole) {
+    return (
+      <div className="max-w-7xl mx-auto py-24 text-center">
+        <Loader2 className="animate-spin text-slate-500 mx-auto mb-3" size={28} />
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+          Verifying permissions...
+        </p>
+      </div>
+    );
+  }
+
+  if (userRole !== 'SUPER_USER') {
+    return (
+      <div className="max-w-xl mx-auto py-20 px-4 text-center">
+        <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-rose-200 shadow-sm">
+          <ShieldAlert size={32} />
+        </div>
+        <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Restricted Access</h1>
+        <p className="text-xs sm:text-sm text-slate-600 mb-6 font-medium leading-relaxed">
+          Revenue analytics, aggregated ledger performance, and EBITDA reporting are accessible exclusively to <strong>Super User</strong> accounts.
+        </p>
+        <Link
+          href="/hospital/dashboard"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors shadow-xs"
+        >
+          Return to Dashboard
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-12">

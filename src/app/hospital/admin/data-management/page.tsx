@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { createClient } from '@/utils/supabase/client';
 import {
   Trash2,
   AlertTriangle,
@@ -51,6 +53,8 @@ export default function AdminDataManagementPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [categories, setCategories] = useState<Record<PurgeCategoryKey, CategoryCountSummary> | null>(null);
   const [overallTotal, setOverallTotal] = useState(0);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const supabase = createClient();
 
   // Modal State
   const [activePurgeTarget, setActivePurgeTarget] = useState<CategoryCountSummary | null>(null);
@@ -65,15 +69,29 @@ export default function AdminDataManagementPage() {
     message: string;
   } | null>(null);
 
-  useEffect(() => {
-    loadCounts();
-  }, []);
-
   const loadCounts = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
 
     try {
+      const { data: authData } = await supabase.auth.getUser();
+      let role = 'STAFF';
+      if (authData?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+        role = profile?.role || 'STAFF';
+      }
+      setUserRole(role);
+
+      if (role !== 'SUPER_USER') {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       const res = await getDataCategoryCountsAction();
       setCategories(res.counts);
       setOverallTotal(res.overallTotal);
@@ -81,13 +99,17 @@ export default function AdminDataManagementPage() {
       setStatus({
         type: 'error',
         title: 'Access Restricted',
-        message: err?.message || 'Failed to load system data counts. Please ensure you are logged in as an Administrator.',
+        message: err?.message || 'Failed to load system data counts. Please ensure you are logged in as a Super User.',
       });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    void loadCounts();
+  }, []);
 
   const handleOpenPurgeModal = (category: CategoryCountSummary) => {
     setActivePurgeTarget(category);
@@ -150,6 +172,26 @@ export default function AdminDataManagementPage() {
     : [];
 
   const fullWipeTarget = categories ? categories['ALL_TRANSACTIONAL_DATA'] : null;
+
+  if (!loading && userRole && userRole !== 'SUPER_USER') {
+    return (
+      <div className="max-w-xl mx-auto py-20 px-4 text-center">
+        <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-rose-200 shadow-sm">
+          <ShieldAlert size={32} />
+        </div>
+        <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Access Restricted</h1>
+        <p className="text-xs sm:text-sm text-slate-600 mb-6 font-medium leading-relaxed">
+          System data purge operations, bulk entity cleanup, and handover reset tools are restricted exclusively to <strong>Super User</strong> accounts.
+        </p>
+        <Link
+          href="/hospital/dashboard"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors shadow-xs"
+        >
+          Return to Dashboard
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-16">

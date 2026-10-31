@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireRole } from '@/lib/auth';
 import { createAdminClient } from '@/utils/supabase/admin';
+import { evaluateMedicalStock } from '@/utils/stockWarnings';
 
 const recordExpenseSchema = z.object({
   title: z.string().trim().min(1, 'Expense title is required').max(150),
@@ -120,7 +121,7 @@ export async function recordIncomeAction(input: unknown) {
 
 export async function sendFinancialReportEmailAction(input: unknown) {
   try {
-    await requireRole(['ADMIN', 'ACCOUNTANT']);
+    await requireRole(['SUPER_USER']);
     const data = sendReportEmailSchema.parse(input);
     const adminSupabase = createAdminClient();
 
@@ -172,7 +173,8 @@ export async function sendFinancialReportEmailAction(input: unknown) {
         .lte('expense_date', endDate.split('T')[0]),
       adminSupabase
         .from('inventory_items')
-        .select('id, name, stock_level, unit_price, reorder_level'),
+        .select('id, name, stock_level, unit_price, reorder_level, inventory_type')
+        .or('inventory_type.eq.MEDICAL,inventory_type.is.null'),
       adminSupabase
         .from('incomes')
         .select('amount, category, title, income_date')
@@ -218,12 +220,12 @@ export async function sendFinancialReportEmailAction(input: unknown) {
     let lowStockCount = 0;
     let outOfStockCount = 0;
     (inventoryRes.data || []).forEach((item) => {
-      const qty = Number(item.stock_level) || 0;
+      const evalRes = evaluateMedicalStock(item);
+      const qty = Math.max(0, Number(item.stock_level) || 0);
       const price = Number(item.unit_price) || 0;
-      const reorder = Number(item.reorder_level) || 50;
       inventoryValuation += qty * price;
-      if (qty === 0) outOfStockCount++;
-      else if (qty <= reorder) lowStockCount++;
+      if (evalRes.status === 'OUT_OF_STOCK') outOfStockCount++;
+      else if (evalRes.needsRestock || evalRes.isApproaching) lowStockCount++;
     });
 
     const totalOutflows = payrollTotal + procurementTotal + generalExpensesTotal;

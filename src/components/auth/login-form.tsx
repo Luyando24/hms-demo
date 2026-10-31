@@ -24,6 +24,8 @@ import {
   Sparkles,
   Monitor,
   Wifi,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { setupPatientFirstTimePasswordAction } from "@/app/patient/login/actions";
 import { getSubdomainUrl } from "@/utils/subdomain";
@@ -347,6 +349,9 @@ function LoginContent({ audience, action }: LoginFormProps) {
   const [firstTimeLoading, setFirstTimeLoading] = useState(false);
   const [firstTimeError, setFirstTimeError] = useState<string | null>(null);
   const [firstTimeSuccess, setFirstTimeSuccess] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showFirstTimePassword, setShowFirstTimePassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleFirstTimeSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -521,12 +526,20 @@ function LoginContent({ audience, action }: LoginFormProps) {
                   />
                   <input
                     name="password"
-                    type="password"
+                    type={showFirstTimePassword ? "text" : "password"}
                     required
                     minLength={8}
                     placeholder="••••••••"
-                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3 pl-10 pr-4 text-xs font-bold text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
+                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3 pl-10 pr-10 text-xs font-bold text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowFirstTimePassword((prev) => !prev)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 rounded-lg transition-colors"
+                    aria-label={showFirstTimePassword ? "Hide password" : "Show password"}
+                  >
+                    {showFirstTimePassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 
@@ -541,12 +554,20 @@ function LoginContent({ audience, action }: LoginFormProps) {
                   />
                   <input
                     name="confirm_password"
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     required
                     minLength={8}
                     placeholder="••••••••"
-                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3 pl-10 pr-4 text-xs font-bold text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
+                    className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3 pl-10 pr-10 text-xs font-bold text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 rounded-lg transition-colors"
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 
@@ -826,14 +847,24 @@ function LoginContent({ audience, action }: LoginFormProps) {
                     <input
                       id={`${audience}-password`}
                       name="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       required
                       minLength={8}
                       maxLength={256}
                       autoComplete="current-password"
-                      className="w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3.5 pl-10 pr-4 text-[14px] tracking-widest text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 font-bold"
+                      className={`w-full rounded-2xl border border-transparent bg-[#f0f4f8] py-3.5 pl-10 pr-12 text-[14px] text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 font-bold ${
+                        showPassword ? 'tracking-normal' : 'tracking-widest'
+                      }`}
                       placeholder="••••••••"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1.5 rounded-xl transition-colors hover:bg-slate-200/50"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
                 </div>
 

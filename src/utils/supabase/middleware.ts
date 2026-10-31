@@ -270,7 +270,7 @@ export async function updateSession(request: NextRequest) {
       return helperResponse(NextResponse.redirect(redirectUrl))
     }
 
-    if (userRole !== 'ADMIN') {
+    if (userRole !== 'ADMIN' && userRole !== 'SUPER_USER') {
       const redirectUrl = getSubdomainUrl(
         landingDestination.subdomain,
         landingDestination.path,

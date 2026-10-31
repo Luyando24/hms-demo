@@ -24,6 +24,7 @@ import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { formatCurrencyAmount } from "@/utils/currency";
 import { playVoiceNotification } from "@/utils/voiceNotification";
+import { evaluateMedicalStock } from "@/utils/stockWarnings";
 import clsx from "clsx";
 
 interface AlertLog {
@@ -68,6 +69,7 @@ export default function HospitalDashboard() {
   const [alerts, setAlerts] = useState<AlertLog[]>([]);
   const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
   const [logFilter, setLogFilter] = useState<'ALL' | 'critical' | 'warning' | 'info'>('ALL');
+  const [userRole, setUserRole] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -99,6 +101,20 @@ export default function HospitalDashboard() {
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
       sevenDaysAgo.setHours(0, 0, 0, 0);
 
+      let currentRole = 'STAFF';
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+          currentRole = profile?.role || 'STAFF';
+          setUserRole(currentRole);
+        }
+      } catch (e) {
+        console.error('Error fetching user role on dashboard:', e);
+      }
+
+      const isSuperUserRole = currentRole === 'SUPER_USER';
+
       // Execute ALL dashboard queries in a single parallel Promise.all batch!
       const [
         { data: sysSettings },
@@ -120,12 +136,15 @@ export default function HospitalDashboard() {
         supabase.from('walkin_queue').select('*', { count: 'exact', head: true }).eq('status', 'WAITING').eq('priority', 'EMERGENCY'),
         supabase.from('beds').select('*', { count: 'exact', head: true }),
         supabase.from('admissions').select('*', { count: 'exact', head: true }).is('discharge_date', null),
-        supabase.from('payments').select('amount').gte('created_at', todayStart.toISOString()),
+        // Restrict revenue analytics query strictly to Super User
+        isSuperUserRole
+          ? supabase.from('payments').select('amount').gte('created_at', todayStart.toISOString())
+          : Promise.resolve({ data: [] as { amount: number }[] }),
         supabase.from('profiles').select('role'),
         supabase.from('walkin_queue').select('created_at').gte('created_at', sevenDaysAgo.toISOString()),
         supabase.from('admissions').select('admission_date').gte('admission_date', sevenDaysAgo.toISOString()),
         supabase.from('walkin_queue').select('*, patients(*)').order('created_at', { ascending: false }).limit(5),
-        supabase.from('inventory_items').select('*').order('stock_level', { ascending: true }).limit(5),
+        supabase.from('inventory_items').select('*').or('inventory_type.eq.MEDICAL,inventory_type.is.null').order('stock_level', { ascending: true }).limit(10),
         supabase.from('blood_inventory').select('*').order('quantity_units', { ascending: true }).limit(3),
         supabase.from('admissions').select('*, patients(*), beds(*)').order('admission_date', { ascending: false }).limit(4),
       ]);
@@ -211,18 +230,19 @@ export default function HospitalDashboard() {
       });
 
       (inventoryData || []).forEach(item => {
-        const stockLevel = item.stock_level || 0;
-        const reorderLevel = item.reorder_level || 10;
-        const isCritical = stockLevel <= reorderLevel;
-        liveAlerts.push({
-          id: `inv-${item.id}`,
-          title: `Low Stock: ${item.name} (${item.category || 'Pharmacy'})`,
-          category: 'INVENTORY',
-          time: formatTimeAgo(item.updated_at),
-          timestamp: item.updated_at || new Date().toISOString(),
-          level: isCritical ? 'critical' : 'warning',
-          details: `Current stock: ${stockLevel} ${item.unit || 'units'} (Reorder Level: ${reorderLevel}).`
-        });
+        const evalRes = evaluateMedicalStock(item);
+        if (evalRes.needsRestock || evalRes.isApproaching) {
+          const isCritical = evalRes.needsRestock;
+          liveAlerts.push({
+            id: `inv-${item.id}`,
+            title: `${evalRes.label}: ${item.name}`,
+            category: 'INVENTORY',
+            time: formatTimeAgo(item.updated_at),
+            timestamp: item.updated_at || new Date().toISOString(),
+            level: isCritical ? 'critical' : 'warning',
+            details: evalRes.message
+          });
+        }
       });
 
       (bloodData || []).forEach(item => {
@@ -333,24 +353,42 @@ export default function HospitalDashboard() {
           <p className="text-xs text-slate-400 font-bold">{Math.max(0, metrics.totalBeds - metrics.occupiedBeds)} beds available</p>
         </div>
 
-        {/* Today's Revenue Metric */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <TrendingUp size={24} strokeWidth={2.5} />
+        {/* Today's Revenue Metric (Strictly Super User Only) vs Operational Metric */}
+        {userRole === 'SUPER_USER' ? (
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <TrendingUp size={24} strokeWidth={2.5} />
+              </div>
+              <span className="flex items-center text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                Settled Today
+              </span>
             </div>
-            <span className="flex items-center text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
-              Settled Today
-            </span>
+            <h3 className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-1">Today&apos;s Revenue</h3>
+            <p className="text-3xl font-black text-slate-900">
+              {formatCurrencyAmount(metrics.todaysRevenue, currencyConfig.symbol, currencyConfig.position)}
+            </p>
+            <p className="text-xs text-emerald-600 font-bold mt-2 flex items-center gap-1">
+              <CheckCircle2 size={14} /> Payments Verified
+            </p>
           </div>
-          <h3 className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-1">Today&apos;s Revenue</h3>
-          <p className="text-3xl font-black text-slate-900">
-            {formatCurrencyAmount(metrics.todaysRevenue, currencyConfig.symbol, currencyConfig.position)}
-          </p>
-          <p className="text-xs text-emerald-600 font-bold mt-2 flex items-center gap-1">
-            <CheckCircle2 size={14} /> Payments Verified
-          </p>
-        </div>
+        ) : (
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                <Activity size={24} strokeWidth={2.5} />
+              </div>
+              <span className="flex items-center text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                OPD Queue
+              </span>
+            </div>
+            <h3 className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-1">Waiting Patients</h3>
+            <p className="text-3xl font-black text-slate-900">{metrics.activeErCases}</p>
+            <p className="text-xs text-blue-600 font-bold mt-2 flex items-center gap-1">
+              <CheckCircle2 size={14} /> Triage & Consultations Active
+            </p>
+          </div>
+        )}
 
         {/* Staff on Duty Metric */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">

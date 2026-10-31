@@ -24,6 +24,7 @@ import {
   playVoiceNotification,
   speakText
 } from '@/utils/voiceNotification';
+import { evaluateMedicalStock } from '@/utils/stockWarnings';
 
 export interface DashboardNotificationItem {
   id: string;
@@ -144,24 +145,28 @@ export function NotificationCenterDropdown() {
         });
       }
 
-      // 2. Fetch low stock inventory items
+      // 2. Fetch low stock medical inventory items
       const { data: lowStock } = await supabase
         .from('inventory_items')
-        .select('id, name, stock_level, unit')
-        .lte('stock_level', 5)
-        .limit(2);
+        .select('id, name, stock_level, reorder_level, unit, inventory_type')
+        .or('inventory_type.eq.MEDICAL,inventory_type.is.null')
+        .order('stock_level', { ascending: true })
+        .limit(6);
 
       if (lowStock) {
         lowStock.forEach((inv: any) => {
-          items.push({
-            id: `inv-${inv.id}`,
-            title: 'Critical Stock Alert',
-            message: `Low inventory for ${inv.name}: only ${inv.stock_level ?? 0} ${inv.unit || 'units'} remaining.`,
-            timestamp: 'System',
-            type: 'warning',
-            category: 'inventory',
-            read: false,
-          });
+          const evalRes = evaluateMedicalStock(inv);
+          if (evalRes.needsRestock || evalRes.isApproaching) {
+            items.push({
+              id: `inv-${inv.id}`,
+              title: `${evalRes.label}: ${inv.name}`,
+              message: evalRes.message,
+              timestamp: 'System',
+              type: evalRes.needsRestock ? 'warning' : 'info',
+              category: 'inventory',
+              read: false,
+            });
+          }
         });
       }
 

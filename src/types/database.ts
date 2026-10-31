@@ -17,7 +17,30 @@ export type Database = {
       [_ in never]: never
     }
     Views: {
-      [_ in never]: never
+      capital_items: {
+        Row: {
+          asset_tag: string | null
+          assigned_to: string | null
+          category: string | null
+          condition: string | null
+          created_at: string | null
+          department: string | null
+          id: string | null
+          last_maintenance: string | null
+          location: string | null
+          model_number: string | null
+          name: string | null
+          next_maintenance: string | null
+          notes: string | null
+          purchase_cost: number | null
+          purchase_date: string | null
+          serial_number: string | null
+          status: string | null
+          updated_at: string | null
+          warranty_expiry: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       graphql: {
@@ -39,6 +62,126 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          actor_name: string | null
+          actor_role: string | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          module: string
+          new_values: Json | null
+          old_values: Json | null
+          record_id: string | null
+          record_type: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_name?: string | null
+          actor_role?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          module: string
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          record_type?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_name?: string | null
+          actor_role?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          module?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          record_type?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      capital_item_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      common_test_types: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          default_reference_range: string | null
+          default_unit: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          price: number | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          default_reference_range?: string | null
+          default_unit?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          default_reference_range?: string | null
+          default_unit?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       inventory_categories: {
         Row: {
           created_at: string | null
@@ -391,9 +534,12 @@ export type Database = {
       }
       clinic_assets: {
         Row: {
+          asset_tag: string | null
+          assigned_to: string | null
           category: string
           condition: string | null
           created_at: string
+          department: string | null
           id: string
           last_maintenance: string | null
           location: string | null
@@ -405,11 +551,16 @@ export type Database = {
           purchase_date: string | null
           serial_number: string | null
           status: string | null
+          updated_at: string
+          warranty_expiry: string | null
         }
         Insert: {
+          asset_tag?: string | null
+          assigned_to?: string | null
           category: string
           condition?: string | null
           created_at?: string
+          department?: string | null
           id?: string
           last_maintenance?: string | null
           location?: string | null
@@ -421,11 +572,16 @@ export type Database = {
           purchase_date?: string | null
           serial_number?: string | null
           status?: string | null
+          updated_at?: string
+          warranty_expiry?: string | null
         }
         Update: {
+          asset_tag?: string | null
+          assigned_to?: string | null
           category?: string
           condition?: string | null
           created_at?: string
+          department?: string | null
           id?: string
           last_maintenance?: string | null
           location?: string | null
@@ -437,6 +593,8 @@ export type Database = {
           purchase_date?: string | null
           serial_number?: string | null
           status?: string | null
+          updated_at?: string
+          warranty_expiry?: string | null
         }
         Relationships: []
       }
@@ -1109,34 +1267,55 @@ export type Database = {
       }
       inventory_items: {
         Row: {
+          batch_number: string | null
           category: string
           created_at: string | null
+          dosage_form: string | null
+          expiry_date: string | null
           id: string
+          inventory_type: string
+          manufacturer: string | null
           name: string
           reorder_level: number | null
           stock_level: number | null
+          storage_condition: string | null
+          strength: string | null
           unit: string
           unit_price: number
           updated_at: string | null
         }
         Insert: {
+          batch_number?: string | null
           category: string
           created_at?: string | null
+          dosage_form?: string | null
+          expiry_date?: string | null
           id?: string
+          inventory_type?: string
+          manufacturer?: string | null
           name: string
           reorder_level?: number | null
           stock_level?: number | null
+          storage_condition?: string | null
+          strength?: string | null
           unit: string
           unit_price?: number
           updated_at?: string | null
         }
         Update: {
+          batch_number?: string | null
           category?: string
           created_at?: string | null
+          dosage_form?: string | null
+          expiry_date?: string | null
           id?: string
+          inventory_type?: string
+          manufacturer?: string | null
           name?: string
           reorder_level?: number | null
           stock_level?: number | null
+          storage_condition?: string | null
+          strength?: string | null
           unit?: string
           unit_price?: number
           updated_at?: string | null

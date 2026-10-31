@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { AuthorizationError, requireRole } from '@/lib/auth';
 import { createAdminClient } from '@/utils/supabase/admin';
+import { logAuditEvent } from '@/utils/auditLogger';
 
 export type PurgeCategoryKey =
   | 'PATIENTS'
@@ -32,7 +33,7 @@ export async function getDataCategoryCountsAction(): Promise<{
   counts: Record<PurgeCategoryKey, CategoryCountSummary>;
   overallTotal: number;
 }> {
-  await requireRole(['ADMIN']);
+  await requireRole(['SUPER_USER']);
   const adminSupabase = createAdminClient();
 
   // Try RPC first
@@ -260,7 +261,7 @@ export async function purgeDataCategoryAction(
   confirmationPhrase: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    await requireRole(['ADMIN']);
+    const { user } = await requireRole(['SUPER_USER']);
 
     const validCategories: PurgeCategoryKey[] = [
       'PATIENTS',
@@ -305,6 +306,13 @@ export async function purgeDataCategoryAction(
     });
 
     if (!rpcError && rpcResult && (rpcResult as any).success) {
+      void logAuditEvent({
+        userId: user.id,
+        action: 'DATA_PURGE',
+        module: 'ADMIN',
+        recordType: category,
+        metadata: { category, confirmationPhrase },
+      });
       revalidateAllHospitalPaths();
       return {
         success: true,
@@ -314,6 +322,14 @@ export async function purgeDataCategoryAction(
 
     // 2. Fallback: Direct Cascading Deletes via adminSupabase (Service Role)
     await executeFallbackPurge(adminSupabase, category);
+
+    void logAuditEvent({
+      userId: user.id,
+      action: 'DATA_PURGE',
+      module: 'ADMIN',
+      recordType: category,
+      metadata: { category, confirmationPhrase },
+    });
 
     revalidateAllHospitalPaths();
     return {

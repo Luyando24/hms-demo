@@ -120,7 +120,12 @@ export default function RegisterPatientModal({
           Array.isArray(settingsData.insurance_providers) &&
           settingsData.insurance_providers.length > 0
         ) {
-          setAdminProviders(settingsData.insurance_providers);
+          const cleanProviders = settingsData.insurance_providers.filter(
+            (p: string) => typeof p === 'string' && !p.startsWith('TVCODE:') && !p.startsWith('{')
+          );
+          if (cleanProviders.length > 0) {
+            setAdminProviders(cleanProviders);
+          }
         }
         if (roomsData) {
           setFacilityRooms(roomsData);

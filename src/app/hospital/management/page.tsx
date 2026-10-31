@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { FileText, Shield, Calendar, AlertTriangle, Plus, Search, ExternalLink, Download, Trash2, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { deleteClinicDocumentAction } from "@/app/hospital/actions";
 import clsx from "clsx";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
@@ -11,6 +12,7 @@ export default function ManagementDashboard() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [userRole, setUserRole] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -19,12 +21,39 @@ export default function ManagementDashboard() {
 
   const fetchDocuments = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('clinic_documents')
-      .select('*')
-      .order('expiry_date', { ascending: true });
+    const [{ data }, { data: authData }] = await Promise.all([
+      supabase
+        .from('clinic_documents')
+        .select('*')
+        .order('expiry_date', { ascending: true }),
+      supabase.auth.getUser()
+    ]);
+
+    if (authData?.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+      setUserRole(profile?.role || 'STAFF');
+    }
+
     if (data) setDocuments(data);
     setLoading(false);
+  };
+
+  const handleDeleteDocument = async (id: string, title: string) => {
+    if (userRole !== 'SUPER_USER') {
+      alert('Only Super Users are authorized to delete compliance documents.');
+      return;
+    }
+    if (!confirm(`Are you sure you want to permanently delete document "${title}"?`)) return;
+    const res = await deleteClinicDocumentAction(id);
+    if (!res.success) {
+      alert(res.error || 'Failed to delete document');
+    } else {
+      void fetchDocuments();
+    }
   };
 
   const filteredDocs = documents.filter(doc => 
@@ -165,9 +194,15 @@ export default function ManagementDashboard() {
                       <button className="p-2 hover:bg-slate-100 text-slate-400 rounded-lg transition-colors" title="Download">
                         <Download size={18} />
                       </button>
-                      <button className="p-2 hover:bg-rose-50 text-rose-600 rounded-lg transition-colors" title="Delete">
-                        <Trash2 size={18} />
-                      </button>
+                      {userRole === 'SUPER_USER' && (
+                        <button 
+                          onClick={() => handleDeleteDocument(doc.id, doc.title)}
+                          className="p-2 hover:bg-rose-50 text-rose-600 rounded-lg transition-colors" 
+                          title="Delete Document"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -27,9 +27,11 @@ import clsx from "clsx";
 import { createClient } from "@/utils/supabase/client";
 import ReportExportModal from "@/components/hospital/ReportExportModal";
 import { formatCurrencyAmount } from "@/utils/currency";
+import { evaluateMedicalStock } from "@/utils/stockWarnings";
 
 export default function ReportsDashboard() {
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [globalPeriod, setGlobalPeriod] = useState<string>('THIS_MONTH');
   const [currencyConfig, setCurrencyConfig] = useState<{ symbol: string, position: 'prefix' | 'suffix' }>({ symbol: '$', position: 'prefix' });
 
@@ -102,17 +104,36 @@ export default function ReportsDashboard() {
         startIso = new Date(now.getFullYear(), 0, 1).toISOString();
       }
 
+      let currentRole = 'STAFF';
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+          currentRole = profile?.role || 'STAFF';
+          setUserRole(currentRole);
+        }
+      } catch (e) {
+        console.error('Error fetching role in reports:', e);
+      }
+      const isSuper = currentRole === 'SUPER_USER';
+
       const [invoicesRes, payrollRes, patientsRes, bedsRes, admissionsRes, labRes, radRes, walkinRes, inventoryRes, incomesRes] = await Promise.all([
-        supabase.from('invoices').select('total_amount, paid_amount, status').gte('created_at', startIso),
-        supabase.from('payroll_records').select('net_salary').gte('created_at', startIso),
+        isSuper
+          ? supabase.from('invoices').select('total_amount, paid_amount, status').gte('created_at', startIso)
+          : Promise.resolve({ data: [] as { total_amount: number; paid_amount: number; status: string }[] }),
+        isSuper
+          ? supabase.from('payroll_records').select('net_salary').gte('created_at', startIso)
+          : Promise.resolve({ data: [] as { net_salary: number }[] }),
         supabase.from('patients').select('id', { count: 'exact', head: true }),
         supabase.from('beds').select('id, status'),
         supabase.from('admissions').select('id').eq('status', 'ADMITTED'),
         supabase.from('lab_orders').select('id', { count: 'exact', head: true }).gte('created_at', startIso),
         supabase.from('radiology_orders').select('id', { count: 'exact', head: true }).gte('created_at', startIso),
         supabase.from('walkin_queue').select('id', { count: 'exact', head: true }).gte('check_in_time', startIso),
-        supabase.from('inventory_items').select('id, name, stock_level, unit_price, reorder_level'),
-        supabase.from('incomes').select('amount').gte('created_at', startIso),
+        supabase.from('inventory_items').select('id, name, stock_level, unit_price, reorder_level, inventory_type').or('inventory_type.eq.MEDICAL,inventory_type.is.null'),
+        isSuper
+          ? supabase.from('incomes').select('amount').gte('created_at', startIso)
+          : Promise.resolve({ data: [] as { amount: number }[] }),
       ]);
 
       // Revenue Metrics
@@ -152,12 +173,12 @@ export default function ReportsDashboard() {
       let lowStock = 0;
       let outStock = 0;
       (inventoryRes.data || []).forEach((item) => {
-        const qty = Number(item.stock_level) || 0;
+        const evalRes = evaluateMedicalStock(item);
+        const qty = Math.max(0, Number(item.stock_level) || 0);
         const price = Number(item.unit_price) || 0;
-        const reorder = Number(item.reorder_level) || 50;
         stockVal += qty * price;
-        if (qty === 0) outStock++;
-        else if (qty <= reorder) lowStock++;
+        if (evalRes.status === 'OUT_OF_STOCK') outStock++;
+        else if (evalRes.needsRestock || evalRes.isApproaching) lowStock++;
       });
 
       const opdCount = walkinRes.count || 0;
@@ -219,11 +240,11 @@ export default function ReportsDashboard() {
   ];
 
   const standardReports = [
-    { key: 'financial', name: 'Monthly Financial Audit & Revenue Log', icon: FileSpreadsheet, type: 'XLSX / CSV / PDF' },
+    ...(userRole === 'SUPER_USER' ? [{ key: 'financial', name: 'Monthly Financial Audit & Revenue Log', icon: FileSpreadsheet, type: 'XLSX / CSV / PDF' }] : []),
     { key: 'patients', name: 'Patient Directory & Census Summary', icon: FilePieChart, type: 'CSV / PDF' },
     { key: 'inventory', name: 'Pharmacy & Stock Inventory Log', icon: FileSpreadsheet, type: 'CSV / XLSX' },
     { key: 'laboratory', name: 'Laboratory Specimen & Test Worklist', icon: FlaskConical, type: 'CSV / PDF' },
-    { key: 'staff', name: 'Staff Workforce & Payroll Audit', icon: Users, type: 'CSV / PDF' },
+    { key: 'staff', name: 'Staff Workforce & Attendance Audit', icon: Users, type: 'CSV / PDF' },
     { key: 'radiology', name: 'Radiology PACS Diagnostic Log', icon: Radio, type: 'CSV / XLSX' },
   ];
 
@@ -246,41 +267,67 @@ export default function ReportsDashboard() {
             <option value="THIS_YEAR">Period: This Year (YTD)</option>
           </select>
 
-          <button 
-            onClick={() => setActiveExportReport({ name: 'Investor EBITDA & Financial Prospectus', key: 'investor_prospectus' })}
-            className="bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-md flex items-center gap-2"
-          >
-            <Download size={16} />
-            Export Investor Deck
-          </button>
+          {userRole === 'SUPER_USER' && (
+            <button 
+              onClick={() => setActiveExportReport({ name: 'Investor EBITDA & Financial Prospectus', key: 'investor_prospectus' })}
+              className="bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition-colors shadow-md flex items-center gap-2 cursor-pointer"
+            >
+              <Download size={16} />
+              Export Investor Deck
+            </button>
+          )}
         </div>
       </div>
 
       {/* Investor & Executive KPI Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Total Gross Revenue</p>
-          <p className="text-2xl font-black text-slate-900">
-            {formatCurrencyAmount(analytics.totalRevenue, currencyConfig.symbol, currencyConfig.position)}
-          </p>
-          <p className="text-xs text-slate-500 font-bold mt-2">Gross Patient Billing</p>
-        </div>
+        {userRole === 'SUPER_USER' ? (
+          <>
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Total Gross Revenue</p>
+              <p className="text-2xl font-black text-slate-900">
+                {formatCurrencyAmount(analytics.totalRevenue, currencyConfig.symbol, currencyConfig.position)}
+              </p>
+              <p className="text-xs text-slate-500 font-bold mt-2">Gross Patient Billing</p>
+            </div>
 
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-          <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-2">Collected Cash Flow</p>
-          <p className="text-2xl font-black text-emerald-600">
-            {formatCurrencyAmount(analytics.collectedRevenue, currencyConfig.symbol, currencyConfig.position)}
-          </p>
-          <p className="text-xs text-emerald-600 font-bold mt-2">Realized Collections</p>
-        </div>
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+              <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-2">Collected Cash Flow</p>
+              <p className="text-2xl font-black text-emerald-600">
+                {formatCurrencyAmount(analytics.collectedRevenue, currencyConfig.symbol, currencyConfig.position)}
+              </p>
+              <p className="text-xs text-emerald-600 font-bold mt-2">Realized Collections</p>
+            </div>
 
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-          <p className="text-[11px] font-bold text-brand-600 uppercase tracking-wider mb-2">Estimated EBITDA</p>
-          <p className="text-2xl font-black text-brand-600">
-            {formatCurrencyAmount(analytics.ebitda, currencyConfig.symbol, currencyConfig.position)}
-          </p>
-          <p className="text-xs text-brand-600 font-bold mt-2">Net Operating Earnings</p>
-        </div>
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+              <p className="text-[11px] font-bold text-brand-600 uppercase tracking-wider mb-2">Estimated EBITDA</p>
+              <p className="text-2xl font-black text-brand-600">
+                {formatCurrencyAmount(analytics.ebitda, currencyConfig.symbol, currencyConfig.position)}
+              </p>
+              <p className="text-xs text-brand-600 font-bold mt-2">Net Operating Earnings</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Patient Census</p>
+              <p className="text-2xl font-black text-slate-900">{analytics.totalPatients}</p>
+              <p className="text-xs text-slate-500 font-bold mt-2">Registered Patients</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+              <p className="text-[11px] font-bold text-blue-600 uppercase tracking-wider mb-2">Active Inpatients</p>
+              <p className="text-2xl font-black text-blue-600">{analytics.activeInpatients}</p>
+              <p className="text-xs text-blue-600 font-bold mt-2">Current Admissions</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+              <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider mb-2">Diagnostic Tests</p>
+              <p className="text-2xl font-black text-amber-600">{analytics.labOrdersCount + analytics.radiologyOrdersCount}</p>
+              <p className="text-xs text-amber-600 font-bold mt-2">Lab & Radiology Orders</p>
+            </div>
+          </>
+        )}
 
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
           <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-2">Medical Stock Asset</p>
@@ -293,7 +340,7 @@ export default function ReportsDashboard() {
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-          <p className="text-[11px] font-bold text-purple-600 uppercase tracking-wider mb-2">Bed Occupancy ROI</p>
+          <p className="text-[11px] font-bold text-purple-600 uppercase tracking-wider mb-2">Bed Occupancy Rate</p>
           <p className="text-2xl font-black text-purple-600">{analytics.occupancyRate}%</p>
           <p className="text-xs text-purple-600 font-bold mt-2">{analytics.activeInpatients} Inpatient Stays</p>
         </div>

@@ -32,50 +32,55 @@ export async function checkIsAdmin(): Promise<boolean> {
 
 const TV_CODE_PREFIX = 'TVCODE:';
 
-async function getSystemSettingsTvCodes(): Promise<{ settingsId: string; codes: TvCodeItem[]; rawProviders: string[] }> {
-  const adminSupabase = createAdminClient();
-  const { data } = await adminSupabase
-    .from('system_settings')
-    .select('id, insurance_providers')
-    .limit(1)
-    .maybeSingle();
+async function syncAndCleanLegacyTvCodes(adminSupabase: any) {
+  try {
+    const { data } = await adminSupabase
+      .from('system_settings')
+      .select('id, insurance_providers')
+      .limit(1)
+      .maybeSingle();
 
-  const rawProviders = data?.insurance_providers || [];
-  const tvCodes: TvCodeItem[] = [];
+    if (!data?.insurance_providers || !Array.isArray(data.insurance_providers)) return;
+    const raw = data.insurance_providers as string[];
+    const hasLegacy = raw.some((item) => typeof item === 'string' && item.startsWith(TV_CODE_PREFIX));
+    if (!hasLegacy) return;
 
-  for (const item of rawProviders) {
-    if (item.startsWith(TV_CODE_PREFIX)) {
-      try {
-        const parsed = JSON.parse(item.slice(TV_CODE_PREFIX.length));
-        if (parsed && parsed.code) {
-          tvCodes.push(parsed);
+    // Migrate any legacy TV codes to tv_broadcast_codes table
+    for (const item of raw) {
+      if (typeof item === 'string' && item.startsWith(TV_CODE_PREFIX)) {
+        try {
+          const parsed = JSON.parse(item.slice(TV_CODE_PREFIX.length));
+          if (parsed && parsed.code) {
+            const { data: existing } = await adminSupabase
+              .from('tv_broadcast_codes')
+              .select('id')
+              .eq('code', parsed.code)
+              .maybeSingle();
+            if (!existing) {
+              await adminSupabase.from('tv_broadcast_codes').insert({
+                code: parsed.code,
+                name: parsed.name || 'Smart TV Display',
+                is_active: parsed.is_active ?? true,
+                created_at: parsed.created_at || new Date().toISOString(),
+                last_connected_at: parsed.last_connected_at || null,
+              });
+            }
+          }
+        } catch {
+          // Skip malformed entries
         }
-      } catch {
-        // Skip invalid entries
       }
     }
-  }
 
-  return {
-    settingsId: data?.id || '',
-    codes: tvCodes,
-    rawProviders,
-  };
-}
-
-async function saveSystemSettingsTvCodes(tvCodes: TvCodeItem[]) {
-  const adminSupabase = createAdminClient();
-  const { settingsId, rawProviders } = await getSystemSettingsTvCodes();
-
-  const nonTvItems = rawProviders.filter((p) => !p.startsWith(TV_CODE_PREFIX));
-  const newTvItems = tvCodes.map((c) => `${TV_CODE_PREFIX}${JSON.stringify(c)}`);
-  const updatedProviders = [...nonTvItems, ...newTvItems];
-
-  if (settingsId) {
+    // Clean system_settings.insurance_providers so it contains ONLY legitimate insurance provider names
+    const cleaned = raw.filter((item) => typeof item === 'string' && !item.startsWith(TV_CODE_PREFIX) && item.trim().length > 0);
+    const finalProviders = cleaned.length > 0 ? cleaned : ['NHIMA', 'Prudential', 'Sanlam', 'Madison Health', 'Professional Life', 'Medland Direct'];
     await adminSupabase
       .from('system_settings')
-      .update({ insurance_providers: updatedProviders })
-      .eq('id', settingsId);
+      .update({ insurance_providers: finalProviders })
+      .eq('id', data.id);
+  } catch (err) {
+    console.error('Error during legacy TV code sync/cleanup:', err);
   }
 }
 
@@ -85,24 +90,30 @@ export async function generateTvBroadcastCode(displayName: string = 'OPD Waiting
     return { ok: false, error: 'Unauthorized: Only Administrators can generate TV connection codes.' };
   }
 
+  const adminSupabase = createAdminClient();
+  await syncAndCleanLegacyTvCodes(adminSupabase);
+
   const randomDigits = Math.floor(100000 + Math.random() * 900000).toString();
   const code = `TV-${randomDigits}`;
-  const newItem: TvCodeItem = {
-    id: `tv-${Date.now()}-${randomDigits}`,
-    code,
-    name: displayName || 'OPD Waiting Room TV',
-    is_active: true,
-    created_at: new Date().toISOString(),
-    last_connected_at: null,
-  };
 
-  const { codes } = await getSystemSettingsTvCodes();
-  const updatedCodes = [newItem, ...codes];
-  await saveSystemSettingsTvCodes(updatedCodes);
+  const { data, error } = await (adminSupabase as any)
+    .from('tv_broadcast_codes')
+    .insert({
+      code,
+      name: displayName?.trim() || 'OPD Waiting Room TV',
+      is_active: true,
+    })
+    .select('id, code, name, is_active, created_at, last_connected_at')
+    .single();
+
+  if (error || !data) {
+    console.error('Failed to insert TV broadcast code into tv_broadcast_codes table:', error);
+    return { ok: false, error: error?.message || 'Failed to generate TV broadcast code.' };
+  }
 
   return {
     ok: true,
-    data: newItem,
+    data: data as TvCodeItem,
   };
 }
 
@@ -112,9 +123,15 @@ export async function revokeTvBroadcastCode(id: string) {
     return { ok: false, error: 'Unauthorized: Only Administrators can revoke TV connection codes.' };
   }
 
-  const { codes } = await getSystemSettingsTvCodes();
-  const updatedCodes = codes.map((c) => (c.id === id || c.code === id ? { ...c, is_active: false } : c));
-  await saveSystemSettingsTvCodes(updatedCodes);
+  const adminSupabase = createAdminClient();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const query = (adminSupabase as any).from('tv_broadcast_codes').update({ is_active: false });
+  const { error } = isUuid ? await query.eq('id', id) : await query.eq('code', id);
+
+  if (error) {
+    console.error('Error revoking TV broadcast code:', error);
+    return { ok: false, error: error.message };
+  }
 
   return { ok: true };
 }
@@ -125,8 +142,20 @@ export async function getTvBroadcastCodes() {
     return { ok: false, error: 'Unauthorized', data: [] };
   }
 
-  const { codes } = await getSystemSettingsTvCodes();
-  return { ok: true, data: codes };
+  const adminSupabase = createAdminClient();
+  await syncAndCleanLegacyTvCodes(adminSupabase);
+
+  const { data, error } = await (adminSupabase as any)
+    .from('tv_broadcast_codes')
+    .select('id, code, name, is_active, created_at, last_connected_at')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching TV broadcast codes:', error);
+    return { ok: false, error: error.message, data: [] };
+  }
+
+  return { ok: true, data: (data || []) as TvCodeItem[] };
 }
 
 export async function verifyTvBroadcastCode(code: string) {
@@ -135,29 +164,36 @@ export async function verifyTvBroadcastCode(code: string) {
   }
 
   const cleanCode = code.trim().toUpperCase();
-  const { codes } = await getSystemSettingsTvCodes();
-  const matched = codes.find((c) => c.code.toUpperCase() === cleanCode);
+  const adminSupabase = createAdminClient();
 
-  if (!matched) {
+  const { data, error } = await (adminSupabase as any)
+    .from('tv_broadcast_codes')
+    .select('id, code, name, is_active')
+    .ilike('code', cleanCode)
+    .maybeSingle();
+
+  if (error || !data) {
     return {
       valid: false,
       message: 'Invalid TV connection code. Please check the code and try again.',
     };
   }
 
-  if (!matched.is_active) {
+  if (!data.is_active) {
     return {
       valid: false,
       message: 'This TV connection code was revoked by an Administrator. Please request a new activation code.',
     };
   }
 
-  matched.last_connected_at = new Date().toISOString();
-  void saveSystemSettingsTvCodes(codes);
+  await (adminSupabase as any)
+    .from('tv_broadcast_codes')
+    .update({ last_connected_at: new Date().toISOString() })
+    .eq('id', data.id);
 
   return {
     valid: true,
-    name: matched.name,
+    name: data.name,
     code: cleanCode,
   };
 }
@@ -168,17 +204,22 @@ export async function checkTvCodeStatus(code: string): Promise<{ valid: boolean;
   }
 
   const cleanCode = code.trim().toUpperCase();
-  const { codes } = await getSystemSettingsTvCodes();
-  const matched = codes.find((c) => c.code.toUpperCase() === cleanCode);
+  const adminSupabase = createAdminClient();
 
-  if (!matched) {
+  const { data, error } = await (adminSupabase as any)
+    .from('tv_broadcast_codes')
+    .select('id, code, name, is_active, last_connected_at')
+    .ilike('code', cleanCode)
+    .maybeSingle();
+
+  if (error || !data) {
     return {
       valid: false,
       message: 'This TV connection code does not exist.',
     };
   }
 
-  if (!matched.is_active) {
+  if (!data.is_active) {
     return {
       valid: false,
       message: 'This TV connection code was manually revoked by an Administrator.',
@@ -187,15 +228,17 @@ export async function checkTvCodeStatus(code: string): Promise<{ valid: boolean;
 
   // Throttled update of last_connected_at (at most once every 5 minutes to avoid excessive DB writes)
   const now = Date.now();
-  const lastConnectedTime = matched.last_connected_at ? new Date(matched.last_connected_at).getTime() : 0;
+  const lastConnectedTime = data.last_connected_at ? new Date(data.last_connected_at).getTime() : 0;
   if (now - lastConnectedTime > 5 * 60 * 1000) {
-    matched.last_connected_at = new Date(now).toISOString();
-    void saveSystemSettingsTvCodes(codes);
+    void (adminSupabase as any)
+      .from('tv_broadcast_codes')
+      .update({ last_connected_at: new Date(now).toISOString() })
+      .eq('id', data.id);
   }
 
   return {
     valid: true,
-    name: matched.name,
+    name: data.name,
   };
 }
 

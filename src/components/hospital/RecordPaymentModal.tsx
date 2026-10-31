@@ -149,8 +149,13 @@ export default function RecordPaymentModal({
         Array.isArray(data.insurance_providers) &&
         data.insurance_providers.length > 0
       ) {
-        setAvailableInsurances(data.insurance_providers);
-        setInsuranceProvider(data.insurance_providers[0]);
+        const cleanProviders = data.insurance_providers.filter(
+          (p: string) => typeof p === 'string' && !p.startsWith('TVCODE:') && !p.startsWith('{')
+        );
+        if (cleanProviders.length > 0) {
+          setAvailableInsurances(cleanProviders);
+          setInsuranceProvider(cleanProviders[0]);
+        }
       }
     }
   };

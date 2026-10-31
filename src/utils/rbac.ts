@@ -1,6 +1,7 @@
 // Role-Based Access Control (RBAC) rules for Hospital Management System
 
 export type UserRole = 
+  | 'SUPER_USER'
   | 'ADMIN' 
   | 'DOCTOR' 
   | 'NURSE' 
@@ -19,13 +20,14 @@ export interface RoleLandingDestination {
 }
 
 export const ROLE_LANDING_DESTINATIONS: Record<UserRole, RoleLandingDestination> = {
+  SUPER_USER: { subdomain: 'admin', path: '/hospital/dashboard' },
   ADMIN: { subdomain: 'admin', path: '/hospital/dashboard' },
   DOCTOR: { subdomain: 'staff', path: '/hospital/opd' },
   NURSE: { subdomain: 'staff', path: '/hospital/ipd' },
   PHARMACIST: { subdomain: 'staff', path: '/hospital/inventory' },
   LAB_TECH: { subdomain: 'staff', path: '/hospital/laboratory' },
   RADIOLOGIST: { subdomain: 'staff', path: '/hospital/radiology' },
-  ACCOUNTANT: { subdomain: 'staff', path: '/hospital/finance' },
+  ACCOUNTANT: { subdomain: 'staff', path: '/hospital/billing' },
   RECEPTIONIST: { subdomain: 'staff', path: '/hospital/reception' },
   WAITING_ROOM: { subdomain: 'staff', path: '/hospital/queue-display' },
   STAFF: { subdomain: 'staff', path: '/hospital/dashboard' },
@@ -33,7 +35,7 @@ export const ROLE_LANDING_DESTINATIONS: Record<UserRole, RoleLandingDestination>
 };
 
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
-  ADMIN: [
+  SUPER_USER: [
     '/hospital/dashboard',
     '/hospital/reception',
     '/hospital/appointments',
@@ -55,6 +57,33 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/admin/rooms',
     '/hospital/admin/inventory-categories',
     '/hospital/admin/data-management',
+    '/hospital/admin/audit',
+    '/hospital/hr',
+    '/hospital/reports',
+    '/hospital/settings',
+    '/hospital/queue-display',
+  ],
+  ADMIN: [
+    '/hospital/dashboard',
+    '/hospital/reception',
+    '/hospital/appointments',
+    '/hospital/patients',
+    '/hospital/er',
+    '/hospital/ipd',
+    '/hospital/opd',
+    '/hospital/icu',
+    '/hospital/radiology',
+    '/hospital/laboratory',
+    '/hospital/inventory',
+    '/hospital/bloodbank',
+    '/hospital/billing',
+    '/hospital/assets',
+    '/hospital/management',
+    '/hospital/staff',
+    '/hospital/admin/departments',
+    '/hospital/admin/rooms',
+    '/hospital/admin/inventory-categories',
+    '/hospital/admin/audit',
     '/hospital/hr',
     '/hospital/reports',
     '/hospital/settings',
@@ -114,7 +143,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/appointments',
     '/hospital/patients',
     '/hospital/billing',
-    '/hospital/finance',
     '/hospital/reports',
     '/hospital/settings',
   ],
@@ -152,4 +180,38 @@ export function getRoleLandingDestination(
   if (!role) return null;
   const normalizedRole = role.toUpperCase() as UserRole;
   return ROLE_LANDING_DESTINATIONS[normalizedRole] ?? null;
+}
+
+/**
+ * Returns true if the user role is SUPER_USER.
+ */
+export function isSuperUser(role: string | undefined | null): boolean {
+  if (!role) return false;
+  return role.toUpperCase() === 'SUPER_USER';
+}
+
+/**
+ * Checks whether a given role is permitted to view revenue analytics, EBITDA, and financial ledgers.
+ * STRICT RULE: Only SUPER_USER has revenue analytics access.
+ */
+export function canAccessRevenueAnalytics(role: string | undefined | null): boolean {
+  return isSuperUser(role);
+}
+
+/**
+ * Checks whether a given role is permitted to execute sensitive deletions (e.g. data purge, assets, documents, patients).
+ * STRICT RULE: Only SUPER_USER has sensitive deletion permissions.
+ */
+export function canPerformSensitiveDeletions(role: string | undefined | null): boolean {
+  return isSuperUser(role);
+}
+
+/**
+ * Checks whether a given role is permitted to view system audit logs.
+ * Both SUPER_USER and ADMIN can review audit trails.
+ */
+export function canAccessAuditLogs(role: string | undefined | null): boolean {
+  if (!role) return false;
+  const upper = role.toUpperCase();
+  return upper === 'SUPER_USER' || upper === 'ADMIN';
 }
