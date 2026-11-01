@@ -149,13 +149,16 @@ export default function EditStaffModal({ isOpen, onClose, onSuccess, staffMember
                       onChange={e => setFormData({...formData, role: e.target.value})}
                       className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-bold appearance-none"
                     >
+                      <option value="SUPER_USER">Super User / Executive Admin</option>
+                      <option value="ADMIN">Administrator</option>
                       <option value="DOCTOR">Medical Doctor</option>
                       <option value="NURSE">Nurse / Clinical Staff</option>
                       <option value="RECEPTIONIST">Receptionist / Front Desk</option>
                       <option value="PHARMACIST">Pharmacist</option>
+                      <option value="LAB_TECH">Laboratory Technician</option>
+                      <option value="RADIOLOGIST">Radiologist / Imaging</option>
                       <option value="ACCOUNTANT">Accountant / Billing</option>
                       <option value="WAITING_ROOM">Waiting Room Display Kiosk</option>
-                      <option value="ADMIN">Administrator</option>
                     </select>
                   </div>
                 </div>

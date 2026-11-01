@@ -468,6 +468,8 @@ Initial Password: ${createdCredentials.tempPassword || 'Set via invite link'}`;
                         className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white transition-all"
                       >
                         <option value="" disabled>-- Select Staff Role --</option>
+                        <option value="SUPER_USER">Super User / Executive Admin</option>
+                        <option value="ADMIN">Administrator</option>
                         <option value="DOCTOR">Medical Doctor</option>
                         <option value="NURSE">Nurse / Clinical Staff</option>
                         <option value="RECEPTIONIST">Receptionist / Front Desk</option>
@@ -476,7 +478,6 @@ Initial Password: ${createdCredentials.tempPassword || 'Set via invite link'}`;
                         <option value="RADIOLOGIST">Radiologist / Imaging</option>
                         <option value="ACCOUNTANT">Accountant / Billing</option>
                         <option value="WAITING_ROOM">Waiting Room Display Kiosk</option>
-                        <option value="ADMIN">Administrator</option>
                       </select>
                     </div>
                   </div>

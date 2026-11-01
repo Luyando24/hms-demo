@@ -15,6 +15,7 @@ import {
   RefreshCw,
   KeyRound,
   DoorOpen,
+  ShieldAlert,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
@@ -40,8 +41,37 @@ export default function StaffDirectory() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   const supabase = createClient();
+
+  useEffect(() => {
+    async function loadCurrentUserRole() {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+
+        const role = (
+          profile?.role ||
+          authData.user.user_metadata?.role ||
+          (authData.user.app_metadata as any)?.role ||
+          ''
+        )
+          .toString()
+          .trim()
+          .toUpperCase();
+
+        if (role) {
+          setCurrentUserRole(role);
+        }
+      }
+    }
+    void loadCurrentUserRole();
+  }, [supabase]);
 
   useEffect(() => {
     fetchStaff();
@@ -108,13 +138,23 @@ export default function StaffDirectory() {
             <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
             Refresh
           </button>
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
-          >
-            <UserPlus size={14} />
-            Register New Staff
-          </button>
+          {currentUserRole === 'SUPER_USER' ? (
+            <button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
+            >
+              <UserPlus size={14} />
+              Register New Staff
+            </button>
+          ) : (
+            <span 
+              className="text-[11px] font-semibold text-slate-400 bg-slate-100 border border-slate-200/80 px-3 py-2 rounded-xl inline-flex items-center gap-1.5 cursor-not-allowed select-none"
+              title="Staff account registration is restricted exclusively to Super Users."
+            >
+              <ShieldAlert size={13} className="text-amber-500" />
+              Registration (Super User Only)
+            </span>
+          )}
         </div>
       </div>
 
@@ -144,13 +184,16 @@ export default function StaffDirectory() {
             className="w-full md:w-auto px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none"
           >
             <option value="ALL">All Staff Roles</option>
+            <option value="SUPER_USER">Super Users</option>
+            <option value="ADMIN">System Administrators</option>
             <option value="DOCTOR">Medical Doctors</option>
             <option value="NURSE">Nurses & Clinical Staff</option>
             <option value="RECEPTIONIST">Receptionists</option>
             <option value="PHARMACIST">Pharmacists</option>
+            <option value="LAB_TECH">Laboratory Technicians</option>
+            <option value="RADIOLOGIST">Radiologists & Imaging</option>
             <option value="ACCOUNTANT">Accountants & Billing</option>
             <option value="WAITING_ROOM">Waiting Room Displays</option>
-            <option value="ADMIN">System Administrators</option>
           </select>
         </div>
       </div>
@@ -205,6 +248,7 @@ export default function StaffDirectory() {
                       <div className="space-y-0.5">
                         <span className={clsx(
                           "px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase tracking-wider inline-flex items-center gap-1",
+                          member.role === 'SUPER_USER' ? "bg-amber-50 text-amber-900 border border-amber-300 font-bold" :
                           member.role === 'DOCTOR' ? "bg-purple-50 text-purple-700 border border-purple-200/60" :
                           member.role === 'NURSE' ? "bg-blue-50 text-blue-700 border border-blue-200/60" :
                           member.role === 'ADMIN' ? "bg-rose-50 text-rose-700 border border-rose-200/60" :
@@ -213,13 +257,14 @@ export default function StaffDirectory() {
                         )}>
                           <span className={clsx(
                             "w-1 h-1 rounded-full",
+                            member.role === 'SUPER_USER' ? "bg-amber-600" :
                             member.role === 'DOCTOR' ? "bg-purple-500" :
                             member.role === 'NURSE' ? "bg-blue-500" :
                             member.role === 'ADMIN' ? "bg-rose-500" :
                             member.role === 'WAITING_ROOM' ? "bg-amber-500" :
                             "bg-slate-400"
                           )} />
-                          {member.role || 'STAFF'}
+                          {member.role === 'SUPER_USER' ? 'SUPER USER' : (member.role || 'STAFF')}
                         </span>
                         <p className="text-xs font-mono font-semibold text-slate-800 tracking-tight">
                           {staffIdDisplay}

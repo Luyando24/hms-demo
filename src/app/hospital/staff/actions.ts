@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { AuthorizationError, requireRole } from '@/lib/auth';
+import { AuthorizationError, requireRole, requireSuperUser } from '@/lib/auth';
 import { createAdminClient } from '@/utils/supabase/admin';
+import { logAuditEvent } from '@/utils/auditLogger';
 
 const staffSchema = z
   .object({
@@ -11,6 +12,7 @@ const staffSchema = z
     firstName: z.string().trim().min(1, 'First name is required').max(100),
     lastName: z.string().trim().min(1, 'Last name is required').max(100),
     role: z.enum([
+      'SUPER_USER',
       'ADMIN',
       'DOCTOR',
       'NURSE',
@@ -33,6 +35,7 @@ const staffSchema = z
 
 function generateSecureStaffId(role: string): string {
   const rolePrefixes: Record<string, string> = {
+    SUPER_USER: 'SUP-ADM',
     DOCTOR: 'MED-DOC',
     NURSE: 'CLN-NRS',
     PHARMACIST: 'PHM-PHR',
@@ -134,7 +137,8 @@ function actionError(error: unknown): string {
 
 export async function createStaffMember(input: unknown) {
   try {
-    await requireRole(['ADMIN']);
+    // Only SUPER_USER has permission to register staff accounts
+    await requireSuperUser();
     const formData = staffSchema.parse(input);
     const assignedStaffNumber =
       (formData.staffNumber && formData.staffNumber.trim()) ||
@@ -225,6 +229,22 @@ export async function createStaffMember(input: unknown) {
       await adminSupabase.auth.admin.deleteUser(staffId);
       throw profileError;
     }
+
+    // System-wide Audit Log for Staff Provisioning
+    await logAuditEvent({
+      action: 'REGISTER_STAFF_ACCOUNT',
+      module: 'STAFF_MANAGEMENT',
+      recordId: staffId,
+      recordType: 'profiles',
+      newValues: {
+        email: formData.email,
+        role: formData.role,
+        staffNumber: assignedStaffNumber,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        department: formData.department,
+      },
+    });
 
     revalidatePath('/hospital/staff');
     revalidatePath('/hospital/hr');

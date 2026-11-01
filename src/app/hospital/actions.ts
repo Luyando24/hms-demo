@@ -46,6 +46,7 @@ const staffUpdateSchema = z
     first_name: z.string().trim().min(1).max(100),
     last_name: z.string().trim().min(1).max(100),
     role: z.enum([
+      'SUPER_USER',
       'ADMIN',
       'DOCTOR',
       'NURSE',
@@ -54,6 +55,7 @@ const staffUpdateSchema = z
       'RADIOLOGIST',
       'ACCOUNTANT',
       'RECEPTIONIST',
+      'WAITING_ROOM',
       'STAFF',
     ]),
     staff_number: z.string().trim().min(1).max(60),
