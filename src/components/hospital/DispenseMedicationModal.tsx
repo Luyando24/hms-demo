@@ -93,6 +93,17 @@ export default function DispenseMedicationModal({
 
       // 2. Perform Patient Queue Routing
       if (patientId) {
+        // Mark existing pharmacy queue record for this patient as completed
+        const currentPharmDeptId = getDeptId('pharmacy');
+        if (currentPharmDeptId) {
+          await supabase
+            .from('walkin_queue')
+            .update({ status: 'COMPLETED' })
+            .eq('patient_id', patientId)
+            .eq('department_id', currentPharmDeptId)
+            .neq('status', 'COMPLETED');
+        }
+
         const { data: queueRow } = await supabase
           .from('walkin_queue')
           .select('token_number')

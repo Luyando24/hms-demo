@@ -275,6 +275,17 @@ export default function RecordPaymentModal({
       : 'Patient';
 
     if (patientId) {
+      // Mark existing billing queue record for this patient as completed
+      const billingDeptId = getDeptId('billing');
+      if (billingDeptId) {
+        await supabase
+          .from('walkin_queue')
+          .update({ status: 'COMPLETED' })
+          .eq('patient_id', patientId)
+          .eq('department_id', billingDeptId)
+          .neq('status', 'COMPLETED');
+      }
+
       const { data: queueRow } = await supabase
         .from('walkin_queue')
         .select('token_number')

@@ -137,6 +137,17 @@ export default function EnterLabResultModal({
     // 3. Department Forwarding & Queue Routing
     try {
       if (patientId) {
+        // Mark existing laboratory queue record for this patient as completed
+        const labDeptId = getDeptId('laboratory');
+        if (labDeptId) {
+          await supabase
+            .from('walkin_queue')
+            .update({ status: 'COMPLETED' })
+            .eq('patient_id', patientId)
+            .eq('department_id', labDeptId)
+            .neq('status', 'COMPLETED');
+        }
+
         if (nextStep === 'DOCTOR_REVIEW') {
           const opdDeptId = getDeptId('opd');
           if (opdDeptId) {

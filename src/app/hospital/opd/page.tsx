@@ -17,7 +17,8 @@ import {
   RefreshCw,
   UserCheck,
   Tv,
-  ArrowRight
+  ArrowRight,
+  FileText
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import clsx from "clsx";
@@ -42,7 +43,8 @@ export default function OutpatientDashboard() {
   const [activeRoomId, setActiveRoomId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
+  const [filterDept, setFilterDept] = useState<string>('OPD');
 
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [selectedQueueItem, setSelectedQueueItem] = useState<any>(null);
@@ -119,9 +121,9 @@ export default function OutpatientDashboard() {
       const [{ data: queueData }, { data: roomsData }, { data: docsData }] = await Promise.all([
         supabase
           .from('walkin_queue')
-          .select('*, patients(*), rooms(*)')
+          .select('*, patients(*), rooms(*), departments(id, name)')
           .order('created_at', { ascending: false })
-          .limit(100),
+          .limit(150),
         supabase
           .from('rooms')
           .select('id, name')
@@ -159,12 +161,34 @@ export default function OutpatientDashboard() {
     const p = item.patients;
     const matchesSearch = searchQuery === '' ||
       item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.token_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.reason?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p?.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p?.file_number?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesStatus = filterStatus === 'ALL' || item.status === filterStatus;
-    return matchesSearch && matchesStatus;
+    const matchesStatus =
+      filterStatus === 'ALL'
+        ? true
+        : filterStatus === 'ACTIVE'
+        ? item.status !== 'COMPLETED'
+        : item.status === filterStatus;
+
+    const deptName = (item.departments?.name || item.department || '').toLowerCase();
+    const matchesDept =
+      filterDept === 'ALL'
+        ? true
+        : filterDept === 'OPD'
+        ? !deptName ||
+          deptName.includes('opd') ||
+          deptName.includes('outpatient') ||
+          deptName.includes('general') ||
+          deptName.includes('nurs') ||
+          deptName.includes('triage') ||
+          deptName.includes('consult')
+        : deptName.includes(filterDept.toLowerCase());
+
+    return matchesSearch && matchesStatus && matchesDept;
   });
 
   const {
@@ -324,20 +348,42 @@ export default function OutpatientDashboard() {
       {/* Main Queue Table */}
       <section className="space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <h2 className="text-base font-bold text-slate-900">OPD Consultation Queue</h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-base font-bold text-slate-900">OPD Consultation Queue</h2>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+              {filteredQueue.length} {filteredQueue.length === 1 ? 'patient' : 'patients'}
+            </span>
+          </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Department Scope Filter */}
+            <select
+              value={filterDept}
+              onChange={(e) => setFilterDept(e.target.value)}
+              className="bg-white border border-slate-200 text-xs font-semibold rounded-xl px-3 py-2 text-slate-700 focus:outline-none shadow-xs"
+              title="Filter queue by department"
+            >
+              <option value="OPD">OPD & Triage Only</option>
+              <option value="ALL">All Hospital Queues</option>
+              <option value="Laboratory">Laboratory Routed</option>
+              <option value="Pharmacy">Pharmacy Routed</option>
+              <option value="Emergency">Emergency (ER)</option>
+              <option value="Billing">Billing Routed</option>
+            </select>
+
             {/* Status Filter */}
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
               className="bg-white border border-slate-200 text-xs font-semibold rounded-xl px-3 py-2 text-slate-700 focus:outline-none shadow-xs"
+              title="Filter queue by status"
             >
-              <option value="ALL">All Statuses</option>
+              <option value="ACTIVE">Active Queue (Waiting & In-Consult)</option>
+              <option value="ALL">All Records (Including Completed)</option>
               <option value="WAITING">Waiting Triage</option>
-              <option value="TRIAGED">Triaged</option>
+              <option value="TRIAGED">Triaged (Ready for Doctor)</option>
               <option value="CONSULTATION">In Consultation</option>
-              <option value="COMPLETED">Completed</option>
+              <option value="COMPLETED">Completed Visits</option>
             </select>
 
             <div className="relative group">
@@ -412,9 +458,18 @@ export default function OutpatientDashboard() {
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-1.5 text-slate-700">
-                      <DoorOpen size={13} className="text-slate-400" />
-                      <span className="text-xs font-semibold">{item.department || 'General OPD'}</span>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 text-slate-700">
+                        <DoorOpen size={13} className="text-slate-400 shrink-0" />
+                        <span className="text-xs font-semibold">
+                          {item.departments?.name || item.department || 'General OPD'}
+                        </span>
+                      </div>
+                      {item.reason && (
+                        <p className="text-[11px] text-slate-400 font-normal line-clamp-1 max-w-[220px]" title={item.reason}>
+                          {item.reason}
+                        </p>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3.5">
@@ -423,6 +478,7 @@ export default function OutpatientDashboard() {
                       item.status === 'COMPLETED' ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" :
                       item.status === 'CONSULTATION' ? "bg-blue-50 text-blue-700 border-blue-200/60" :
                       item.status === 'TRIAGED' ? "bg-indigo-50 text-indigo-700 border-indigo-200/60" :
+                      item.status === 'CALLING' ? "bg-purple-50 text-purple-700 border-purple-200/60" :
                       "bg-amber-50 text-amber-700 border-amber-200/60"
                     )}>
                       <span className={clsx(
@@ -430,9 +486,14 @@ export default function OutpatientDashboard() {
                         item.status === 'COMPLETED' ? "bg-emerald-500" :
                         item.status === 'CONSULTATION' ? "bg-blue-500 animate-pulse" :
                         item.status === 'TRIAGED' ? "bg-indigo-500" :
+                        item.status === 'CALLING' ? "bg-purple-500" :
                         "bg-amber-500"
                       )} />
-                      {item.status}
+                      {item.status === 'WAITING' ? 'Waiting Triage' :
+                       item.status === 'TRIAGED' ? 'Triaged' :
+                       item.status === 'CONSULTATION' ? 'In Consult' :
+                       item.status === 'CALLING' ? 'Calling Patient' :
+                       item.status}
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-right">
@@ -448,7 +509,7 @@ export default function OutpatientDashboard() {
                         </button>
                       )}
 
-                      {/* When Triaged or In Consult and viewed by a Nurse, display status badge (Never Start Consult) */}
+                      {/* When Triaged or In Consult and viewed by a Nurse, display status badge */}
                       {(item.status === 'TRIAGED' || item.status === 'CONSULTATION') && currentUserRole === 'NURSE' && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2.5 py-1 rounded-lg">
                           <Check size={12} className="text-indigo-600" />
@@ -456,15 +517,37 @@ export default function OutpatientDashboard() {
                         </span>
                       )}
 
-                      {/* Doctor Consultation is strictly for Doctors and Admins (NEVER Nurses) */}
-                      {currentUserRole !== 'NURSE' && (item.status === 'TRIAGED' || item.status === 'CONSULTATION' || item.status === 'WAITING') && item.patients && (
+                      {/* Doctor Consultation is strictly for Doctors and Admins */}
+                      {currentUserRole !== 'NURSE' && (item.status === 'TRIAGED' || item.status === 'CONSULTATION' || item.status === 'WAITING' || item.status === 'CALLING') && item.patients && (
                         <button 
                           onClick={() => void handleStartConsult(item)}
                           className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5 active:scale-98"
                         >
                           <Stethoscope size={13} />
-                          Start Consult
+                          {item.status === 'CONSULTATION' ? 'Continue Consult' : 'Start Consult'}
                         </button>
+                      )}
+
+                      {/* Completed Visits: Always provide View EHR / Notes and Completed status badge */}
+                      {item.status === 'COMPLETED' && (
+                        <div className="flex items-center gap-1.5">
+                          {item.patients?.id ? (
+                            <Link
+                              href={`/hospital/patients/${item.patients.id}`}
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80 px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all shadow-2xs"
+                              title="View patient history, clinical notes, and previous consultations"
+                            >
+                              <FileText size={12} className="text-slate-500" />
+                              View Notes
+                            </Link>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Walk-in</span>
+                          )}
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-1 rounded-lg">
+                            <CheckCircle2 size={11} className="text-emerald-600" />
+                            Completed
+                          </span>
+                        </div>
                       )}
                     </div>
                   </td>
