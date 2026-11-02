@@ -55,13 +55,39 @@ BEGIN
   SELECT id INTO v_user_id FROM auth.users WHERE lower(email) = lower(trim(v_email));
 
   IF v_user_id IS NOT NULL THEN
-    -- If user already exists in auth.users, promote them to SUPER_USER
+    -- If user already exists in auth.users, promote them to SUPER_USER and update password
     UPDATE auth.users
     SET 
-      raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object('role', 'SUPER_USER', 'staff_number', v_staff_number),
+      encrypted_password = crypt(v_password, gen_salt('bf', 10)),
+      email_confirmed_at = COALESCE(email_confirmed_at, now()),
+      raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email'), 'role', 'SUPER_USER', 'staff_number', v_staff_number),
       raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object('first_name', v_first_name, 'last_name', v_last_name),
       updated_at = now()
     WHERE id = v_user_id;
+
+    -- Ensure identity exists in auth.identities
+    INSERT INTO auth.identities (
+      id,
+      user_id,
+      identity_data,
+      provider,
+      provider_id,
+      last_sign_in_at,
+      created_at,
+      updated_at
+    ) VALUES (
+      v_user_id::text,
+      v_user_id,
+      jsonb_build_object('sub', v_user_id::text, 'email', lower(trim(v_email)), 'role', 'SUPER_USER'),
+      'email',
+      v_user_id::text,
+      now(),
+      now(),
+      now()
+    )
+    ON CONFLICT (provider, provider_id) DO UPDATE SET
+      identity_data = EXCLUDED.identity_data,
+      updated_at = now();
 
     UPDATE public.profiles
     SET 
@@ -96,7 +122,7 @@ BEGIN
       'authenticated',
       'authenticated',
       lower(trim(v_email)),
-      crypt(v_password, gen_salt('bf')),
+      crypt(v_password, gen_salt('bf', 10)),
       now(),
       jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email'), 'role', 'SUPER_USER', 'staff_number', v_staff_number),
       jsonb_build_object('first_name', v_first_name, 'last_name', v_last_name),
@@ -105,6 +131,30 @@ BEGIN
       '',
       ''
     );
+
+    -- Insert corresponding auth.identities record required by Supabase Auth GoTrue
+    INSERT INTO auth.identities (
+      id,
+      user_id,
+      identity_data,
+      provider,
+      provider_id,
+      last_sign_in_at,
+      created_at,
+      updated_at
+    ) VALUES (
+      v_user_id::text,
+      v_user_id,
+      jsonb_build_object('sub', v_user_id::text, 'email', lower(trim(v_email)), 'role', 'SUPER_USER'),
+      'email',
+      v_user_id::text,
+      now(),
+      now(),
+      now()
+    )
+    ON CONFLICT (provider, provider_id) DO UPDATE SET
+      identity_data = EXCLUDED.identity_data,
+      updated_at = now();
 
     INSERT INTO public.profiles (
       id,

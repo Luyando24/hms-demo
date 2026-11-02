@@ -222,7 +222,7 @@ export async function updateSession(request: NextRequest) {
       pathname.includes('/hr') ||
       pathname.includes('/staff')
 
-    if (isAdminOnlyRoute && userRole !== 'ADMIN') {
+    if (isAdminOnlyRoute && userRole !== 'ADMIN' && userRole !== 'SUPER_USER') {
       const defaultUrl = getSubdomainUrl(
         landingDestination.subdomain,
         landingDestination.path,

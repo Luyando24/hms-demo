@@ -46,7 +46,7 @@ function isRoleAllowedForAudience(
   }
 
   if (audience === 'admin') {
-    return role === 'ADMIN';
+    return role === 'ADMIN' || role === 'SUPER_USER';
   }
 
   return role !== 'PATIENT' && Boolean(ROLE_PERMISSIONS[role]);
@@ -183,7 +183,7 @@ export async function authenticateLogin(
         trustedWorkstationsEnabled: (settings as any).geofence_trusted_workstations_enabled ?? true,
       };
 
-      const isEnforced = role !== 'ADMIN' || !geofenceConfig.allowAdminBypass;
+      const isEnforced = (role !== 'ADMIN' && role !== 'SUPER_USER') || !geofenceConfig.allowAdminBypass;
       const isRoleTargeted = geofenceConfig.enforceRoles.some(
         (r) => r.toUpperCase() === role
       );
