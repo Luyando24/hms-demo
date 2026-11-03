@@ -65,7 +65,11 @@ BEGIN
       updated_at = now()
     WHERE id = v_user_id;
 
-    -- Ensure identity exists in auth.identities
+    -- Clean stale identities to prevent duplicate key or mismatch
+    DELETE FROM auth.identities 
+    WHERE user_id = v_user_id OR (provider = 'email' AND provider_id = v_user_id::text);
+
+    -- Ensure identity exists in auth.identities (id is UUID)
     INSERT INTO auth.identities (
       id,
       user_id,
@@ -76,18 +80,22 @@ BEGIN
       created_at,
       updated_at
     ) VALUES (
-      v_user_id::text,
       v_user_id,
-      jsonb_build_object('sub', v_user_id::text, 'email', lower(trim(v_email)), 'role', 'SUPER_USER'),
+      v_user_id,
+      jsonb_build_object(
+        'sub', v_user_id::text,
+        'email', lower(trim(v_email)),
+        'email_verified', true,
+        'role', 'SUPER_USER',
+        'first_name', v_first_name,
+        'last_name', v_last_name
+      ),
       'email',
       v_user_id::text,
       now(),
       now(),
       now()
-    )
-    ON CONFLICT (provider, provider_id) DO UPDATE SET
-      identity_data = EXCLUDED.identity_data,
-      updated_at = now();
+    );
 
     UPDATE public.profiles
     SET 
@@ -132,29 +140,37 @@ BEGIN
       ''
     );
 
-    -- Insert corresponding auth.identities record required by Supabase Auth GoTrue
-    INSERT INTO auth.identities (
-      id,
-      user_id,
-      identity_data,
-      provider,
-      provider_id,
-      last_sign_in_at,
-      created_at,
-      updated_at
-    ) VALUES (
-      v_user_id::text,
-      v_user_id,
-      jsonb_build_object('sub', v_user_id::text, 'email', lower(trim(v_email)), 'role', 'SUPER_USER'),
-      'email',
-      v_user_id::text,
-      now(),
-      now(),
-      now()
-    )
-    ON CONFLICT (provider, provider_id) DO UPDATE SET
-      identity_data = EXCLUDED.identity_data,
-      updated_at = now();
+  -- Clean stale identities to prevent duplicate key or mismatch
+  DELETE FROM auth.identities 
+  WHERE user_id = v_user_id OR (provider = 'email' AND provider_id = v_user_id::text);
+
+  -- Insert corresponding auth.identities record required by Supabase Auth GoTrue (id is UUID)
+  INSERT INTO auth.identities (
+    id,
+    user_id,
+    identity_data,
+    provider,
+    provider_id,
+    last_sign_in_at,
+    created_at,
+    updated_at
+  ) VALUES (
+    v_user_id,
+    v_user_id,
+    jsonb_build_object(
+      'sub', v_user_id::text,
+      'email', lower(trim(v_email)),
+      'email_verified', true,
+      'role', 'SUPER_USER',
+      'first_name', v_first_name,
+      'last_name', v_last_name
+    ),
+    'email',
+    v_user_id::text,
+    now(),
+    now(),
+    now()
+  );
 
     INSERT INTO public.profiles (
       id,
