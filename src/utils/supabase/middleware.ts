@@ -219,10 +219,18 @@ export async function updateSession(request: NextRequest) {
     const isAdminOnlyRoute =
       pathname.includes('/admin/') ||
       pathname.endsWith('/admin') ||
-      pathname.includes('/hr') ||
-      pathname.includes('/staff')
+      pathname.includes('/hr')
 
     if (isAdminOnlyRoute && userRole !== 'ADMIN' && userRole !== 'SUPER_USER') {
+      const defaultUrl = getSubdomainUrl(
+        landingDestination.subdomain,
+        landingDestination.path,
+      )
+      return helperResponse(NextResponse.redirect(defaultUrl))
+    }
+
+    // Staff directory is exclusively restricted to SUPER_USER
+    if (pathname.includes('/staff') && userRole !== 'SUPER_USER') {
       const defaultUrl = getSubdomainUrl(
         landingDestination.subdomain,
         landingDestination.path,
@@ -287,6 +295,24 @@ export async function updateSession(request: NextRequest) {
     if (!pathname.startsWith('/hospital/') && !isPublicRoute) {
       url.pathname = `/hospital${pathname}`
       return helperResponse(NextResponse.rewrite(url))
+    }
+
+    const effectivePath = url.pathname
+    // Staff directory is exclusively restricted to SUPER_USER
+    if (effectivePath.includes('/staff') && userRole !== 'SUPER_USER') {
+      const redirectUrl = getSubdomainUrl(
+        landingDestination.subdomain,
+        landingDestination.path,
+      )
+      return helperResponse(NextResponse.redirect(redirectUrl))
+    }
+
+    if (!isRouteAllowedForRole(userRole, effectivePath)) {
+      return helperResponse(
+        NextResponse.redirect(
+          getSubdomainUrl(landingDestination.subdomain, landingDestination.path),
+        ),
+      )
     }
 
     return supabaseResponse

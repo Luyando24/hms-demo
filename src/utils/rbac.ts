@@ -79,7 +79,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/hospital/billing',
     '/hospital/assets',
     '/hospital/management',
-    '/hospital/staff',
     '/hospital/admin/departments',
     '/hospital/admin/rooms',
     '/hospital/admin/inventory-categories',

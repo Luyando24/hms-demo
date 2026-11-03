@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { AuthorizationError, requireRole } from '@/lib/auth';
+import { AuthorizationError, requireRole, requireSuperUser } from '@/lib/auth';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { getSubdomainUrl } from '@/utils/subdomain';
 import { generateWorkstationToken, WORKSTATION_COOKIE_NAME } from '@/utils/workstation';
@@ -329,7 +329,7 @@ export async function deleteClinicDocumentAction(id: string) {
 
 export async function updateStaffAction(id: string, input: unknown) {
   try {
-    await requireRole(['ADMIN']);
+    await requireSuperUser();
     const staffId = uuidSchema.parse(id);
     const staffData = staffUpdateSchema.parse(input);
     const adminSupabase = createAdminClient();
@@ -390,7 +390,7 @@ export async function updateStaffAction(id: string, input: unknown) {
 
 export async function deleteStaffAction(id: string) {
   try {
-    const { user } = await requireRole(['ADMIN']);
+    const { user } = await requireSuperUser();
     const staffId = uuidSchema.parse(id);
     if (staffId === user.id) {
       throw new Error('You cannot delete your own administrator account.');

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { 
   Users, 
   UserPlus, 
@@ -73,20 +74,12 @@ export default function StaffDirectory() {
     void loadCurrentUserRole();
   }, [supabase]);
 
-  useEffect(() => {
-    fetchStaff();
-
-    const channel = supabase
-      .channel('staff_directory_live_channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => fetchStaff())
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentPage, searchQuery, roleFilter]);
-
   const fetchStaff = async () => {
+    if (currentUserRole && currentUserRole !== 'SUPER_USER') {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     const res = await getStaffDirectoryAction({
       page: currentPage,
@@ -108,6 +101,28 @@ export default function StaffDirectory() {
     setLoading(false);
   };
 
+  useEffect(() => {
+    if (currentUserRole && currentUserRole !== 'SUPER_USER') {
+      setLoading(false);
+      return;
+    }
+
+    if (currentUserRole === 'SUPER_USER') {
+      fetchStaff();
+    }
+
+    const channel = supabase
+      .channel('staff_directory_live_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        if (currentUserRole === 'SUPER_USER') fetchStaff();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentPage, searchQuery, roleFilter, currentUserRole]);
+
   const handleDeleteStaff = async (member: any) => {
     if (!confirm(`Are you sure you want to remove staff member ${member.first_name} ${member.last_name}?`)) return;
 
@@ -121,6 +136,28 @@ export default function StaffDirectory() {
   };
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  if (currentUserRole !== null && currentUserRole !== 'SUPER_USER') {
+    return (
+      <div className="max-w-xl mx-auto my-16 bg-white rounded-3xl p-8 border border-slate-200/80 shadow-sm text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
+          <ShieldAlert size={32} />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900">Restricted Access</h2>
+        <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+          The Staff Directory and personnel management console are exclusively restricted to Super Administrators.
+        </p>
+        <div className="pt-2">
+          <Link
+            href="/hospital/dashboard"
+            className="inline-flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-colors shadow-xs"
+          >
+            Return to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">

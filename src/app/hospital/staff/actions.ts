@@ -271,7 +271,7 @@ export async function changeStaffPasswordAction(input: {
   autoGenerate?: boolean;
 }) {
   try {
-    await requireRole(['ADMIN']);
+    await requireSuperUser();
     const adminSupabase = createAdminClient();
 
     if (!input.staffId) {
@@ -330,6 +330,7 @@ export async function getStaffDirectoryAction(params?: {
   searchQuery?: string;
 }) {
   try {
+    await requireSuperUser();
     const adminSupabase = createAdminClient();
     const page = Math.max(1, params?.page || 1);
     const pageSize = Math.max(1, params?.pageSize || 10);

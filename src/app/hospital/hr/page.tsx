@@ -25,6 +25,7 @@ import {
   Mail,
   Loader2,
   Send,
+  ShieldAlert,
 } from "lucide-react";
 import clsx from "clsx";
 import { createClient } from "@/utils/supabase/client";
@@ -104,6 +105,7 @@ export default function HRDashboard() {
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error', title: string, message: string } | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   const [currencyConfig, setCurrencyConfig] = useState<{ symbol: string, position: 'prefix' | 'suffix' }>({ symbol: '$', position: 'prefix' });
 
@@ -121,6 +123,31 @@ export default function HRDashboard() {
   const supabase = createClient();
 
   useEffect(() => {
+    async function loadCurrentUserRole() {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+
+        const role = (
+          profile?.role ||
+          authData.user.user_metadata?.role ||
+          (authData.user.app_metadata as any)?.role ||
+          ''
+        )
+          .toString()
+          .trim()
+          .toUpperCase();
+
+        if (role) {
+          setCurrentUserRole(role);
+        }
+      }
+    }
+    void loadCurrentUserRole();
     fetchHRData();
     fetchCurrencyConfig();
 
@@ -308,13 +335,23 @@ export default function HRDashboard() {
             <Calculator size={18} />
             Process Payroll
           </button>
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="bg-brand-600 text-white px-5 py-3 rounded-xl text-sm font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/20 flex items-center gap-2"
-          >
-            <Plus size={18} />
-            Register Staff
-          </button>
+          {currentUserRole === 'SUPER_USER' ? (
+            <button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-brand-600 text-white px-5 py-3 rounded-xl text-sm font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/20 flex items-center gap-2"
+            >
+              <Plus size={18} />
+              Register Staff
+            </button>
+          ) : (
+            <span 
+              className="text-xs font-semibold text-slate-400 bg-slate-200/60 border border-slate-300/70 px-4 py-3 rounded-xl inline-flex items-center gap-1.5 cursor-not-allowed select-none"
+              title="Staff account registration is restricted exclusively to Super Administrators."
+            >
+              <ShieldAlert size={15} className="text-amber-500" />
+              Registration (Super Admin Only)
+            </span>
+          )}
         </div>
       </div>
 
@@ -571,9 +608,11 @@ export default function HRDashboard() {
             <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/10 blur-2xl rounded-full pointer-events-none" />
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-black tracking-tight">Personnel Roster</h2>
-              <Link href="/hospital/staff" className="text-xs text-brand-400 hover:underline font-bold flex items-center gap-1">
-                Full Directory <ExternalLink size={12} />
-              </Link>
+              {currentUserRole === 'SUPER_USER' && (
+                <Link href="/hospital/staff" className="text-xs text-brand-400 hover:underline font-bold flex items-center gap-1">
+                  Full Directory <ExternalLink size={12} />
+                </Link>
+              )}
             </div>
             
             <div className="space-y-3">
@@ -607,11 +646,13 @@ export default function HRDashboard() {
         </div>
       </div>
 
-      <AddStaffModal 
-        isOpen={isAddModalOpen} 
-        onClose={() => setIsAddModalOpen(false)} 
-        onSuccess={fetchHRData} 
-      />
+      {currentUserRole === 'SUPER_USER' && (
+        <AddStaffModal 
+          isOpen={isAddModalOpen} 
+          onClose={() => setIsAddModalOpen(false)} 
+          onSuccess={fetchHRData} 
+        />
+      )}
 
       <ProcessPayrollModal 
         isOpen={isPayrollModalOpen}
